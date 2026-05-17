@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZeDMD Admin</title>
+<style>
+body { background:#121212; color:#e0e0e0; font-family:Arial,sans-serif; padding:20px; max-width:600px; margin:0 auto; }
+h1 { color:#4a9eff; }
+h2 { color:#aaa; font-size:1em; margin-top:20px; border-bottom:1px solid #333; padding-bottom:5px; }
+.section { background:#1e1e1e; border-radius:8px; padding:15px; margin-bottom:15px; }
+button { background:#007bff; color:#fff; border:none; padding:10px 16px; border-radius:4px; cursor:pointer; margin:4px 0; width:100%; }
+button:hover { background:#0056b3; }
+button.red { background:#dc3545; }
+button.green { background:#28a745; }
+button.grey { background:#555; }
+input[type=text], input[type=password], input[type=number], select {
+  background:#2c2c2c; color:#e0e0e0; border:1px solid #444;
+  padding:10px; border-radius:4px; width:100%; margin-bottom:8px; box-sizing:border-box;
+}
+input[type=file] { background:#2c2c2c; color:#e0e0e0; border:none; padding:8px; border-radius:4px; width:100%; margin-bottom:8px; }
+input[type=range] { width:100%; }
+.status { color:#aaa; font-size:0.85em; margin:5px 0; }
+.file-list { list-style:none; padding:0; }
+.file-list li { display:flex; justify-content:space-between; align-items:center; padding:6px; border-bottom:1px solid #333; font-size:0.85em; }
+label { display:block; font-size:0.9em; color:#aaa; margin-bottom:4px; margin-top:10px; }
+a.back { color:#4a9eff; text-decoration:none; display:block; margin-bottom:15px; }
+pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overflow-x:auto; }
+</style>
+</head>
+<body>
+<a class="back" href="/">&#x2190; Back to Main</a>
+<h1>&#x2699; ZeDMD Admin</h1>
+
+<!-- Restart -->
+<div class="section">
+  <h2>System</h2>
+  <button class="red" onclick="restartESP()">&#x21BA; Restart ESP</button>
+  <div class="status" id="restart-status"></div>
+</div>
+
+<!-- WiFi -->
+<div class="section">
+  <h2>WiFi Configuration</h2>
+  <label>SSID</label>
+  <input type="text" id="ssid">
+  <label>Password</label>
+  <input type="password" id="password">
+  <label>Port</label>
+  <input type="number" id="port" min="1" max="65535" value="3333">
+  <div class="status" id="wifi-status"></div>
+  <button onclick="saveWiFi()">Save WiFi</button>
+  <button class="red" onclick="resetWiFi()">Reset WiFi</button>
+</div>
+
+<!-- Display Settings -->
+<div class="section">
+  <h2>Display Settings</h2>
+  <label>RGB Order</label>
+  <select id="rgb-order" onchange="saveRGB()">
+    <option value="0">R, G, B</option>
+    <option value="1">B, R, G</option>
+    <option value="2">G, B, R</option>
+    <option value="3">R, B, G</option>
+    <option value="4">G, R, B</option>
+    <option value="5">B, G, R</option>
+  </select>
+  <label>Scaling Mode</label>
+  <select id="scaling-mode" onchange="saveScaling()"></select>
+  <div class="status" id="display-status"></div>
+  <button onclick="applyDisplay()">Apply Display Settings</button>
+</div>
+
+<!-- Transport -->
+<div class="section">
+  <h2>Transport</h2>
+  <label>Connection Type</label>
+  <select id="transport">
+    <option value="0">USB</option>
+    <option value="1">WiFi UDP</option>
+    <option value="2">WiFi TCP</option>
+    <option value="3">SPI</option>
+  </select>
+  <label>UDP Delay (ms)</label>
+  <input type="number" id="udp-delay" min="0" max="100" value="5">
+  <label>USB Packet Size Multiplier</label>
+  <input type="number" id="usb-size" min="1" max="8" value="4">
+  <div class="status" id="transport-status"></div>
+  <button onclick="saveTransportSettings()">Save Transport Settings</button>
+</div>
+
+<!-- Panel Settings -->
+<div class="section">
+  <h2>Panel Settings</h2>
+  <label>Clock Phase (0-3)</label>
+  <input type="number" id="clkphase" min="0" max="3" value="0">
+  <label>I2S Speed</label>
+  <input type="number" id="i2sspeed" min="1" max="20" value="8">
+  <label>Latch Blanking (1-4)</label>
+  <input type="number" id="latch" min="1" max="4" value="2">
+  <label>Min Refresh Rate</label>
+  <input type="number" id="minrefresh" min="1" max="120" value="30">
+  <label>Panel Driver</label>
+  <input type="number" id="driver" min="0" max="10" value="0">
+  <div class="status" id="panel-status"></div>
+  <button onclick="savePanelSettings()">Save Panel Settings</button>
+</div>
+
+<!-- Web File Update -->
+<div class="section">
+  <h2>Update Web Files</h2>
+  <p style="color:#aaa; font-size:0.85em;">Upload index.html or admin.html directly — no filesystem flash needed.</p>
+  <label>Select HTML file</label>
+  <input type="file" id="upload-html-file" accept=".html">
+  <button onclick="uploadHtmlFile()">&#x2191; Upload File</button>
+  <div class="status" id="upload-html-status"></div>
+</div>
+
+<!-- Information -->
+<div class="section">
+  <h2>Information</h2>
+  <div class="status" id="info-version"></div>
+  <label><input type="checkbox" id="debug-cb" onchange="toggleDebug()"> Show Debug Info</label>
+  <div id="debug-info" style="display:none">
+    <pre id="debug-content"></pre>
+  </div>
+</div>
+
+<script>
+window.onload = function() {
+  fetch('/get_config').then(function(r) { return r.json(); }).then(function(d) {
+    document.getElementById('ssid').value = d.ssid || '';
+    document.getElementById('port').value = d.port || 3333;
+    document.getElementById('rgb-order').value = d.rgbOrder || 0;
+    if (d.transport !== undefined) document.getElementById('transport').value = d.transport;
+    if (d.udpDelay !== undefined) document.getElementById('udp-delay').value = d.udpDelay;
+    if (d.usbSize !== undefined) document.getElementById('usb-size').value = d.usbSize;
+    if (d.panelClkphase !== undefined) document.getElementById('clkphase').value = d.panelClkphase;
+    if (d.panelI2sspeed !== undefined) document.getElementById('i2sspeed').value = d.panelI2sspeed;
+    if (d.panelLatchBlanking !== undefined) document.getElementById('latch').value = d.panelLatchBlanking;
+    if (d.panelMinRefreshRate !== undefined) document.getElementById('minrefresh').value = d.panelMinRefreshRate;
+    if (d.panelDriver !== undefined) document.getElementById('driver').value = d.panelDriver;
+    fetchScalingModes(d.scaleMode);
+  });
+  fetch('/get_version').then(function(r) { return r.text(); }).then(function(v) {
+    document.getElementById('info-version').innerText = 'Firmware: ' + v;
+  });
+};
+
+function restartESP() {
+  if (!confirm('Restart ESP now?')) return;
+  var status = document.getElementById('restart-status');
+  status.innerText = 'Restarting...';
+  status.style.color = 'orange';
+  fetch('/restart', {method:'POST'})
+    .then(function() {
+      status.innerText = 'ESP is restarting — page will reload in 5 seconds...';
+      setTimeout(function() { location.reload(); }, 5000);
+    })
+    .catch(function() {
+      status.innerText = 'ESP restarted (connection lost)';
+      setTimeout(function() { location.reload(); }, 5000);
+    });
+}
+
+function saveWiFi() {
+  var fd = new FormData();
+  fd.append('ssid', document.getElementById('ssid').value);
+  fd.append('password', document.getElementById('password').value);
+  fd.append('port', document.getElementById('port').value);
+  fetch('/save_wifi', {method:'POST', body: fd})
+    .then(function(r) { return r.text(); })
+    .then(function(t) { document.getElementById('wifi-status').innerText = t; });
+}
+
+function resetWiFi() {
+  if (!confirm('Reset WiFi settings?')) return;
+  fetch('/reset_wifi', {method:'POST'}).then(function() { location.reload(); });
+}
+
+function saveRGB() {
+  var fd = new FormData();
+  fd.append('rgbOrder', document.getElementById('rgb-order').value);
+  fetch('/save_rgb_order', {method:'POST', body: fd})
+    .then(function() { document.getElementById('display-status').innerText = 'RGB saved'; });
+}
+
+function fetchScalingModes(currentScale) {
+  fetch('/get_scaling_modes').then(function(r) { return r.json(); }).then(function(modes) {
+    var sel = document.getElementById('scaling-mode');
+    sel.innerHTML = '';
+    if (modes.scalingModes) {
+      modes.scalingModes.forEach(function(m, i) {
+        var opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = m;
+        sel.appendChild(opt);
+      });
+    }
+    sel.value = currentScale || 0;
+  }).catch(function() {});
+}
+
+function saveScaling() {
+  var fd = new FormData();
+  fd.append('scalingMode', document.getElementById('scaling-mode').value);
+  fetch('/save_scaling_mode', {method:'POST', body: fd});
+}
+
+function applyDisplay() {
+  fetch('/apply', {method:'POST'})
+    .then(function() { document.getElementById('display-status').innerText = 'Applied!'; });
+}
+
+function saveTransportSettings() {
+  var status = document.getElementById('transport-status');
+  var p1 = new FormData(); p1.append('transport', document.getElementById('transport').value);
+  var p2 = new FormData(); p2.append('udpDelay', document.getElementById('udp-delay').value);
+  var p3 = new FormData(); p3.append('usbPackageSizeMultiplier', document.getElementById('usb-size').value);
+  Promise.all([
+    fetch('/save_transport', {method:'POST', body: p1}),
+    fetch('/save_udp_delay', {method:'POST', body: p2}),
+    fetch('/save_usb_size', {method:'POST', body: p3})
+  ]).then(function() {
+    status.innerText = 'Saved — restart required!';
+    status.style.color = 'orange';
+  });
+}
+
+function savePanelSettings() {
+  var fd = new FormData();
+  fd.append('panelClkphase', document.getElementById('clkphase').value);
+  fd.append('panelI2sspeed', document.getElementById('i2sspeed').value);
+  fd.append('panelLatchBlanking', document.getElementById('latch').value);
+  fd.append('panelMinRefreshRate', document.getElementById('minrefresh').value);
+  fd.append('panelDriver', document.getElementById('driver').value);
+  fetch('/save_panel_settings', {method:'POST', body: fd})
+    .then(function() {
+      document.getElementById('panel-status').innerText = 'Saved — restart required!';
+      document.getElementById('panel-status').style.color = 'orange';
+    });
+}
+
+function uploadHtmlFile() {
+  var file = document.getElementById('upload-html-file').files[0];
+  var status = document.getElementById('upload-html-status');
+  if (!file) { status.innerText = 'Please select a file.'; status.style.color = 'red'; return; }
+  if (!file.name.endsWith('.html')) { status.innerText = 'Only .html files allowed.'; status.style.color = 'red'; return; }
+  status.innerText = 'Uploading ' + file.name + '...';
+  status.style.color = '#aaa';
+  var fd = new FormData();
+  fd.append('file', file, file.name);
+  fetch('/upload_file', {method: 'POST', body: fd})
+    .then(function(r) {
+      if (r.ok) {
+        status.innerText = '✓ ' + file.name + ' uploaded — reload page to apply.';
+        status.style.color = 'green';
+      } else {
+        status.innerText = '✗ Upload failed (status ' + r.status + ').';
+        status.style.color = 'red';
+      }
+    })
+    .catch(function() { status.innerText = '✗ Upload error.'; status.style.color = 'red'; });
+}
+
+function toggleDebug() {
+  var show = document.getElementById('debug-cb').checked;
+  document.getElementById('debug-info').style.display = show ? 'block' : 'none';
+  if (show) {
+    fetch('/debug_info').then(function(r) { return r.text(); }).then(function(t) {
+      document.getElementById('debug-content').innerText = t;
+    });
+  }
+}
+
+
+
+
+
+
+
+</script>
+</body>
+</html>
