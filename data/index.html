@@ -273,7 +273,7 @@
                         <input type="range" id="radio-volume-slider" min="0" max="21" value="15"
                             oninput="setRadioVolume(parseInt(this.value))">
                         <span>&#128266;</span>
-                        <span id="radio-vol-val" style="min-width:24px; text-align:right; font-size:0.85em; color:#aaa; margin-left:4px;">15</span>
+                        <span id="radio-vol-val" style="min-width:30px; text-align:right; font-size:0.85em; color:#aaa; margin-left:4px;">15</span>
                     </div>
                     <div style="display:flex; gap:8px; align-items:stretch;">
                         <button id="radio-toggle-btn" onclick="toggleRadio()"
@@ -286,8 +286,20 @@
                         </button>
                         <a href="/radio.html"
                             style="display:flex; align-items:center; padding:9px 14px; background:#2c3e50; color:#fff; border-radius:4px; text-decoration:none; font-size:0.85em; white-space:nowrap; box-sizing:border-box;">
-                            &#x2699; Sender
+                            &#x2699; Verwalten
                         </a>
+                    </div>
+
+                    <!-- Gespeicherte Sender (ausklappbar) -->
+                    <div style="margin-top:10px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:8px 10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;"
+                             onclick="togglePresetList()">
+                            <span style="font-size:0.85em; color:#aaa;">&#128251; Gespeicherte Sender</span>
+                            <span id="preset-list-arrow" style="color:#aaa; font-size:0.85em;">&#9654;</span>
+                        </div>
+                        <div id="preset-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px; max-height:220px; overflow-y:auto;">
+                            <div id="preset-list-content" style="font-size:0.85em; color:#aaa;">Lade...</div>
+                        </div>
                     </div>
                 </div>
 
@@ -801,6 +813,59 @@
             });
         }
 
+        function togglePresetList() {
+            var panel = document.getElementById('preset-list-panel');
+            var arrow = document.getElementById('preset-list-arrow');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                arrow.textContent = '▼';
+                loadPresetList();
+            } else {
+                panel.style.display = 'none';
+                arrow.textContent = '▶';
+            }
+        }
+
+        function loadPresetList() {
+            var content = document.getElementById('preset-list-content');
+            if (!content) return;
+            fetch('/radio_presets').then(function(r) { return r.json(); }).then(function(presets) {
+                if (presets.length === 0) {
+                    content.innerHTML = '<span style="color:#666;">Keine Sender gespeichert &mdash; <a href="/radio.html" style="color:#007bff;">Sender verwalten</a></span>';
+                    return;
+                }
+                content.innerHTML = '';
+                presets.forEach(function(preset, idx) {
+                    var isActive = (_radioPreset === idx);
+                    var row = document.createElement('div');
+                    row.id = 'preset-row-' + idx;
+                    row.style.cssText = 'display:flex; align-items:center; gap:8px; padding:5px 4px; border-bottom:1px solid #333; border-radius:3px;'
+                        + (isActive ? 'background:#1a3a1a;' : '');
+
+                    var nameSpan = document.createElement('span');
+                    nameSpan.textContent = preset.name || ('Sender ' + (idx + 1));
+                    nameSpan.style.cssText = 'flex:1; font-size:0.9em; color:' + (isActive ? '#4caf50' : '#e0e0e0') + ';';
+
+                    var playBtn = document.createElement('button');
+                    playBtn.textContent = isActive ? '▶ Aktiv' : '▶';
+                    playBtn.style.cssText = 'width:auto; padding:4px 10px; margin:0; font-size:0.85em; background:'
+                        + (isActive ? '#27ae60' : '#2c3e50') + ';';
+                    playBtn.onclick = function() {
+                        var fd = new FormData();
+                        fd.append('url', preset.url);
+                        fd.append('preset', idx);
+                        fetch('/radio_play', { method: 'POST', body: fd });
+                    };
+
+                    row.appendChild(nameSpan);
+                    row.appendChild(playBtn);
+                    content.appendChild(row);
+                });
+            }).catch(function() {
+                if (content) content.innerHTML = '<span style="color:#c0392b;">Fehler beim Laden</span>';
+            });
+        }
+
         function saveClockColors() {
             var clockHex = document.getElementById('clock-color').value;
             var dateHex  = document.getElementById('date-color').value;
@@ -906,10 +971,6 @@
                     document.getElementById("screensaver-brightness-value").innerText = brightness;
                     document.getElementById("screensaver-duration").value = duration;
                     document.getElementById("screensaver-duration-value").innerText = duration;
-                    requestAnimationFrame(function() {
-                        document.getElementById("screensaver-duration").value = duration;
-                        document.getElementById("screensaver-brightness").value = brightness;
-                    });
                     if (config.screensaverMode !== undefined) {
                         document.getElementById("screensaver-mode").value = config.screensaverMode;
                     }
@@ -920,14 +981,8 @@
                         document.getElementById("screensaver-strict-timer").checked = config.screensaverStrictTimer == 1;
                     }
                     if (config.clockR !== undefined) {
-                        var cHex = toHex(config.clockR, config.clockG, config.clockB);
-                        var dHex = toHex(config.dateR, config.dateG, config.dateB);
-                        document.getElementById('clock-color').value = cHex;
-                        document.getElementById('date-color').value = dHex;
-                        requestAnimationFrame(function() {
-                            document.getElementById('clock-color').value = cHex;
-                            document.getElementById('date-color').value = dHex;
-                        });
+                        document.getElementById('clock-color').value = toHex(config.clockR, config.clockG, config.clockB);
+                        document.getElementById('date-color').value  = toHex(config.dateR,  config.dateG,  config.dateB);
                     }
                 }
             };
@@ -1009,12 +1064,25 @@
                     el.innerHTML = '<span style="color:#666;">Keine MP3s in /GifAudio/</span>';
                     return;
                 }
-                el.innerHTML = files.map(function(f) {
-                    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #333;">'
-                        + '<span>' + f.name + ' <span style="color:#666;font-size:0.85em;">(' + Math.round(f.size/1024) + ' KB)</span></span>'
-                        + '<button onclick="gifAudioDelete(\'' + f.name + '\')" style="padding:2px 8px;background:#8b1a1a;font-size:0.8em;margin:0;">&#x2715;</button>'
-                        + '</div>';
-                }).join('');
+                el.innerHTML = '';
+                files.forEach(function(f) {
+                    var row = document.createElement('div');
+                    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #333;';
+                    var nameSpan = document.createElement('span');
+                    var nameTxt  = document.createTextNode(f.name + ' ');
+                    var sizeSpan = document.createElement('span');
+                    sizeSpan.style.cssText = 'color:#666;font-size:0.85em;';
+                    sizeSpan.textContent = '(' + Math.round(f.size / 1024) + ' KB)';
+                    nameSpan.appendChild(nameTxt);
+                    nameSpan.appendChild(sizeSpan);
+                    var delBtn = document.createElement('button');
+                    delBtn.textContent = '✕';
+                    delBtn.style.cssText = 'padding:2px 8px;background:#8b1a1a;font-size:0.8em;margin:0;';
+                    delBtn.onclick = (function(name) { return function() { gifAudioDelete(name); }; })(f.name);
+                    row.appendChild(nameSpan);
+                    row.appendChild(delBtn);
+                    el.appendChild(row);
+                });
             }).catch(function() {
                 var el = document.getElementById('gif-audio-list');
                 if (el) el.innerHTML = '<span style="color:#c0392b;">Fehler beim Laden</span>';
@@ -1040,8 +1108,6 @@
             }
             uploadNext();
         }
-
-        gifAudioLoad();
 
         function setRadioVolume(v, skipSend) {
             v = Math.max(0, Math.min(21, v));
@@ -1372,11 +1438,9 @@
                         list.innerHTML = "<li><span>No files in selected folder.</span></li>";
                     } else {
                         // Cache verwenden statt bei jedem Refresh neu laden
-                        (function() {
-                            var favLines = cachedFavLines;
-                            var ignLines = cachedIgnLines;
-                            (function() {
-                            files.forEach(function(filepath) {
+                        var favLines = cachedFavLines;
+                        var ignLines = cachedIgnLines;
+                        files.forEach(function(filepath) {
                                 var name = filepath.replace("FS:/screensaver/", "").replace(/^SD:\/[^\/]+\//, "");
                                 var li = document.createElement('li');
                                 var span = document.createElement('span');
@@ -1451,8 +1515,6 @@
                                 li.appendChild(delBtn);
                                 list.appendChild(li);
                             });
-                            })();
-                        })();
                     }
                     // Gesamtzahl abrufen und Pagination aktualisieren
                     var xhr2 = new XMLHttpRequest();
@@ -1488,6 +1550,7 @@
         window.onload = function () {
             loadConfig();
             refreshFavIgnCache();
+            gifAudioLoad();
             fetchFsInfo();
             fetchSDInfo();
             loadSDFolders();
@@ -1543,6 +1606,9 @@
                         if (stEl)    stEl.innerText   = 'Kein Sender gewählt';
                         if (trackEl) trackEl.innerText = '';
                     }
+                    // Preset-Panel aktualisieren wenn es offen ist
+                    var panel = document.getElementById('preset-list-panel');
+                    if (panel && panel.style.display !== 'none') loadPresetList();
                 }).catch(function() {});
             }
             updateRadioBtns();
