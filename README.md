@@ -67,6 +67,23 @@ Play an MP3 file from the SD card in sync with an animated GIF screensaver.
 Place matching audio files in `/GifAudio/` on the SD card — the upload UI is already available on the main page.
 The feature is **prepared in firmware** but not yet fully implemented and tested.
 
+### Stereo Audio *(planned)*
+Stereo output using **two MAX98357A modules** — one for the left channel, one for the right.
+
+The SD pin is **not an active switch** — it is wired once and permanently fixed: Module L gets GND and always outputs the left channel; Module R gets 3.3V and always outputs the right channel. The ESP32 sends a stereo I2S stream and each module automatically filters its own channel — no firmware switching needed.
+
+> ⚠️ Requires firmware change: the current build outputs mono I2S. The hardware wiring is the easy part — stereo I2S output in firmware is still to be implemented.
+
+| MAX98357A Pin | ESP32-S3 | Notes |
+|---------------|----------|-------|
+| BCLK | **GPIO 9** | shared — both modules |
+| LRC (WSEL) | **GPIO 14** | shared — both modules |
+| DIN | **GPIO 21** | shared — both modules |
+| SD — Module L | **GND** | permanently wired → always left channel |
+| SD — Module R | **3.3V** | permanently wired → always right channel |
+| VIN | **5V** | each module separately |
+| GND | **GND** | each module separately |
+
 ---
 
 ## What's different from original ZeDMD

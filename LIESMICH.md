@@ -67,6 +67,23 @@ Beim Abspielen eines animierten GIF-Screensavers passend dazu eine MP3-Datei von
 Passende Audiodateien einfach in `/GifAudio/` auf der SD ablegen — die Upload-UI ist auf der Hauptseite bereits vorhanden.
 Das Feature ist **firmware-seitig vorbereitet**, aber noch nicht vollständig implementiert und getestet.
 
+### Stereo-Audio *(geplant)*
+Stereo-Ausgabe mit **zwei MAX98357A-Modulen** — eines für den linken, eines für den rechten Kanal.
+
+Der SD-Pin ist **keine aktive Umschaltung**, sondern eine **einmalige feste Verdrahtung**: Modul L bekommt GND und spielt danach immer automatisch den linken Kanal, Modul R bekommt 3,3V und spielt immer den rechten. Der ESP32 sendet einen Stereo-I2S-Datenstrom, jedes Modul filtert seinen Kanal selbst heraus — die Firmware muss nichts umschalten.
+
+> ⚠️ Erfordert Firmware-Anpassung: aktuell wird Mono-I2S ausgegeben. Die Hardware-Verdrahtung ist der einfache Teil — die Stereo-Ausgabe in der Firmware ist noch zu implementieren.
+
+| MAX98357A Pin | ESP32-S3 | Hinweis |
+|---------------|----------|---------|
+| BCLK | **GPIO 9** | gemeinsam — beide Module |
+| LRC (WSEL) | **GPIO 14** | gemeinsam — beide Module |
+| DIN | **GPIO 21** | gemeinsam — beide Module |
+| SD — Modul L | **GND** | fest verdrahtet → immer linker Kanal |
+| SD — Modul R | **3,3V** | fest verdrahtet → immer rechter Kanal |
+| VIN | **5V** | jedes Modul separat |
+| GND | **GND** | jedes Modul separat |
+
 ---
 
 ## Was ist anders als beim Original-ZeDMD?
