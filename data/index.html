@@ -141,8 +141,10 @@
         button.delete-btn {
             background-color: #dc3545;
             width: auto;
-            padding: 6px 12px;
+            min-width: 36px;
+            padding: 6px 8px;
             margin-bottom: 0;
+            text-align: center;
         }
 
         button.delete-btn:hover {
@@ -220,7 +222,36 @@
 
         .screensaver-file-list li span {
             word-break: break-all;
+            flex: 1;
         }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #555;
+            border-radius: 24px;
+            transition: background 0.2s;
+        }
+        .toggle-slider:before {
+            content: "";
+            position: absolute;
+            height: 18px; width: 18px;
+            left: 3px; bottom: 3px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+        .toggle-switch input:checked + .toggle-slider { background: #007bff; }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
     </style>
 </head>
 
@@ -232,87 +263,121 @@
                 style="max-width: 100%; margin-bottom: 20px; display: block; margin: 0 auto;">
             <br>
             <div class="sections-grid">
-                <!-- WiFi + Advanced Settings → Admin Seite -->
+                <!-- Radio Section -->
                 <div class="section">
-                    <h2 class="section-header">Settings</h2>
-                    <p style="color:#aaa; font-size:0.85em;">WiFi, Display, RGB Order and advanced settings are available on the admin page.</p>
-                    <a href="/admin" style="display:inline-block; background:#555; color:#fff; padding:10px 16px; border-radius:4px; text-decoration:none; margin-top:8px;">&#x2699; Open Admin Page</a>
+                    <h2 class="section-header">&#127925; Webradio</h2>
+                    <div style="font-size:0.85em; color:#ccc; margin-bottom:4px; min-height:1.1em;" id="radio-station"></div>
+                    <div style="font-size:0.8em; color:#aaa; margin-bottom:8px; min-height:1em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="radio-track"></div>
+                    <div class="slider-container" style="margin-bottom:10px;">
+                        <span>&#128263;</span>
+                        <input type="range" id="radio-volume-slider" min="0" max="21" value="15"
+                            oninput="setRadioVolume(parseInt(this.value))">
+                        <span>&#128266;</span>
+                        <span id="radio-vol-val" style="min-width:24px; text-align:right; font-size:0.85em; color:#aaa; margin-left:4px;">15</span>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:stretch;">
+                        <button id="radio-toggle-btn" onclick="toggleRadio()"
+                            style="width:auto; padding:9px 20px; background:#27ae60; font-size:0.9em; margin:0; white-space:nowrap;">
+                            &#9654; Play
+                        </button>
+                        <button id="radio-display-btn" onclick="toggleRadioDisplay()"
+                            style="width:auto; padding:9px 12px; background:#555; font-size:0.85em; margin:0; white-space:nowrap;" title="Display ein/aus">
+                            &#128250;
+                        </button>
+                        <a href="/radio.html"
+                            style="display:flex; align-items:center; padding:9px 14px; background:#2c3e50; color:#fff; border-radius:4px; text-decoration:none; font-size:0.85em; white-space:nowrap; box-sizing:border-box;">
+                            &#x2699; Sender
+                        </a>
+                    </div>
                 </div>
 
-                <!-- Display Brightness (bleibt auf Hauptseite) -->
+                <!-- GIF-Audio Section -->
                 <div class="section">
-                    <h2 class="section-header">Brightness</h2>
-                    <label for="brightness">Display Brightness:</label>
-                    <div class="slider-container">
-                        <span>&#x1F311;</span>
-                        <input type="range" id="brightness" name="brightness" min="1" max="15"
-                            oninput="updateBrightness()">
-                        <span>&#x2600;</span>
+                    <h2 class="section-header">&#127925; GIF-Audio</h2>
+                    <div style="font-size:0.8em; color:#aaa; margin-bottom:10px;">
+                        MP3-Dateien f&uuml;r GIF-Begleitung &mdash; Dateiname muss dem GIF-Namen entsprechen (z.B. <em>demo.gif</em> &rarr; <em>demo.mp3</em>).<br>
+                        Ordner auf SD: <code>/GifAudio/</code>
                     </div>
-                    <div id="display-status" class="status-message"></div>
-                </div>
-
-                <!-- Screensaver Settings Section -->
-                <div class="section">
-                    <h2 class="section-header">Screensaver Settings</h2>
-
-                    <!-- Screensaver Mode -->
-                    <label for="screensaver-mode">Display Mode:</label>
-                    <select id="screensaver-mode" onchange="saveScreensaverMode()" style="background:#2c2c2c; color:#e0e0e0; border:1px solid #444; padding:10px; border-radius:4px; width:100%; margin-bottom:10px;">
-                        <option value="0">Screensaver only</option>
-                        <option value="1">Clock only</option>
-                        <option value="2">Clock + Screensaver</option>
-                    </select>
-                    <div id="mode-status" class="status-message"></div>
-
-                    <!-- Clock Colors (nur wenn Clock Modus) -->
-                    <div id="clock-colors-section">
-                        <label>Clock Time Color:</label>
-                        <input type="color" id="clock-color" value="#00ffc8"
-                            style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin-bottom:8px;">
-
-                        <label>Date Color:</label>
-                        <input type="color" id="date-color" value="#b4b4b4"
-                            style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin-bottom:8px;">
-
-                        <button onclick="saveClockColors()">Apply Clock Colors</button>
-                        <div id="clock-color-status" class="status-message"></div>
+                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+                        <label style="background:#2c3e50; padding:8px 14px; border-radius:4px; cursor:pointer; font-size:0.85em;">
+                            &#8679; MP3 hochladen
+                            <input type="file" accept=".mp3,.MP3" multiple style="display:none;"
+                                onchange="gifAudioUpload(this.files)">
+                        </label>
+                        <span id="gif-audio-upload-status" style="font-size:0.8em; color:#aaa;"></span>
                     </div>
-
-                    <!-- Screensaver Brightness Slider -->
-                    <label for="screensaver-brightness">Screensaver Brightness:</label>
-                    <div class="slider-container">
-                        <span>&#x1F311;</span>
-                        <input type="range" id="screensaver-brightness" name="screensaverBrightness" min="1" max="15"
-                            oninput="updateScreensaverBrightness()">
-                        <span>&#x2600;</span>
-                    </div>
-                    <br>
-                    <div id="screensaver-status" class="status-message"></div>
-                    <button onclick="applyScreensaverBrightness()">Apply Screensaver Brightness</button>
-
-                    <!-- Screensaver Duration Slider -->
-                    <label for="screensaver-duration">Screensaver Duration: <span id="screensaver-duration-value">10</span>s</label>
-                    <div class="slider-container">
-                        <span>5s</span>
-                        <input type="range" id="screensaver-duration" name="screensaverDuration" min="5" max="60" step="5" value="10"
-                            oninput="updateScreensaverDuration()">
-                        <span>60s</span>
-                    </div>
-                    <br>
-                    <div id="screensaver-duration-status" class="status-message"></div>
-                    <button onclick="applyScreensaverDuration()">Apply Duration</button>
+                    <div id="gif-audio-list" style="font-size:0.82em; color:#ccc;">Lade...</div>
                 </div>
 
                 <!-- SD Card / LittleFS Section -->
                 <div class="section">
                     <h2 class="section-header">Screensaver Source &amp; Upload</h2>
 
-                    <div id="sd-card-status" class="status-message">Checking SD card...</div>
+                    <!-- Speicheranzeige LittleFS + SD -->
+                    <div style="margin-bottom:14px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+                            <span style="font-size:0.82em; color:#aaa;">LittleFS</span>
+                            <span id="fs-info" style="font-size:0.82em; color:#aaa;"></span>
+                        </div>
+                        <div style="background:#333; border-radius:4px; height:7px; overflow:hidden; margin-bottom:8px;">
+                            <div id="fs-bar" style="height:100%; background:#007bff; width:0%; border-radius:4px; transition:width 0.4s;"></div>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+                            <span style="font-size:0.82em; color:#aaa;">SD Card</span>
+                            <span id="sd-info" style="font-size:0.82em; color:#aaa;">–</span>
+                        </div>
+                        <div style="background:#333; border-radius:4px; height:7px; overflow:hidden;">
+                            <div id="sd-bar" style="height:100%; background:#28a745; width:0%; border-radius:4px; transition:width 0.4s;"></div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                        <div id="sd-card-status" class="status-message" style="margin:0; flex:1;">Checking SD card...</div>
+                        <button id="eject-btn" onclick="ejectSD()" style="display:none; width:auto; padding:8px 14px; margin:0; background:#6c757d;">&#x23CF; Eject</button>
+                    </div>
 
                     <label>Select Screensaver Folder:</label>
-                    <div id="sd-folder-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:15px;">
+                    <div id="sd-folder-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
                         <span style="color:#aaa; font-size:0.85em;">Loading...</span>
+                    </div>
+                    <div id="sd-folder-status" class="status-message"></div>
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        <button onclick="setScreensaverPaths()">Apply Folder Selection</button>
+                        <button id="cancel-scan-btn" onclick="cancelScan()" style="display:none; width:auto; padding:8px 14px; margin:0; background:#c0392b;">&#x2715; Scan abbrechen</button>
+                    </div>
+
+                    <!-- Aktuell angezeigte Datei -->
+                    <div style="margin-top:14px; padding:10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;">
+                        <div style="font-size:0.82em; color:#aaa; margin-bottom:6px;">Aktuell angezeigt:</div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span id="current-file-name" style="flex:1; font-size:0.9em; word-break:break-all; color:#e0e0e0;">–</span>
+                            <button id="fav-btn" onclick="toggleFavorite()" style="width:auto; padding:6px 12px; margin:0; font-size:1.2em; background:#555;">☆</button>
+                            <button id="ign-btn" onclick="toggleIgnore()" style="width:auto; padding:6px 12px; margin:0; font-size:1.2em; background:#555;" title="Ignorieren">🚫</button>
+                        </div>
+                    </div>
+
+                    <!-- Favoritenliste -->
+                    <div style="margin-top:10px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:8px 10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;"
+                             onclick="toggleFavoritesList()">
+                            <span style="font-size:0.85em; color:#aaa;">⭐ Favoriten</span>
+                            <span id="fav-list-arrow" style="color:#aaa; font-size:0.85em;">▶</span>
+                        </div>
+                        <div id="fav-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px; max-height:200px; overflow-y:auto;">
+                            <div id="fav-list-content" style="font-size:0.82em; color:#aaa;">Lade...</div>
+                        </div>
+                    </div>
+
+                    <!-- Ignore-Liste -->
+                    <div style="margin-top:10px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:8px 10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;"
+                             onclick="toggleIgnoreList()">
+                            <span style="font-size:0.85em; color:#aaa;">🚫 Ignorierte Dateien</span>
+                            <span id="ign-list-arrow" style="color:#aaa; font-size:0.85em;">▶</span>
+                        </div>
+                        <div id="ign-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px; max-height:200px; overflow-y:auto;">
+                            <div id="ign-list-content" style="font-size:0.82em; color:#aaa;">Lade...</div>
+                        </div>
                     </div>
 
                     <!-- Upload to Active Folder -->
@@ -342,11 +407,98 @@
                         <span id="pause-status" style="font-size:0.85em; color:#aaa;">Running</span>
                     </div>
 
-                    <label>Active Screensaver Files:</label>
+                    <label>Active Screensaver Files: <span id="screensaver-file-count" style="color:#aaa; font-weight:normal;"></span></label>
                     <ul class="screensaver-file-list" id="sd-screensaver-file-list">
                         <li><span>Loading...</span></li>
                     </ul>
+                    <div id="ss-pagination" style="display:none; display:flex; gap:8px; align-items:center; margin-top:6px;">
+                        <button id="ss-prev-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(-1)">&#9664; Zurück</button>
+                        <span id="ss-page-info" style="font-size:0.85em; color:#aaa;"></span>
+                        <button id="ss-next-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(1)">Weiter &#9654;</button>
+                    </div>
                 </div>
+
+                <!-- Screensaver Settings Section -->
+                <div class="section">
+                    <h2 class="section-header">Screensaver Settings</h2>
+
+                    <!-- Screensaver Mode -->
+                    <label for="screensaver-mode">Display Mode:</label>
+                    <select id="screensaver-mode" onchange="saveScreensaverMode()" style="background:#2c2c2c; color:#e0e0e0; border:1px solid #444; padding:10px; border-radius:4px; width:100%; margin-bottom:10px;">
+                        <option value="0">Nur Screensaver</option>
+                        <option value="1">Nur Uhr</option>
+                        <option value="2">Uhr + Screensaver</option>
+                        <option value="3">Uhr + Wetter</option>
+                        <option value="4">Uhr+Wetter + Screensaver</option>
+                    </select>
+                    <div id="mode-status" class="status-message"></div>
+
+                    <!-- Clock Colors (nur wenn Clock Modus) -->
+                    <div id="clock-colors-section">
+                        <label>Clock Time Color:</label>
+                        <input type="color" id="clock-color" value="#00ffc8"
+                            style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin-bottom:8px;">
+
+                        <label>Date Color:</label>
+                        <input type="color" id="date-color" value="#b4b4b4"
+                            style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin-bottom:8px;">
+
+                        <button onclick="saveClockColors()">Apply Clock Colors</button>
+                        <div id="clock-color-status" class="status-message"></div>
+                    </div>
+
+                    <!-- Screensaver Brightness Slider -->
+                    <label for="screensaver-brightness">Screensaver Brightness: <span id="screensaver-brightness-value">–</span></label>
+                    <div class="slider-container">
+                        <span>&#x1F311;</span>
+                        <input type="range" id="screensaver-brightness" name="screensaverBrightness" min="1" max="15"
+                            oninput="updateScreensaverBrightness()">
+                        <span>&#x2600;</span>
+                    </div>
+                    <br>
+                    <div id="screensaver-status" class="status-message"></div>
+                    <button onclick="applyScreensaverBrightness()">Apply Screensaver Brightness</button>
+
+                    <!-- Screensaver Duration Slider -->
+                    <label for="screensaver-duration">Screensaver Duration: <span id="screensaver-duration-value">10</span>s</label>
+                    <div class="slider-container">
+                        <span>5s</span>
+                        <input type="range" id="screensaver-duration" name="screensaverDuration" min="5" max="60" step="5" value="10"
+                            oninput="updateScreensaverDuration()">
+                        <span>60s</span>
+                    </div>
+                    <br>
+                    <div id="screensaver-duration-status" class="status-message"></div>
+                    <button onclick="applyScreensaverDuration()">Apply Duration</button>
+
+                    <!-- Order + Strict Timer Toggle -->
+                    <div style="display:flex; align-items:center; gap:24px; margin-top:14px; flex-wrap:wrap;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span style="font-size:0.95em; color:#aaa;">A-Z Order</span>
+                            <label class="toggle-switch" style="margin:0;">
+                                <input type="checkbox" id="screensaver-shuffle" onchange="saveScreensaverShuffle()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span style="font-size:0.95em;">Random Order</span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <label class="toggle-switch" style="margin:0;">
+                                <input type="checkbox" id="screensaver-strict-timer" onchange="saveScreensaverStrictTimer()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span style="font-size:0.95em;">Strict Timer</span>
+                        </div>
+                    </div>
+                    <div id="screensaver-shuffle-status" class="status-message"></div>
+                </div>
+
+                <!-- WiFi + Advanced Settings → Admin Seite -->
+                <div class="section">
+                    <h2 class="section-header">Settings</h2>
+                    <p style="color:#aaa; font-size:0.85em;">WiFi, Display, RGB Order and advanced settings are available on the admin page.</p>
+                    <a href="/admin" style="display:inline-block; background:#555; color:#fff; padding:10px 16px; border-radius:4px; text-decoration:none; margin-top:8px;">&#x2699; Open Admin Page</a>
+                </div>
+
             </div>
         </div>
     </div>
@@ -354,180 +506,6 @@
 
     <!-- JavaScript Functions -->
     <script>
-        let debugInterval;
-
-        function fetchWiFiStatus() {
-            var xhr = new XMLHttpRequest();
-            xhr.open("GET", "/wifi_status", true);
-
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-                    var wifiInfo = JSON.parse(xhr.responseText);
-                    var wifiStatusElem = document.getElementById('wifi-status');
-                    var signalStatusElem = document.getElementById('signal-status');
-
-                    if (wifiInfo.connected) {
-                        wifiStatusElem.innerHTML = `Connected to ${wifiInfo.ssid} with ${wifiInfo.signal} dB strength.<br>`;
-                        wifiStatusElem.style.color = "green";
-                        wifiStatusElem.innerHTML += `IP Address: ${wifiInfo.ip} Port: ${wifiInfo.port}`;
-
-                        if (wifiInfo.signal < -78) {
-                            signalStatusElem.innerHTML = "Warning: Weak WiFi signal!";
-                            signalStatusElem.style.color = "orange";
-                        } else {
-                            signalStatusElem.innerHTML = "";
-                        }
-                    } else {
-                        wifiStatusElem.innerHTML = "Not connected to wifi network: Please configure wifi settings.";
-                        wifiStatusElem.style.color = "red";
-                    }
-                }
-            };
-            xhr.send();
-        }
-        setInterval(fetchWiFiStatus, 10000);
-        fetchWiFiStatus();
-
-        function resetWiFi() {
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", "/reset_wifi", true);
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-                    alert("Wi-Fi settings reset. Device will reboot.");
-                }
-            };
-            xhr.send();
-        }
-
-        function saveWiFiConfig() {
-            var ssid = document.getElementById('ssid').value;
-            var password = document.getElementById('password').value;
-            var port = document.getElementById('port').value;
-
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", "/save_wifi", true);
-            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-
-            xhr.onreadystatechange = function () {
-                var statusElem = document.getElementById('status');
-                if (xhr.readyState === XMLHttpRequest.DONE) {
-                    if (xhr.status === 200) {
-                        statusElem.innerText = "Success: " + xhr.responseText;
-                        statusElem.classList.remove('error');
-                        statusElem.classList.add('success');
-                    } else {
-                        statusElem.innerText = "Error: " + xhr.responseText;
-                        statusElem.classList.remove('success');
-                        statusElem.classList.add('error');
-                    }
-                }
-            };
-
-            var params = "ssid=" + encodeURIComponent(ssid) +
-                "&password=" + encodeURIComponent(password) +
-                "&port=" + encodeURIComponent(port);
-            xhr.send(params);
-        }
-
-        function updateRgbOrder() {
-            var rgbOrder = document.getElementById('rgb-order').value;
-
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", "/save_rgb_order", true);
-            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-
-            xhr.onreadystatechange = function () {
-                var displayStatusElem = document.getElementById('display-status');
-                if (xhr.readyState === XMLHttpRequest.DONE) {
-                    if (xhr.status === 200) {
-                        displayStatusElem.innerText = "RGB Order updated successfully.";
-                        displayStatusElem.classList.remove('error');
-                        displayStatusElem.classList.add('success');
-                    } else {
-                        displayStatusElem.innerText = "Error: Could not update RGB Order.";
-                        displayStatusElem.classList.remove('success');
-                        displayStatusElem.classList.add('error');
-                    }
-                }
-            };
-
-            xhr.send(`rgbOrder=${rgbOrder}`);
-        }
-
-        function updateBrightness() {
-            var brightness = document.getElementById('brightness').value;
-
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", "/save_brightness", true);
-            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-
-            xhr.onreadystatechange = function () {
-                var displayStatusElem = document.getElementById('display-status');
-                if (xhr.readyState === XMLHttpRequest.DONE) {
-                    if (xhr.status === 200) {
-                        displayStatusElem.innerText = "Brightness updated successfully.";
-                        displayStatusElem.classList.remove('error');
-                        displayStatusElem.classList.add('success');
-                    } else {
-                        displayStatusElem.innerText = "Error: Could not update Brightness.";
-                        displayStatusElem.classList.remove('success');
-                        displayStatusElem.classList.add('error');
-                    }
-                }
-            };
-
-            xhr.send(`brightness=${brightness}`);
-        }
-
-        function apply() {
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", "/applyt", true);
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-                    alert("Device will reboot.");
-                }
-            };
-            xhr.send();
-        }
-
-        function toggleDebugInfo() {
-            var debugInfoDiv = document.getElementById('debug-info');
-            if (document.getElementById('toggleDebug').checked) {
-                debugInfoDiv.style.display = 'block';
-                debugInterval = setInterval(fetchDebugInfo, 5000);
-                fetchDebugInfo();
-            } else {
-                debugInfoDiv.style.display = 'none';
-                clearInterval(debugInterval);
-            }
-        }
-
-        function fetchDebugInfo() {
-            var xhr = new XMLHttpRequest();
-            xhr.open("GET", "/debug_info", true);
-
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-                    document.getElementById('debug-content').innerText = xhr.responseText;
-                }
-            };
-
-            xhr.send();
-        }
-
-        function fetchVersion() {
-            var xhr = new XMLHttpRequest();
-            xhr.open("GET", "/get_version", true);
-
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-                    document.getElementById('zedmd-version').innerText = "Running ZeDMD version: " + xhr.responseText;
-                }
-            };
-            xhr.send();
-        }
-        fetchVersion();
-
         function fetchFsInfo() {
             var xhr = new XMLHttpRequest();
             xhr.open("GET", "/fs_info", true);
@@ -548,97 +526,6 @@
                     else bar.style.background = "#007bff";
                 }
             };
-            xhr.send();
-        }
-
-        function previewScreensaver() {
-            // nothing to preview for raw files, just show filename
-            var file = document.getElementById('screensaverUpload').files[0];
-            if (file) {
-                document.getElementById('screensaver-upload-status').innerText = "Selected: " + file.name;
-            }
-        }
-
-        function uploadScreensaver() {
-            var file = document.getElementById('screensaverUpload').files[0];
-            if (!file) {
-                alert("Please select a .raw file first.");
-                return;
-            }
-
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", "/upload_screensaver", true);
-
-            var formData = new FormData();
-            formData.append("data", file);
-
-            xhr.onreadystatechange = function () {
-                var statusElem = document.getElementById('screensaver-upload-status');
-                if (xhr.readyState === XMLHttpRequest.DONE) {
-                    if (xhr.status === 200) {
-                        statusElem.innerText = "Upload successful: " + file.name;
-                        statusElem.style.color = "green";
-                        loadScreensaverFiles();
-                        fetchFsInfo();  // Speicheranzeige aktualisieren
-                    } else {
-                        statusElem.innerText = "Error uploading file.";
-                        statusElem.style.color = "red";
-                    }
-                }
-            };
-
-            xhr.send(formData);
-        }
-
-        function deleteScreensaver(filename) {
-            if (!confirm("Delete " + filename + "?")) return;
-
-            var xhr = new XMLHttpRequest();
-            xhr.open("GET", "/delete_screensaver?file=" + encodeURIComponent(filename), true);
-
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === XMLHttpRequest.DONE) {
-                    if (xhr.status === 200) {
-                        loadScreensaverFiles(); // refresh list
-                    } else {
-                        alert("Error deleting file.");
-                    }
-                }
-            };
-
-            xhr.send();
-        }
-
-        function loadScreensaverFiles() {
-            var xhr = new XMLHttpRequest();
-            xhr.open("GET", "/screensaver_files", true);
-
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-                    var files = JSON.parse(xhr.responseText);
-                    var list = document.getElementById('screensaver-file-list');
-                    list.innerHTML = "";
-
-                    if (files.length === 0) {
-                        list.innerHTML = "<li><span>No screensaver images found.</span></li>";
-                        return;
-                    }
-
-                    files.forEach(function (filename) {
-                        var li = document.createElement('li');
-                        var span = document.createElement('span');
-                        span.textContent = filename;
-                        var btn = document.createElement('button');
-                        btn.className = 'delete-btn';
-                        btn.textContent = '🗑 Delete';
-                        btn.onclick = function() { deleteScreensaver(filename); };
-                        li.appendChild(span);
-                        li.appendChild(btn);
-                        list.appendChild(li);
-                    });
-                }
-            };
-
             xhr.send();
         }
 
@@ -668,6 +555,250 @@
             };
 
             xhr.send(`screensaverDuration=${duration}`);
+        }
+
+        function saveScreensaverShuffle() {
+            var val = document.getElementById('screensaver-shuffle').checked ? 1 : 0;
+            var statusElem = document.getElementById('screensaver-shuffle-status');
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/save_screensaver_shuffle", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    if (xhr.status === 200) {
+                        statusElem.innerText = val ? "Random order on" : "Sequential order on";
+                        statusElem.style.color = "green";
+                    } else {
+                        statusElem.innerText = "Error saving.";
+                        statusElem.style.color = "red";
+                    }
+                }
+            };
+            xhr.send(`screensaverShuffle=${val}`);
+        }
+
+        function saveScreensaverStrictTimer() {
+            var val = document.getElementById('screensaver-strict-timer').checked ? 1 : 0;
+            var statusElem = document.getElementById('screensaver-shuffle-status');
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/save_screensaver_strict_timer", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    if (xhr.status === 200) {
+                        statusElem.innerText = val ? "Strict timer on" : "Strict timer off";
+                        statusElem.style.color = "green";
+                    } else {
+                        statusElem.innerText = "Error saving.";
+                        statusElem.style.color = "red";
+                    }
+                }
+            };
+            xhr.send(`screensaverStrictTimer=${val}`);
+        }
+
+        var currentFilePath = '';
+        var cachedFavLines = [];
+        var cachedIgnLines = [];
+
+        function refreshFavIgnCache(callback) {
+            Promise.all([
+                fetch('/get_favorites').then(function(r) { return r.text(); }),
+                fetch('/get_ignores').then(function(r) { return r.text(); })
+            ]).then(function(results) {
+                cachedFavLines = results[0].split('\n').map(function(l){ return l.trim(); });
+                cachedIgnLines = results[1].split('\n').map(function(l){ return l.trim(); });
+                if (callback) callback();
+            }).catch(function() { if (callback) callback(); });
+        }
+
+        function fetchCurrentFile() {
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", "/screensaver_current", true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                    var data = JSON.parse(xhr.responseText);
+                    currentFilePath = data.path;
+                    var nameEl = document.getElementById('current-file-name');
+                    var favBtn = document.getElementById('fav-btn');
+                    var ignBtn = document.getElementById('ign-btn');
+                    if (nameEl) nameEl.textContent = data.name || '–';
+                    if (favBtn) {
+                        favBtn.textContent = data.favorite ? '⭐' : '☆';
+                        favBtn.style.background = data.favorite ? '#f0a500' : '#555';
+                    }
+                    if (ignBtn) {
+                        ignBtn.style.background = data.ignored ? '#c0392b' : '#555';
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        function toggleFavorite() {
+            if (!currentFilePath) return;
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/toggle_favorite", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                    var data = JSON.parse(xhr.responseText);
+                    var favBtn = document.getElementById('fav-btn');
+                    if (favBtn) {
+                        favBtn.textContent = data.favorite ? '⭐' : '☆';
+                        favBtn.style.background = data.favorite ? '#f0a500' : '#555';
+                    }
+                    refreshFavIgnCache();
+                    var panel = document.getElementById('fav-list-panel');
+                    if (panel && panel.style.display !== 'none') loadFavoritesList();
+                }
+            };
+            xhr.send("path=" + encodeURIComponent(currentFilePath));
+        }
+
+        function toggleFavoritesList() {
+            var panel = document.getElementById('fav-list-panel');
+            var arrow = document.getElementById('fav-list-arrow');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                arrow.textContent = '▼';
+                loadFavoritesList();
+            } else {
+                panel.style.display = 'none';
+                arrow.textContent = '▶';
+            }
+        }
+
+        function loadFavoritesList() {
+            var content = document.getElementById('fav-list-content');
+            fetch('/get_favorites').then(function(r) { return r.text(); }).then(function(t) {
+                var lines = t.split('\n').map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 0; });
+                if (lines.length === 0) {
+                    content.innerHTML = '<span style="color:#666;">Keine Favoriten gespeichert</span>';
+                    return;
+                }
+                content.innerHTML = '';
+                lines.forEach(function(path) {
+                    var name = path.split('/').pop();
+                    var row = document.createElement('div');
+                    row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:4px 2px; border-bottom:1px solid #333;';
+                    var label = document.createElement('span');
+                    label.textContent = name;
+                    label.title = path;
+                    label.style.cssText = 'flex:1; word-break:break-all; color:#e0e0e0;';
+                    var removeBtn = document.createElement('button');
+                    removeBtn.textContent = '✕';
+                    removeBtn.style.cssText = 'width:auto; padding:2px 8px; margin:0 0 0 8px; background:#c0392b; font-size:0.85em;';
+                    removeBtn.onclick = function() {
+                        var xhr = new XMLHttpRequest();
+                        xhr.open("POST", "/toggle_favorite", true);
+                        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                        xhr.onreadystatechange = function() {
+                            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                                loadFavoritesList();
+                                // fav-btn aktualisieren falls aktuell angezeigte Datei betroffen
+                                if (currentFilePath === path) {
+                                    var favBtn = document.getElementById('fav-btn');
+                                    if (favBtn) { favBtn.textContent = '☆'; favBtn.style.background = '#555'; }
+                                }
+                            }
+                        };
+                        xhr.send("path=" + encodeURIComponent(path));
+                    };
+                    var favPlayBtn = document.createElement('button');
+                    favPlayBtn.textContent = '▶';
+                    favPlayBtn.style.cssText = 'width:auto; padding:2px 8px; margin:0 0 0 8px; background:#28a745; font-size:0.85em;';
+                    favPlayBtn.onclick = function() {
+                        var x = new XMLHttpRequest();
+                        x.open("POST", "/play_file", true);
+                        x.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                        x.send("path=" + encodeURIComponent(path));
+                    };
+                    row.appendChild(label);
+                    row.appendChild(favPlayBtn);
+                    row.appendChild(removeBtn);
+                    content.appendChild(row);
+                });
+            }).catch(function() {
+                content.innerHTML = '<span style="color:#c0392b;">Fehler beim Laden</span>';
+            });
+        }
+
+        function toggleIgnore() {
+            if (!currentFilePath) return;
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/toggle_ignore", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                    var data = JSON.parse(xhr.responseText);
+                    var ignBtn = document.getElementById('ign-btn');
+                    if (ignBtn) {
+                        ignBtn.style.background = data.ignored ? '#c0392b' : '#555';
+                    }
+                    refreshFavIgnCache();
+                    var panel = document.getElementById('ign-list-panel');
+                    if (panel && panel.style.display !== 'none') loadIgnoreList();
+                }
+            };
+            xhr.send("path=" + encodeURIComponent(currentFilePath));
+        }
+
+        function toggleIgnoreList() {
+            var panel = document.getElementById('ign-list-panel');
+            var arrow = document.getElementById('ign-list-arrow');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                arrow.textContent = '▼';
+                loadIgnoreList();
+            } else {
+                panel.style.display = 'none';
+                arrow.textContent = '▶';
+            }
+        }
+
+        function loadIgnoreList() {
+            var content = document.getElementById('ign-list-content');
+            fetch('/get_ignores').then(function(r) { return r.text(); }).then(function(t) {
+                var lines = t.split('\n').map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 0; });
+                if (lines.length === 0) {
+                    content.innerHTML = '<span style="color:#666;">Keine ignorierten Dateien</span>';
+                    return;
+                }
+                content.innerHTML = '';
+                lines.forEach(function(path) {
+                    var name = path.split('/').pop();
+                    var row = document.createElement('div');
+                    row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:4px 2px; border-bottom:1px solid #333;';
+                    var label = document.createElement('span');
+                    label.textContent = name;
+                    label.title = path;
+                    label.style.cssText = 'flex:1; word-break:break-all; color:#e0e0e0;';
+                    var removeBtn = document.createElement('button');
+                    removeBtn.textContent = '✕';
+                    removeBtn.style.cssText = 'width:auto; padding:2px 8px; margin:0 0 0 8px; background:#c0392b; font-size:0.85em;';
+                    removeBtn.onclick = function() {
+                        var xhr = new XMLHttpRequest();
+                        xhr.open("POST", "/toggle_ignore", true);
+                        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                        xhr.onreadystatechange = function() {
+                            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                                loadIgnoreList();
+                                if (currentFilePath === path) {
+                                    var ignBtn = document.getElementById('ign-btn');
+                                    if (ignBtn) ignBtn.style.background = '#555';
+                                }
+                            }
+                        };
+                        xhr.send("path=" + encodeURIComponent(path));
+                    };
+                    row.appendChild(label);
+                    row.appendChild(removeBtn);
+                    content.appendChild(row);
+                });
+            }).catch(function() {
+                content.innerHTML = '<span style="color:#c0392b;">Fehler beim Laden</span>';
+            });
         }
 
         function saveClockColors() {
@@ -741,6 +872,7 @@
 
         function updateScreensaverBrightness() {
             var brightness = document.getElementById('screensaver-brightness').value;
+            document.getElementById('screensaver-brightness-value').innerText = brightness;
 
             var xhr = new XMLHttpRequest();
             xhr.open("POST", "/save_screensaver_brightness", true);
@@ -762,72 +894,16 @@
             xhr.send(`screensaverBrightness=${brightness}`);
         }
 
-        function fetchScalingModes() {
-            var xhr = new XMLHttpRequest();
-            xhr.open("GET", "/get_scaling_modes", true);
-
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-                    var scalingModeData = JSON.parse(xhr.responseText);
-                    var scalingModeContainer = document.getElementById('scaling-mode-container');
-                    var scalingModeSelect = document.getElementById('scaling-mode');
-
-                    scalingModeSelect.innerHTML = "";
-
-                    if (scalingModeData.hasScalingModes) {
-                        scalingModeData.modes.forEach((mode, index) => {
-                            var option = document.createElement("option");
-                            option.value = index;
-                            option.text = mode;
-                            scalingModeSelect.add(option);
-                        });
-
-                        scalingModeSelect.value = scalingModeData.currentMode;
-                        scalingModeContainer.style.display = 'block';
-                    } else {
-                        scalingModeContainer.style.display = 'none';
-                    }
-                }
-            };
-
-            xhr.send();
-        }
-
-        function updateScalingMode() {
-            var scalingMode = document.getElementById('scaling-mode').value;
-
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", "/save_scaling_mode", true);
-            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-
-            xhr.onreadystatechange = function () {
-                var displayStatusElem = document.getElementById('display-status');
-                if (xhr.readyState === XMLHttpRequest.DONE) {
-                    if (xhr.status === 200) {
-                        displayStatusElem.innerText = "Scaling mode updated successfully.";
-                        displayStatusElem.classList.remove('error');
-                        displayStatusElem.classList.add('success');
-                    } else {
-                        displayStatusElem.innerText = "Error: Could not update scaling mode.";
-                        displayStatusElem.classList.remove('success');
-                        displayStatusElem.classList.add('error');
-                    }
-                }
-            };
-
-            xhr.send(`scalingMode=${scalingMode}`);
-        }
-
         function loadConfig() {
             var xhr = new XMLHttpRequest();
             xhr.open("GET", "/get_config", true);
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === 4 && xhr.status === 200) {
                     var config = JSON.parse(xhr.responseText);
-                    document.getElementById("brightness").value = config.brightness;
                     var brightness = parseInt(config.screensaverBrightness) || 3;
                     var duration = parseInt(config.screensaverDuration) || 10;
                     document.getElementById("screensaver-brightness").value = brightness;
+                    document.getElementById("screensaver-brightness-value").innerText = brightness;
                     document.getElementById("screensaver-duration").value = duration;
                     document.getElementById("screensaver-duration-value").innerText = duration;
                     requestAnimationFrame(function() {
@@ -836,6 +912,12 @@
                     });
                     if (config.screensaverMode !== undefined) {
                         document.getElementById("screensaver-mode").value = config.screensaverMode;
+                    }
+                    if (config.screensaverShuffle !== undefined) {
+                        document.getElementById("screensaver-shuffle").checked = config.screensaverShuffle == 1;
+                    }
+                    if (config.screensaverStrictTimer !== undefined) {
+                        document.getElementById("screensaver-strict-timer").checked = config.screensaverStrictTimer == 1;
                     }
                     if (config.clockR !== undefined) {
                         var cHex = toHex(config.clockR, config.clockG, config.clockB);
@@ -912,6 +994,93 @@
             uploadNext(0);
         }
 
+        var _radioPlaying     = false;
+        var _radioPreset      = -1;
+        var _radioLastPreset  = -1;
+        var _radioDisplayActive = true;
+        var _radioVolume      = 15;
+
+        // ── GIF-Audio ─────────────────────────────────────────────────────────
+        function gifAudioLoad() {
+            fetch('/gif_audio_files').then(function(r) { return r.json(); }).then(function(files) {
+                var el = document.getElementById('gif-audio-list');
+                if (!el) return;
+                if (files.length === 0) {
+                    el.innerHTML = '<span style="color:#666;">Keine MP3s in /GifAudio/</span>';
+                    return;
+                }
+                el.innerHTML = files.map(function(f) {
+                    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #333;">'
+                        + '<span>' + f.name + ' <span style="color:#666;font-size:0.85em;">(' + Math.round(f.size/1024) + ' KB)</span></span>'
+                        + '<button onclick="gifAudioDelete(\'' + f.name + '\')" style="padding:2px 8px;background:#8b1a1a;font-size:0.8em;margin:0;">&#x2715;</button>'
+                        + '</div>';
+                }).join('');
+            }).catch(function() {
+                var el = document.getElementById('gif-audio-list');
+                if (el) el.innerHTML = '<span style="color:#c0392b;">Fehler beim Laden</span>';
+            });
+        }
+
+        function gifAudioDelete(name) {
+            var fd = new FormData(); fd.append('name', name);
+            fetch('/gif_audio_delete', { method: 'POST', body: fd })
+                .then(function() { gifAudioLoad(); });
+        }
+
+        function gifAudioUpload(files) {
+            if (!files || files.length === 0) return;
+            var status = document.getElementById('gif-audio-upload-status');
+            var i = 0;
+            function uploadNext() {
+                if (i >= files.length) { if (status) status.innerText = 'Fertig.'; gifAudioLoad(); return; }
+                var fd = new FormData(); fd.append('file', files[i], files[i].name);
+                if (status) status.innerText = 'Lade ' + files[i].name + '...';
+                fetch('/gif_audio_upload', { method: 'POST', body: fd })
+                    .then(function() { i++; uploadNext(); });
+            }
+            uploadNext();
+        }
+
+        gifAudioLoad();
+
+        function setRadioVolume(v, skipSend) {
+            v = Math.max(0, Math.min(21, v));
+            _radioVolume = v;
+            var valEl = document.getElementById('radio-vol-val');
+            if (valEl) valEl.innerText = v;
+            var slider = document.getElementById('radio-volume-slider');
+            if (slider) slider.value = v;
+            if (!skipSend) {
+                var fd = new FormData(); fd.append('vol', v);
+                fetch('/radio_volume', { method: 'POST', body: fd });
+            }
+        }
+
+        function toggleRadioDisplay() {
+            _radioDisplayActive = !_radioDisplayActive;
+            var fd = new FormData();
+            fd.append('active', _radioDisplayActive ? '1' : '0');
+            fetch('/radio_display', { method: 'POST', body: fd });
+            document.getElementById('radio-display-btn').style.background = _radioDisplayActive ? '#27ae60' : '#555';
+        }
+
+        function toggleRadio() {
+            if (_radioPlaying) {
+                fetch('/radio_stop', { method: 'POST' }).then(function() { updateRadioBtns(); });
+            } else if (_radioLastPreset >= 0) {
+                fetch('/radio_presets').then(function(r) { return r.json(); }).then(function(presets) {
+                    if (presets[_radioLastPreset]) {
+                        var fd = new FormData();
+                        fd.append('url', presets[_radioLastPreset].url);
+                        fd.append('preset', _radioLastPreset);
+                        fetch('/radio_play', { method: 'POST', body: fd }).then(function() { updateRadioBtns(); });
+                    }
+                });
+            } else {
+                window.location.href = '/radio.html';
+            }
+        }
+
         function toggleScreensaverPause() {
             var xhr = new XMLHttpRequest();
             xhr.open('POST', '/screensaver_pause', true);
@@ -936,6 +1105,55 @@
             xhr.send();
         }
 
+        function fetchSDInfo() {
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", "/sd_info", true);
+            xhr.timeout = 5000;
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                    var info = JSON.parse(xhr.responseText);
+                    var sdInfoElem = document.getElementById('sd-info');
+                    var sdBar = document.getElementById('sd-bar');
+                    var ejectBtn = document.getElementById('eject-btn');
+                    if (info.available && info.total > 0) {
+                        var usedMB = (info.used / 1024).toFixed(0);
+                        var totalMB = (info.total / 1024).toFixed(0);
+                        var freeMB = (info.free / 1024).toFixed(0);
+                        var pct = ((info.used / info.total) * 100).toFixed(1);
+                        sdInfoElem.innerText = usedMB + " MB / " + totalMB + " MB (" + freeMB + " MB frei)";
+                        sdBar.style.width = pct + "%";
+                        if (pct > 80) sdBar.style.background = "#dc3545";
+                        else if (pct > 60) sdBar.style.background = "#ffc107";
+                        else sdBar.style.background = "#28a745";
+                        if (ejectBtn) ejectBtn.style.display = 'block';
+                    } else {
+                        sdInfoElem.innerText = "–";
+                        sdBar.style.width = "0%";
+                        if (ejectBtn) ejectBtn.style.display = 'none';
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        function ejectSD() {
+            if (!confirm("SD-Karte sicher auswerfen?")) return;
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/eject_sd", true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                    var statusElem = document.getElementById('sd-card-status');
+                    statusElem.innerText = "⏏ SD card ejected — safe to remove";
+                    statusElem.style.color = "#aaa";
+                    document.getElementById('eject-btn').style.display = 'none';
+                    document.getElementById('sd-info').innerText = "–";
+                    document.getElementById('sd-bar').style.width = "0%";
+                    loadSDFolders();
+                }
+            };
+            xhr.send();
+        }
+
         function loadSDFolders() {
             var xhr = new XMLHttpRequest();
             xhr.open("GET", "/sd_folders", true);
@@ -955,7 +1173,7 @@
                 }
                 if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
                     var data = JSON.parse(xhr.responseText);
-                    activeScreensaverPath = data.currentPath || '';  // Sync mit Server
+                    var selectedPaths = (data.currentPaths || '').split(',').map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 0; });
                     var statusElem = document.getElementById('sd-card-status');
                     var folderList = document.getElementById('sd-folder-list');
 
@@ -969,12 +1187,47 @@
 
                     folderList.innerHTML = '';
 
-                    // Standard LittleFS button — immer sichtbar!
+                    // LittleFS Toggle-Button + versteckte Checkbox
+                    var defCb = document.createElement('input');
+                    defCb.type = 'checkbox'; defCb.value = 'FS:'; defCb.style.display = 'none';
+                    defCb.checked = (selectedPaths.indexOf('FS:') >= 0 || selectedPaths.length === 0);
                     var defBtn = document.createElement('button');
-                    defBtn.innerText = '📁 LittleFS (default)';
+                    defBtn.innerText = '📁 LittleFS';
                     defBtn.style.cssText = 'width:auto; padding:8px 14px; margin-bottom:0; background:' +
-                        (data.currentPath === '' ? '#28a745' : '#007bff') + ';';
-                    defBtn.onclick = function() { setScreensaverPath(''); };
+                        (defCb.checked ? '#28a745' : '#007bff') + ';';
+                    defBtn.onclick = function() {
+                        defCb.checked = !defCb.checked;
+                        defBtn.style.background = defCb.checked ? '#28a745' : '#007bff';
+                    };
+                    folderList.appendChild(defCb);
+
+                    // Favoriten Button
+                    var favBtn = document.createElement('button');
+                    favBtn.innerText = '⭐ Favoriten';
+                    favBtn.style.cssText = 'width:auto; padding:8px 14px; margin-bottom:0; background:' +
+                        (data.currentPaths === 'FAV' ? '#28a745' : '#007bff') + ';';
+                    favBtn.onclick = function() {
+                        document.querySelectorAll('#sd-folder-list input[type=checkbox]').forEach(function(cb){ cb.checked = false; });
+                        document.querySelectorAll('#sd-folder-list button').forEach(function(b){ b.style.background = '#007bff'; });
+                        favBtn.style.background = '#28a745';
+                        activeScreensaverPath = '';
+                        var statusElem = document.getElementById('sd-folder-status');
+                        if (statusElem) { statusElem.innerText = 'Favoriten werden geladen...'; statusElem.style.color = '#aaa'; }
+                        var xhr = new XMLHttpRequest();
+                        xhr.open("POST", "/set_screensaver_paths", true);
+                        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                        xhr.onreadystatechange = function() {
+                            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                                setTimeout(function() {
+                                    sdFileOffset = 0;
+                                    loadSDScreensaverFiles();
+                                    if (statusElem) { statusElem.innerText = 'Favoriten aktiv'; statusElem.style.color = 'green'; }
+                                }, 2000);
+                            }
+                        };
+                        xhr.send("paths=FAV");
+                    };
+                    folderList.appendChild(favBtn);
                     folderList.appendChild(defBtn);
 
                     if (!data.available) {
@@ -982,40 +1235,88 @@
                         return;
                     }
 
-                    // SD folder buttons
+                    // SD-Ordner als Toggle-Buttons mit versteckter Checkbox
                     if (data.folders && data.folders.length > 0) {
                         data.folders.forEach(function(folder) {
+                            var isSelected = selectedPaths.indexOf(folder) >= 0;
+                            var cb = document.createElement('input');
+                            cb.type = 'checkbox';
+                            cb.value = folder;
+                            cb.checked = isSelected;
+                            cb.style.display = 'none';
                             var btn = document.createElement('button');
                             btn.innerText = '📂 ' + folder;
                             btn.style.cssText = 'width:auto; padding:8px 14px; margin-bottom:0; background:' +
-                                (data.currentPath === folder ? '#28a745' : '#007bff') + ';';
-                            btn.onclick = function() { setScreensaverPath(folder); };
+                                (isSelected ? '#28a745' : '#007bff') + ';';
+                            btn.onclick = function() {
+                                cb.checked = !cb.checked;
+                                btn.style.background = cb.checked ? '#28a745' : '#007bff';
+                                var anyChecked = Array.from(document.querySelectorAll('#sd-folder-list input[type=checkbox]')).some(function(c){ return c.checked; });
+                                defBtn.style.background = anyChecked ? '#007bff' : '#28a745';
+                            };
+                            folderList.appendChild(cb);
                             folderList.appendChild(btn);
                         });
                     } else {
-                        folderList.innerHTML += '<span style="color:#aaa; font-size:0.85em; margin-left:8px;">No folders found on SD card</span>';
+                        folderList.innerHTML += '<span style="color:#aaa; font-size:0.85em; margin-left:8px;">Keine Ordner auf SD Karte gefunden</span>';
                     }
 
-                    // Load active files
+                    // Load active files + SD Speicherinfo
                     loadSDScreensaverFiles();
+                    fetchSDInfo();
                 }
             };
             xhr.send();
         }
 
-        function setScreensaverPath(path) {
-            activeScreensaverPath = path;  // Merken für Upload
+        function setScreensaverPaths() {
+            var checkboxes = document.querySelectorAll('#sd-folder-list input[type=checkbox]');
+            var selected = [];
+            checkboxes.forEach(function(cb) { if (cb.checked) selected.push(cb.value); });
+            var paths = selected.join(',');
+            activeScreensaverPath = selected.length > 0 ? selected[0] : '';
+            var statusElem = document.getElementById('sd-folder-status');
+            statusElem.innerText = 'wird geladen...';
+            statusElem.style.color = '#aaa';
+            var cancelBtn = document.getElementById('cancel-scan-btn');
+            if (cancelBtn) cancelBtn.style.display = 'inline-block';
             var xhr = new XMLHttpRequest();
-            xhr.open("POST", "/set_screensaver_path", true);
+            xhr.open("POST", "/set_screensaver_paths", true);
             xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-                    loadSDFolders();
-                    // Kurz warten bis ESP die Dateien geladen hat dann Liste aktualisieren
-                    setTimeout(function() { loadSDScreensaverFiles(); }, 500);
+                    var countEl = document.getElementById('screensaver-file-count');
+                    if (countEl) countEl.textContent = 'wird geladen...';
+                    setTimeout(function() {
+                        sdFileOffset = 0;
+                        loadSDFolders();
+                        loadSDScreensaverFiles();
+                        statusElem.innerText = selected.length > 0 ? selected.length + ' Ordner aktiv' : 'LittleFS aktiv';
+                        statusElem.style.color = 'green';
+                        if (cancelBtn) cancelBtn.style.display = 'none';
+                    }, 8000);
+                } else if (xhr.readyState === XMLHttpRequest.DONE) {
+                    statusElem.innerText = 'Fehler beim Speichern';
+                    statusElem.style.color = 'red';
                 }
             };
-            xhr.send("path=" + encodeURIComponent(path));
+            xhr.send("paths=" + encodeURIComponent(paths));
+        }
+
+        function cancelScan() {
+            var statusElem = document.getElementById('sd-folder-status');
+            var cancelBtn = document.getElementById('cancel-scan-btn');
+            if (statusElem) { statusElem.innerText = 'Scan wird abgebrochen...'; statusElem.style.color = '#e67e22'; }
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/cancel_scan", true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                    if (statusElem) { statusElem.innerText = 'Scan abgebrochen — LittleFS aktiv'; statusElem.style.color = 'green'; }
+                    if (cancelBtn) cancelBtn.style.display = 'none';
+                    setTimeout(function() { sdFileOffset = 0; loadSDFolders(); loadSDScreensaverFiles(); }, 2000);
+                }
+            };
+            xhr.send();
         }
 
         function deleteActiveFile(filepath) {
@@ -1046,9 +1347,22 @@
             xhr.send();
         }
 
+        var sdFileOffset = 0;
+        var sdFileTotal = 0;
+        var sdFilePageSize = 20;
+
+        function sdFilePage(dir) {
+            var newOffset = sdFileOffset + dir * sdFilePageSize;
+            if (newOffset < 0) newOffset = 0;
+            if (newOffset >= sdFileTotal) return;
+            sdFileOffset = newOffset;
+            loadSDScreensaverFiles();
+        }
+
         function loadSDScreensaverFiles() {
             var xhr = new XMLHttpRequest();
-            xhr.open("GET", "/screensaver_files", true);
+            var url = "/screensaver_files?offset=" + sdFileOffset;
+            xhr.open("GET", url, true);
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
                     var files = JSON.parse(xhr.responseText);
@@ -1056,21 +1370,116 @@
                     list.innerHTML = "";
                     if (files.length === 0) {
                         list.innerHTML = "<li><span>No files in selected folder.</span></li>";
-                        return;
+                    } else {
+                        // Cache verwenden statt bei jedem Refresh neu laden
+                        (function() {
+                            var favLines = cachedFavLines;
+                            var ignLines = cachedIgnLines;
+                            (function() {
+                            files.forEach(function(filepath) {
+                                var name = filepath.replace("FS:/screensaver/", "").replace(/^SD:\/[^\/]+\//, "");
+                                var li = document.createElement('li');
+                                var span = document.createElement('span');
+                                span.textContent = name;
+
+                                // Favoriten-Button
+                                var isFav = favLines.indexOf(filepath) >= 0;
+                                var favBtn = document.createElement('button');
+                                favBtn.className = 'delete-btn';
+                                favBtn.textContent = isFav ? '⭐' : '☆';
+                                favBtn.style.background = isFav ? '#f0a500' : '#555';
+                                favBtn.onclick = function() {
+                                    var x = new XMLHttpRequest();
+                                    x.open("POST", "/toggle_favorite", true);
+                                    x.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                                    x.onreadystatechange = function() {
+                                        if (x.readyState === XMLHttpRequest.DONE && x.status === 200) {
+                                            var d = JSON.parse(x.responseText);
+                                            favBtn.textContent = d.favorite ? '⭐' : '☆';
+                                            favBtn.style.background = d.favorite ? '#f0a500' : '#555';
+                                            if (currentFilePath === filepath) {
+                                                var fb = document.getElementById('fav-btn');
+                                                if (fb) { fb.textContent = d.favorite ? '⭐' : '☆'; fb.style.background = d.favorite ? '#f0a500' : '#555'; }
+                                            }
+                                        }
+                                    };
+                                    x.send("path=" + encodeURIComponent(filepath));
+                                };
+
+                                // Ignore-Button
+                                var isIgn = ignLines.indexOf(filepath) >= 0;
+                                var ignBtn = document.createElement('button');
+                                ignBtn.className = 'delete-btn';
+                                ignBtn.textContent = '🚫';
+                                ignBtn.style.background = isIgn ? '#c0392b' : '#555';
+                                ignBtn.onclick = function() {
+                                    var x = new XMLHttpRequest();
+                                    x.open("POST", "/toggle_ignore", true);
+                                    x.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                                    x.onreadystatechange = function() {
+                                        if (x.readyState === XMLHttpRequest.DONE && x.status === 200) {
+                                            var d = JSON.parse(x.responseText);
+                                            ignBtn.style.background = d.ignored ? '#c0392b' : '#555';
+                                            if (currentFilePath === filepath) {
+                                                var ib = document.getElementById('ign-btn');
+                                                if (ib) ib.style.background = d.ignored ? '#c0392b' : '#555';
+                                            }
+                                        }
+                                    };
+                                    x.send("path=" + encodeURIComponent(filepath));
+                                };
+
+                                var playBtn = document.createElement('button');
+                                playBtn.className = 'delete-btn';
+                                playBtn.textContent = '▶';
+                                playBtn.style.background = '#28a745';
+                                playBtn.onclick = function() {
+                                    var x = new XMLHttpRequest();
+                                    x.open("POST", "/play_file", true);
+                                    x.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                                    x.send("path=" + encodeURIComponent(filepath));
+                                };
+
+                                var delBtn = document.createElement('button');
+                                delBtn.className = 'delete-btn';
+                                delBtn.textContent = '🗑';
+                                delBtn.onclick = function() { deleteActiveFile(filepath); };
+                                li.appendChild(span);
+                                li.appendChild(playBtn);
+                                li.appendChild(favBtn);
+                                li.appendChild(ignBtn);
+                                li.appendChild(delBtn);
+                                list.appendChild(li);
+                            });
+                            })();
+                        })();
                     }
-                    files.forEach(function(filepath) {
-                        var name = filepath.replace("FS:/screensaver/", "").replace(/^SD:\/[^\/]+\//, "");
-                        var li = document.createElement('li');
-                        var span = document.createElement('span');
-                        span.textContent = name;
-                        var btn = document.createElement('button');
-                        btn.className = 'delete-btn';
-                        btn.textContent = '🗑';
-                        btn.onclick = function() { deleteActiveFile(filepath); };
-                        li.appendChild(span);
-                        li.appendChild(btn);
-                        list.appendChild(li);
-                    });
+                    // Gesamtzahl abrufen und Pagination aktualisieren
+                    var xhr2 = new XMLHttpRequest();
+                    xhr2.open("GET", "/screensaver_folder_count", true);
+                    xhr2.onreadystatechange = function() {
+                        if (xhr2.readyState === XMLHttpRequest.DONE && xhr2.status === 200) {
+                            var info = JSON.parse(xhr2.responseText);
+                            sdFileTotal = info.total;
+                            var countEl = document.getElementById('screensaver-file-count');
+                            countEl.textContent = '(' + info.total + ')';
+                            var pagination = document.getElementById('ss-pagination');
+                            var prevBtn = document.getElementById('ss-prev-btn');
+                            var nextBtn = document.getElementById('ss-next-btn');
+                            var pageInfo = document.getElementById('ss-page-info');
+                            if (info.total > sdFilePageSize && info.showing < info.total) {
+                                pagination.style.display = 'flex';
+                                var from = sdFileOffset + 1;
+                                var to = Math.min(sdFileOffset + sdFilePageSize, info.total);
+                                pageInfo.textContent = from + '–' + to + ' von ' + info.total;
+                                prevBtn.disabled = false;  // Wrap-Around: immer aktiv
+                                nextBtn.disabled = false;   // Wrap-Around: immer aktiv
+                            } else {
+                                pagination.style.display = 'none';
+                            }
+                        }
+                    };
+                    xhr2.send();
                 }
             };
             xhr.send();
@@ -1078,10 +1487,12 @@
 
         window.onload = function () {
             loadConfig();
-            fetchScalingModes();
-            loadScreensaverFiles();
+            refreshFavIgnCache();
             fetchFsInfo();
+            fetchSDInfo();
             loadSDFolders();
+            fetchCurrentFile();
+            setInterval(fetchCurrentFile, 5000);
             fetch('/screensaver_status').then(function(r) { return r.json(); }).then(function(d) {
                 var btn = document.getElementById('pause-btn');
                 var status = document.getElementById('pause-status');
@@ -1099,6 +1510,43 @@
                     }
                 }
             }).catch(function() {});
+
+            // Radio-Status aktualisieren
+            function updateRadioBtns() {
+                fetch('/radio_status').then(function(r) { return r.json(); }).then(function(d) {
+                    _radioPlaying    = d.playing;
+                    _radioPreset     = d.preset;
+                    _radioLastPreset = (d.lastPreset !== undefined && d.lastPreset >= 0) ? d.lastPreset : _radioLastPreset;
+                    if (d.volume !== undefined) setRadioVolume(d.volume, true);
+                    if (d.displayActive !== undefined) {
+                        _radioDisplayActive = d.displayActive;
+                        var dBtn = document.getElementById('radio-display-btn');
+                        if (dBtn) dBtn.style.background = _radioDisplayActive ? '#27ae60' : '#555';
+                    }
+                    var btn     = document.getElementById('radio-toggle-btn');
+                    var stEl    = document.getElementById('radio-station');
+                    var trackEl = document.getElementById('radio-track');
+                    if (!btn) return;
+                    if (d.playing) {
+                        btn.innerHTML = '&#9632; Stop';
+                        btn.style.background = '#c0392b';
+                        if (stEl)    stEl.innerText   = d.station || '';
+                        if (trackEl) trackEl.innerText = d.title   || '';
+                    } else if (_radioLastPreset >= 0) {
+                        btn.innerHTML = '&#9654; Play';
+                        btn.style.background = '#27ae60';
+                        if (stEl)    stEl.innerText   = 'Gestoppt';
+                        if (trackEl) trackEl.innerText = '';
+                    } else {
+                        btn.innerHTML = '&#9654; Play';
+                        btn.style.background = '#555';
+                        if (stEl)    stEl.innerText   = 'Kein Sender gewählt';
+                        if (trackEl) trackEl.innerText = '';
+                    }
+                }).catch(function() {});
+            }
+            updateRadioBtns();
+            setInterval(updateRadioBtns, 5000);
         };
     </script>
 </body>

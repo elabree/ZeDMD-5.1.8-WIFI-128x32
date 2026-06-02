@@ -1,38 +1,53 @@
 
 #include <Arduino.h>
+#include <algorithm>
 #include <AsyncUDP.h>
 #include <Bounce2.h>
 #include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
 #include <LittleFS.h>
 #include <WiFi.h>
+#include <HTTPClient.h>
+#ifdef ZEDMD_WIFI
+#include <PubSubClient.h>
+#include <Update.h>
+#endif
 
 #include <cstring>
 #include <AnimatedGIF.h>
-#include <SD.h>
-#include <SPI.h>
-
-// SD Karte SPI Pins
-#ifdef CONFIG_IDF_TARGET_ESP32S3
-  // ESP32-S3 Pins (HUB75 belegt andere Pins)
-  #define SD_MOSI 11
-  #define SD_MISO 13
-  #define SD_SCK  12
-  #define SD_CS   10
-#elif defined(ZEDMD_WIFI)
-  // Standard ESP32 WiFi Build
-  // Menu Pins GPIO21 + GPIO33 werden nicht gebraucht → für SD nutzen
-  // Beide haben interne Pull-Ups → ideal für SPI MISO!
-  #define SD_MOSI 18
-  #define SD_MISO 21  // Hat internen Pull-Up ✓
-  #define SD_SCK  2
-  #define SD_CS   33  // Hat internen Pull-Up ✓
+#ifdef WEBRADIO_ENABLED
+#include "radio.h"
+#endif
+#ifdef SD_MMC_BUILD
+  // SDMMC onboard SD-Karte (1-bit Modus)
+  #include <SD_MMC.h>
+  #define SD_MMC_CLK_PIN  39
+  #define SD_MMC_CMD_PIN  38
+  #define SD_MMC_DATA_PIN 40
+  #define SD SD_MMC  // einheitliche SD-Schnittstelle für den Rest des Codes
 #else
-  // Standard ESP32 USB Build — keine SD Karte
-  #define SD_MOSI 18
-  #define SD_MISO 21
-  #define SD_SCK  2
-  #define SD_CS   33
+  #include <SD.h>
+  #include <SPI.h>
+  // SD Karte SPI Pins
+  #ifdef CONFIG_IDF_TARGET_ESP32S3
+    // ESP32-S3 Pins (HUB75 belegt andere Pins)
+    #define SD_MOSI 11
+    #define SD_MISO 13
+    #define SD_SCK  12
+    #define SD_CS   10
+  #elif defined(ZEDMD_WIFI)
+    // Standard ESP32 WiFi Build
+    #define SD_MOSI 18
+    #define SD_MISO 21
+    #define SD_SCK  2
+    #define SD_CS   33
+  #else
+    // Standard ESP32 USB Build — keine SD Karte
+    #define SD_MOSI 18
+    #define SD_MISO 21
+    #define SD_SCK  2
+    #define SD_CS   33
+  #endif
 #endif
 
 // Specific improvements and #define for the ESP32 S3 series
@@ -132,7 +147,7 @@ mz_ulong bufferSizes[NUM_BUFFERS] __attribute__((aligned(4))) = {0};
 bool bufferCompressed[NUM_BUFFERS] __attribute__((aligned(4))) = {0};
 
 // The uncompress buffer should be bug enough
-uint8_t uncompressBuffer[2048] __attribute__((aligned(4)));
+uint8_t* uncompressBuffer = nullptr;  // alloziert in PSRAM (setup)
 uint8_t *renderBuffer[NUM_RENDER_BUFFERS];
 uint8_t currentRenderBuffer __attribute__((aligned(4)));
 uint8_t lastRenderBuffer __attribute__((aligned(4)));
@@ -155,11 +170,13 @@ uint8_t brightness = 2;
 int8_t rgbMode = 0;
 uint8_t rgbModeLoaded = 0;
 int8_t yOffset = 0;
+#ifdef DISPLAY_LED_MATRIX
 uint8_t panelClkphase = 0;
 uint8_t panelDriver = 0;
 uint8_t panelI2sspeed = 8;
 uint8_t panelLatchBlanking = 2;
 uint8_t panelMinRefreshRate = 30;
+#endif
 
 // I needed to change these from RGB to RC (Red Color), BC, GC to prevent
 // conflicting with the TFT_SPI Library.
@@ -189,6 +206,51 @@ int8_t transport = TRANSPORT_WIFI_UDP;
 #else
 int8_t transport = TRANSPORT_USB;
 #endif
+// ── Log Ring-Buffer ───────────────────────────────────────────────────────────
+#define LOG_LINES     80
+#define LOG_LINE_LEN  120
+#define RTC_LOG_LINES 40
+#define RTC_LINE_LEN  100
+
+static char (*logBuffer)[LOG_LINE_LEN] = nullptr;  // alloziert in PSRAM (setup)
+static uint8_t logHead = 0;
+static uint8_t logCount = 0;
+static portMUX_TYPE logMux = portMUX_INITIALIZER_UNLOCKED;
+
+// RTC-Speicher: überlebt Watchdog/Exception-Resets
+RTC_DATA_ATTR static char rtcLog[RTC_LOG_LINES][RTC_LINE_LEN];
+RTC_DATA_ATTR static uint8_t rtcLogHead = 0;
+RTC_DATA_ATTR static uint8_t rtcLogCount = 0;
+RTC_DATA_ATTR static bool rtcLogValid = false;
+
+void logMsg(const char* fmt, ...) {
+  char tmp[LOG_LINE_LEN];
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(tmp, sizeof(tmp), fmt, args);
+  va_end(args);
+#ifdef WEBRADIO_ENABLED
+  if (!radioIsPlaying) Serial.println(tmp);
+#else
+  Serial.println(tmp);
+#endif
+  uint32_t ms = millis();
+  char line[LOG_LINE_LEN];
+  snprintf(line, sizeof(line), "[%lu.%03lu] %s", ms / 1000, ms % 1000, tmp);
+  portENTER_CRITICAL(&logMux);
+  strncpy(logBuffer[logHead], line, LOG_LINE_LEN - 1);
+  logHead = (logHead + 1) % LOG_LINES;
+  if (logCount < LOG_LINES) logCount++;
+  // Auch in RTC-Speicher schreiben
+  strncpy(rtcLog[rtcLogHead], line, RTC_LINE_LEN - 1);
+  rtcLog[rtcLogHead][RTC_LINE_LEN - 1] = '\0';
+  rtcLogHead = (rtcLogHead + 1) % RTC_LOG_LINES;
+  if (rtcLogCount < RTC_LOG_LINES) rtcLogCount++;
+  rtcLogValid = true;
+  portEXIT_CRITICAL(&logMux);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 bool logoActive;
 volatile bool transportActive;  // volatile: wird von Task_ReadSerial (Core 1) gesetzt!
 uint8_t transportWaitCounter;
@@ -198,17 +260,30 @@ bool serverRunning;
 uint8_t throbberColors[6] __attribute__((aligned(4))) = {0};
 mz_ulong uncompressedBufferSize = 2048;
 uint16_t shortId;
-// Screensaver
-String screensaverFiles[20];
-uint8_t screensaverCount = 0;
-uint8_t screensaverIndex = 0;
-uint8_t screensaverTickCounter = 0;
+// Screensaver — Pfade dynamisch im PSRAM, kein festes Limit
+SemaphoreHandle_t screensaverFilesMutex = nullptr;
+char (*screensaverFiles)[128] = nullptr;
+uint16_t screensaverFilesCapacity = 0;
+uint16_t screensaverCount = 0;
+uint16_t screensaverIndex = 0;
+uint32_t screensaverRAWShowStart = 0;
 uint8_t screensaverBrightness = 3;
 uint8_t screensaverDuration = 10;  // Anzeigedauer in Sekunden, Default 10
+bool screensaverShuffle = false;
+bool screensaverStrictTimer = true;
 bool sdCardAvailable = false;
-volatile bool screensaverReloadNeeded = false;
+bool sdCardWarningPending = false;
+uint64_t sdTotalBytes = 0;
+uint64_t sdUsedBytes = 0;
+volatile bool screensaverReloadNeeded  = false;
+volatile bool screensaverLoadRunning   = false;  // Background-Task läuft
 volatile bool sdRefreshNeeded = false;
-String cachedSDFolders = "[]";  // Cache für SD Ordner Liste
+String cachedSDFolders    = "[]";  // Cache für SD Ordner Liste
+String cachedGifAudioFiles = "[]"; // Cache für /gif_audio_files
+String cachedSdFiles       = "[]"; // Cache für /sd_files (letzter angefragter Ordner)
+String cachedSdFilesFolder = "";   // Ordner für den cachedSdFiles gilt
+volatile bool gifAudioRefreshNeeded = false;
+volatile bool sdFilesRefreshNeeded  = false;
 bool screensaverPaused = false;  // Screensaver Pause/Play
 uint8_t screensaverMode = 0;     // 0=Screensaver only, 1=Clock only, 2=Clock+Screensaver
 bool ntpSynced = false;
@@ -216,8 +291,100 @@ String ntpServer = "pool.ntp.org";
 uint8_t clockR = 0,   clockG = 255, clockB = 200;  // Uhrzeit Farbe (Cyan)
 uint8_t dateR  = 180, dateG  = 180, dateB  = 180;  // Datum Farbe (Grau)
 volatile bool clockColorChanged = true;  // Erzwingt Neuzeichnung wenn Farbe geändert
-SPIClass spiSD(HSPI);  // Global — darf nicht lokal sein!
-String screensaverPath = "";  // Aktuell gewählter Pfad (leer = Standard)
+// Wetter (Modus 3)
+float weatherTemp = 0.0f;
+float weatherWindSpeed = 0.0f;
+uint8_t weatherHumidity = 0;
+uint16_t weatherPressure = 0;
+uint16_t weatherCode = 0;
+bool weatherIsDay = true;
+bool weatherAvailable = false;
+uint32_t lastWeatherFetch = 0;
+uint32_t lastMqttWeather  = 0;
+uint32_t weatherPhaseStart = 0;
+uint16_t forecastCode[3]    = {0, 0, 0};
+int8_t   forecastTempMax[3] = {0, 0, 0};
+volatile bool forecastAvailable  = false;
+volatile bool weatherFetchRunning = false;
+
+#ifdef ZEDMD_WIFI
+String   mqttServer    = "";
+uint16_t mqttPort      = 1883;
+#endif
+float    weatherLat    = 52.3202f;
+float    weatherLon    = 10.4011f;
+#ifdef ZEDMD_WIFI
+WiFiClient   mqttWifiClient;
+PubSubClient mqttClient(mqttWifiClient);
+uint32_t     lastMqttReconnect = 0;
+
+void onMqttMessage(char* topic, byte* payload, unsigned int length) {
+  if (length == 0) return;
+  static char buf[2048];  // static: kein Stack-Druck auf mqttTask (8KB Stack)
+  if (length >= sizeof(buf)) return;
+  memcpy(buf, payload, length);
+  buf[length] = '\0';
+
+  auto val = [&](const char* key) -> float {
+    char search[48];
+    snprintf(search, sizeof(search), "\"%s\":", key);
+    const char* p = strstr(buf, search);
+    if (!p) return 0.0f;
+    const char* v = p + strlen(search);
+    while (*v == ' ') v++;
+    if (*v == '"') v++;
+    return atof(v);
+  };
+
+  weatherTemp      = val("outTemp_C");
+  weatherHumidity  = (uint8_t)roundf(val("outHumidity"));
+  weatherWindSpeed = val("windSpeed_kph");
+  weatherPressure  = (uint16_t)roundf(val("barometer_mbar"));
+  weatherAvailable = true;
+  lastMqttWeather  = millis();
+  __sync_synchronize();  // alle Wetterwerte vor clockColorChanged auf Core 1 sichtbar
+  clockColorChanged = true;
+}
+
+void mqttConnect() {
+  if (mqttServer.length() == 0) return;
+  if (!wifiActive || WiFi.status() != WL_CONNECTED) return;
+  if (mqttClient.connect("ZeDMD_wx")) {
+    mqttClient.subscribe("weather/loop");
+    logMsg("MQTT: verbunden");
+  } else {
+    logMsg("MQTT: Verbindung fehlgeschlagen (rc=%d)", mqttClient.state());
+  }
+}
+
+void mqttTask(void* pvParameters) {
+  for (;;) {
+    if (wifiActive && WiFi.status() == WL_CONNECTED) {
+      if (mqttClient.connected()) {
+        mqttClient.loop();
+      } else {
+        uint32_t now = millis();
+        if (now - lastMqttReconnect > 5000) {
+          lastMqttReconnect = now;
+          mqttConnect();
+        }
+      }
+    }
+    vTaskDelay(pdMS_TO_TICKS(20));
+  }
+}
+#endif
+uint8_t weatherPage = 0;  // 0=Uhr+Wetter, 1=Vorhersage, 2=Screensaver
+#ifndef SD_MMC_BUILD
+SPIClass spiSD(HSPI);  // Global — darf nicht lokal sein! (SPI-SD-Builds only)
+#endif
+String screensaverPaths = "";      // Kommagetrennte Liste gewählter Pfade (leer = LittleFS)
+String screensaverFavorites = "";  // Newline-getrennte Favoriten-Pfade
+volatile bool forcePlayPending = false;
+String forcePlayFile = "";
+String currentlyPlayingFile = "";  // aktuell gespieltes GIF (auch Force-Play)
+String screensaverIgnore = "";     // Newline-getrennte Ignore-Pfade
+volatile bool cancelSdScan = false;
 
 // AnimatedGIF
 AnimatedGIF gif;
@@ -226,18 +393,50 @@ File gifFile;
 // Forward Declarations
 void LoadScreensaverFiles();
 void InitSDCard();
-void SaveScreensaverPath();
-void LoadScreensaverPath();
+void SaveScreensaverPaths();
+void LoadScreensaverPaths();
+void addScreensaverFile(const String& path);
+void SaveScreensaverCache();
+bool TryLoadScreensaverCache();
+void InvalidateAllFolderCaches();
+String folderCacheKey(const String& path);
+uint16_t TryLoadFolderCache(const String& sdPath);
+void SaveFolderCache(const String& sdPath, uint16_t fromIndex, uint16_t count);
+void sortScreensaverFiles();
+void shuffleScreensaverFiles();
+bool isFavorite(const char* path);
+void toggleFavorite(const char* path);
+void LoadFavorites();
+bool isIgnored(const char* path);
+void toggleIgnore(const char* path);
+void LoadIgnore();
 String GetSDFolders();
 void SaveScreensaverLum();
 void SaveScreensaverDuration();
 void SaveScreensaverMode();
+void SaveScreensaverShuffle();
+void SaveScreensaverStrictTimer();
+void SaveWeatherConfig();
+void LoadWeatherConfig();
+#ifdef ZEDMD_WIFI
+void SaveMqttConfig();
+void LoadMqttConfig();
+#endif
 void LoadScreensaverMode();
 void DisplayClock();
 void InitNTP();
 void SaveClockColors();
 void LoadClockColors();
+void fetchWeather();
+void weatherFetchTask(void* pvParams);
+void triggerWeatherFetch();
+void DisplayWeather();
+void DisplayClockWeather();
+void DisplayWeatherForecast();
 void GIFDraw(GIFDRAW *pDraw);
+#ifdef WEBRADIO_ENABLED
+void DisplayRadio();
+#endif
 
 void DoRestart(int sec) {
   if (wifiActive) {
@@ -266,7 +465,7 @@ void RestartAfterError() { DoRestart(30); }
 
 void DisplayNumber(uint32_t chf, uint8_t nc, uint16_t x, uint16_t y, uint8_t r,
                    uint8_t g, uint8_t b, bool transparent = false) {
-  char text[nc];
+  char text[16];
   sprintf(text, "%d", chf);
 
   uint8_t i = 0;
@@ -281,9 +480,9 @@ void DisplayNumber(uint32_t chf, uint8_t nc, uint16_t x, uint16_t y, uint8_t r,
 
 void DisplayVersion(bool logo = false) {
   // display the version number to the lower right
-  char version[10];
-  snprintf(version, 9, "%d.%d.%d", ZEDMD_VERSION_MAJOR, ZEDMD_VERSION_MINOR,
-           ZEDMD_VERSION_PATCH);
+  char version[16];
+  snprintf(version, sizeof(version), "%d.%d.%d%s", ZEDMD_VERSION_MAJOR, ZEDMD_VERSION_MINOR,
+           ZEDMD_VERSION_PATCH, ZEDMD_VERSION_SUFFIX);
   display->DisplayText(version, TOTAL_WIDTH - (strlen(version) * 4) - 5,
                        TOTAL_HEIGHT - 5, 255 * !logo, 255 * !logo, 255 * !logo,
                        logo);
@@ -639,23 +838,21 @@ void DisplayLogo(void) {
     return;
   }
 #ifndef DISPLAY_RM67162_AMOLED
+  uint8_t px[3];
   for (uint16_t tj = 0; tj < TOTAL_BYTES; tj += 3) {
+    f.read(px, 3);
     if (rgbMode == rgbModeLoaded) {
-      renderBuffer[currentRenderBuffer][tj] = f.read();
-      renderBuffer[currentRenderBuffer][tj + 1] = f.read();
-      renderBuffer[currentRenderBuffer][tj + 2] = f.read();
+      renderBuffer[currentRenderBuffer][tj]     = px[0];
+      renderBuffer[currentRenderBuffer][tj + 1] = px[1];
+      renderBuffer[currentRenderBuffer][tj + 2] = px[2];
     } else {
-      renderBuffer[currentRenderBuffer][tj + rgbOrder[rgbMode * 3]] = f.read();
-      renderBuffer[currentRenderBuffer][tj + rgbOrder[rgbMode * 3 + 1]] =
-          f.read();
-      renderBuffer[currentRenderBuffer][tj + rgbOrder[rgbMode * 3 + 2]] =
-          f.read();
+      renderBuffer[currentRenderBuffer][tj + rgbOrder[rgbMode * 3]]     = px[0];
+      renderBuffer[currentRenderBuffer][tj + rgbOrder[rgbMode * 3 + 1]] = px[1];
+      renderBuffer[currentRenderBuffer][tj + rgbOrder[rgbMode * 3 + 2]] = px[2];
     }
   }
 #else
-  for (uint16_t tj = 0; tj < TOTAL_BYTES; tj++) {
-    renderBuffer[currentRenderBuffer][tj] = f.read();
-  }
+  f.read(renderBuffer[currentRenderBuffer], TOTAL_BYTES);
 #endif
   f.close();
 
@@ -692,10 +889,8 @@ void DisplayUpdate() {
     return;
   }
 
-  for (uint16_t tj = 0; tj < TOTAL_BYTES; tj++) {
-    renderBuffer[currentRenderBuffer][tj] = f.read();
-  }
-
+  // Bulk-Read statt byte-by-byte
+  f.read(renderBuffer[currentRenderBuffer], TOTAL_BYTES);
   f.close();
 
   Render();
@@ -714,16 +909,30 @@ void DisplayUpdate() {
 // AnimatedGIF Callbacks
 // ─────────────────────────────────────────────
 
-// LittleFS open/close/read/seek callbacks for AnimatedGIF
+#define GIF_READ_AHEAD_SIZE 4096
+#define GIF_AUDIO_DIR "/GifAudio"  // SD-Ordner für GIF-Begleit-MP3s
+static uint8_t* gifReadAheadBuf = nullptr;  // alloziert in PSRAM (lazy, GIFOpenFile)
+static int32_t  gifReadAheadStart = 0;
+static int32_t  gifReadAheadLen   = 0;
+static bool     gifIsSD           = false;
+
 void * GIFOpenFile(const char *fname, int32_t *pSize) {
   String path = String(fname);
   if (path.startsWith("SD:")) {
     gifFile = SD.open(path.substring(3), "r");
+    gifIsSD = true;
   } else if (path.startsWith("FS:")) {
     gifFile = LittleFS.open(path.substring(3), "r");
+    gifIsSD = false;
   } else {
     gifFile = LittleFS.open(fname, "r");
+    gifIsSD = false;
   }
+  if (!gifReadAheadBuf) {
+    gifReadAheadBuf = (uint8_t*)heap_caps_malloc(GIF_READ_AHEAD_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  }
+  gifReadAheadStart = 0;
+  gifReadAheadLen   = 0;
   if (gifFile) {
     *pSize = gifFile.size();
     return (void *)&gifFile;
@@ -738,15 +947,45 @@ void GIFCloseFile(void *pHandle) {
 
 int32_t GIFReadFile(GIFFILE *pFile, uint8_t *pBuf, int32_t iLen) {
   File *f = static_cast<File *>(pFile->fHandle);
-  int32_t iBytesRead = f->read(pBuf, iLen);
-  pFile->iPos = f->position();
-  return iBytesRead;
+  if (!gifIsSD) {
+    int32_t iBytesRead = f->read(pBuf, iLen);
+    pFile->iPos = f->position();
+    return iBytesRead;
+  }
+  int32_t bytesServed = 0;
+  while (bytesServed < iLen) {
+    int32_t curPos = pFile->iPos + bytesServed;
+    if (gifReadAheadLen > 0 &&
+        curPos >= gifReadAheadStart &&
+        curPos < gifReadAheadStart + gifReadAheadLen) {
+      int32_t bufOffset = curPos - gifReadAheadStart;
+      int32_t available = gifReadAheadLen - bufOffset;
+      int32_t toCopy    = min((int32_t)(iLen - bytesServed), available);
+      memcpy(pBuf + bytesServed, gifReadAheadBuf + bufOffset, toCopy);
+      bytesServed += toCopy;
+    } else {
+      f->seek(curPos);
+      gifReadAheadStart = curPos;
+      gifReadAheadLen   = f->read(gifReadAheadBuf, GIF_READ_AHEAD_SIZE);
+      if (gifReadAheadLen <= 0) break;
+    }
+  }
+  pFile->iPos += bytesServed;
+  return bytesServed;
 }
 
 int32_t GIFSeekFile(GIFFILE *pFile, int32_t iPosition) {
   File *f = static_cast<File *>(pFile->fHandle);
+  if (gifIsSD &&
+      gifReadAheadLen > 0 &&
+      iPosition >= gifReadAheadStart &&
+      iPosition < gifReadAheadStart + gifReadAheadLen) {
+    pFile->iPos = iPosition;
+    return iPosition;
+  }
   f->seek(iPosition);
   pFile->iPos = f->position();
+  gifReadAheadLen = 0;
   return pFile->iPos;
 }
 
@@ -761,13 +1000,14 @@ void GIFDraw(GIFDRAW *pDraw) {
   s = pDraw->pPixels;
 
   if (pDraw->ucDisposalMethod == 2) {
-    // Hintergrundfarbe wiederherstellen
+    // Hintergrundfarbe wiederherstellen — ucBackground ist ein Palette-Index, kein RGB565
+    uint16_t bgColor = usPalette[pDraw->ucBackground];
     for (int x = 0; x < pDraw->iWidth; x++) {
       uint32_t pos = (y * TOTAL_WIDTH + pDraw->iX + x) * 3;
       if (pos + 2 < TOTAL_BYTES) {
-        renderBuffer[currentRenderBuffer][pos]     = (pDraw->ucBackground >> 8) & 0xf8;
-        renderBuffer[currentRenderBuffer][pos + 1] = (pDraw->ucBackground >> 3) & 0xfc;
-        renderBuffer[currentRenderBuffer][pos + 2] = (pDraw->ucBackground << 3);
+        renderBuffer[currentRenderBuffer][pos]     = (bgColor >> 8) & 0xf8;
+        renderBuffer[currentRenderBuffer][pos + 1] = (bgColor >> 3) & 0xfc;
+        renderBuffer[currentRenderBuffer][pos + 2] = (bgColor << 3);
       }
     }
     s = pDraw->pPixels;
@@ -805,38 +1045,79 @@ void GIFDraw(GIFDRAW *pDraw) {
   }
 }
 
-// GIF abspielen — gibt true zurück wenn GIF, false wenn kein GIF
-bool PlayGIF(const String &path, uint32_t endTime = 0) {
+// GIF abspielen — loopt intern bis endTime, um Freeze zwischen den Loops zu vermeiden
+bool PlayGIF(const String &path, uint32_t endTime = 0, bool clearFirst = true, bool loopUntilEnd = true) {
   if (!path.endsWith(".gif") && !path.endsWith(".GIF")) return false;
 
-  gif.begin(LITTLE_ENDIAN_PIXELS);
-
-#ifdef BOARD_HAS_PSRAM
-  gif.setDrawType(GIF_DRAW_COOKED);
+#ifdef WEBRADIO_ENABLED
+  bool gifAudioActive = false;
+  if (path.startsWith("SD:") && !radioIsPlaying) {
+    // Dateiname aus GIF-Pfad extrahieren, Extension tauschen, in /GifAudio/ suchen
+    String gifName = path.substring(path.lastIndexOf('/') + 1);
+    int dotIdx = gifName.lastIndexOf('.');
+    if (dotIdx >= 0) {
+      String base = gifName.substring(0, dotIdx);
+      String mp3  = String(GIF_AUDIO_DIR) + "/" + base + ".mp3";
+      if (!SD.exists(mp3.c_str())) mp3 = String(GIF_AUDIO_DIR) + "/" + base + ".MP3";
+      if (SD.exists(mp3.c_str())) {
+        radioPlayLocalFile(mp3.c_str());
+        gifAudioActive = true;
+      }
+    }
+  }
 #endif
 
-  if (!gif.open(path.c_str(), GIFOpenFile, GIFCloseFile, GIFReadFile, GIFSeekFile, GIFDraw)) {
-    return false;
-  }
+  bool firstOpen = true;
+  do {
+    gif.begin(LITTLE_ENDIAN_PIXELS);
+#ifdef BOARD_HAS_PSRAM
+    gif.setDrawType(GIF_DRAW_COOKED);
+#endif
+    if (!gif.open(path.c_str(), GIFOpenFile, GIFCloseFile, GIFReadFile, GIFSeekFile, GIFDraw))
+      return !firstOpen;
 
-  display->ClearScreen();  // Reste vom vorherigen Bild löschen
+    // Nur beim allerersten Öffnen clearen — danach kein Clear, sonst schwarzer Flash
+    if (firstOpen && clearFirst) {
+      display->ClearScreen();
+      memset(renderBuffer[currentRenderBuffer], 0, TOTAL_BYTES);
+      if (NUM_RENDER_BUFFERS > 1)
+        memset(renderBuffer[lastRenderBuffer], 0, TOTAL_BYTES);
+    }
+    firstOpen = false;
 
-  // Frame für Frame abspielen — delay manuell, damit endTime genau eingehalten wird
-  int frameDelay = 0;
-  while (gif.playFrame(false, &frameDelay) && !transportActive) {
-    if (endTime > 0 && millis() >= endTime) break;
-    if (frameDelay > 0) {
-      uint32_t waitUntil = millis() + (uint32_t)frameDelay;
-      if (endTime > 0 && waitUntil > endTime) waitUntil = endTime;
-      while (millis() < waitUntil && !transportActive) {
+    int frameDelay = 0;
+    uint32_t frameStart = millis();
+    while (gif.playFrame(false, &frameDelay) && !transportActive && !screensaverReloadNeeded
+           && !forcePlayPending
+           && (endTime == 0 || millis() < endTime)) {
+      if (frameDelay > 0) {
+        uint32_t elapsed   = millis() - frameStart;
+        uint32_t remaining = (frameDelay > (int)elapsed) ? ((uint32_t)frameDelay - elapsed) : 0;
+        uint32_t waitUntil = millis() + remaining;
+        while (millis() < waitUntil && !transportActive && !forcePlayPending && (endTime == 0 || millis() < endTime)) {
+          vTaskDelay(pdMS_TO_TICKS(5));
+        }
+      }
+      frameStart = millis();
+      yield();
+      esp_task_wdt_reset();
+    }
+    // Letzter Frame: volle Anzeigedauer abwarten bevor gif.close()
+    if (frameDelay > 0 && !transportActive && !screensaverReloadNeeded && !forcePlayPending && (endTime == 0 || millis() < endTime)) {
+      uint32_t elapsed   = millis() - frameStart;
+      uint32_t remaining = (frameDelay > (int)elapsed) ? ((uint32_t)frameDelay - elapsed) : 0;
+      uint32_t waitUntil = millis() + remaining;
+      while (millis() < waitUntil && !transportActive && !forcePlayPending && (endTime == 0 || millis() < endTime)) {
         vTaskDelay(pdMS_TO_TICKS(5));
       }
     }
-    yield();
-    esp_task_wdt_reset();
-  }
+    gif.close();
+  } while (loopUntilEnd && !transportActive && !screensaverReloadNeeded && !forcePlayPending && (endTime == 0 || millis() < endTime));
 
-  gif.close();
+#ifdef WEBRADIO_ENABLED
+  if (gifAudioActive) radioStopLocalFile();
+#endif
+
   return true;
 }
 
@@ -846,7 +1127,7 @@ void ScreenSaver() {
   display->SetBrightness(screensaverBrightness);
 
   if (screensaverCount > 0) {
-    String path = screensaverFiles[screensaverIndex];
+    String path = String(screensaverFiles[screensaverIndex]);
 
     // Nur RAW laden — GIF wird in loop() via PlayGIF abgespielt
     if (!path.endsWith(".gif") && !path.endsWith(".GIF")) {
@@ -860,9 +1141,7 @@ void ScreenSaver() {
         f = LittleFS.open(path, "r");
       }
       if (f) {
-        for (uint16_t tj = 0; tj < TOTAL_BYTES; tj++) {
-          renderBuffer[currentRenderBuffer][tj] = f.read();
-        }
+        f.read(renderBuffer[currentRenderBuffer], TOTAL_BYTES);
         f.close();
         Render();
       } else {
@@ -879,9 +1158,8 @@ void ScreenSaver() {
       f = LittleFS.open("/logo.raw", "r");
     }
     if (f) {
-      for (uint16_t tj = 0; tj < TOTAL_BYTES; tj++) {
-        renderBuffer[currentRenderBuffer][tj] = f.read();
-      }
+      // Bulk-Read statt byte-by-byte
+      f.read(renderBuffer[currentRenderBuffer], TOTAL_BYTES);
       f.close();
       Render();
     } else {
@@ -1009,8 +1287,7 @@ static uint8_t IRAM_ATTR HandleData(uint8_t *pData, size_t len) {
 
             // Including the ACK, the response will be 64 bytes long. That
             // leaves some space for future features.
-            uint8_t *response = (uint8_t *)malloc(64 - N_ACK_CHARS);
-            memset(response, 0, 64 - N_ACK_CHARS);
+            uint8_t response[64 - N_ACK_CHARS] = {};  // Stack reicht für 59 Bytes
             memcpy(response, CtrlChars, N_INTERMEDIATE_CTR_CHARS);
             response[N_INTERMEDIATE_CTR_CHARS] = TOTAL_WIDTH & 0xff;
             response[N_INTERMEDIATE_CTR_CHARS + 1] = (TOTAL_WIDTH >> 8) & 0xff;
@@ -1048,7 +1325,6 @@ static uint8_t IRAM_ATTR HandleData(uint8_t *pData, size_t len) {
             Serial.write(response, 64 - N_ACK_CHARS);
             // This flush is required for USB CDC on Windows.
             Serial.flush();
-            free(response);
             return 1;
           }
 
@@ -1073,6 +1349,12 @@ static uint8_t IRAM_ATTR HandleData(uint8_t *pData, size_t len) {
 #endif
           case 27:  // set SSID
           {
+            if (payloadSize > 32) {
+              headerBytesReceived = 0;
+              numCtrlCharsFound = 0;
+              if (wifiActive) break;
+              return 1;
+            }
             if (payloadMissing == payloadSize) {
               memset(tmpStringBuffer, 0, 33);
               if (payloadMissing > (len - pos)) {
@@ -1113,6 +1395,12 @@ static uint8_t IRAM_ATTR HandleData(uint8_t *pData, size_t len) {
 
           case 28:  // set password
           {
+            if (payloadSize > 32) {
+              headerBytesReceived = 0;
+              numCtrlCharsFound = 0;
+              if (wifiActive) break;
+              return 1;
+            }
             if (payloadMissing == payloadSize) {
               memset(tmpStringBuffer, 0, 33);
               if (payloadMissing > (len - pos)) {
@@ -1153,6 +1441,12 @@ static uint8_t IRAM_ATTR HandleData(uint8_t *pData, size_t len) {
 
           case 29:  // set port
           {
+            if (payloadSize > 32) {
+              headerBytesReceived = 0;
+              numCtrlCharsFound = 0;
+              if (wifiActive) break;
+              return 1;
+            }
             if (payloadMissing == payloadSize) {
               memset(tmpStringBuffer, 0, 33);
               if (payloadMissing > (len - pos)) {
@@ -1578,7 +1872,6 @@ static void HandleTcpDisconnect(void *arg, AsyncClient *client) {
   payloadMissing = 0;
   headerBytesReceived = 0;
   numCtrlCharsFound = 0;
-  delay(100);
   transportActive = false;
 }
 
@@ -1688,7 +1981,8 @@ void StartServer() {
   server->on("/get_version", HTTP_GET, [](AsyncWebServerRequest *request) {
     String version = String(ZEDMD_VERSION_MAJOR) + "." +
                      String(ZEDMD_VERSION_MINOR) + "." +
-                     String(ZEDMD_VERSION_PATCH);
+                     String(ZEDMD_VERSION_PATCH) + ZEDMD_VERSION_SUFFIX +
+                     " (" __DATE__ " " __TIME__ ")";
     request->send(200, "text/plain", version);
   });
 
@@ -1839,6 +2133,66 @@ void StartServer() {
     request->send(200, "text/plain", debugInfo);
   });
 
+  server->on("/log", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String out = "";
+    portENTER_CRITICAL(&logMux);
+    uint8_t total = logCount;
+    uint8_t start = (logCount < LOG_LINES) ? 0 : logHead;
+    for (uint8_t i = 0; i < total; i++) {
+      out += logBuffer[(start + i) % LOG_LINES];
+      out += "\n";
+    }
+    portEXIT_CRITICAL(&logMux);
+    request->send(200, "text/plain; charset=utf-8", out);
+  });
+
+  // GET /crashlog — Log vom letzten Crash (RTC-Speicher, überlebt Resets)
+  server->on("/crashlog", HTTP_GET, [](AsyncWebServerRequest *request) {
+    if (!rtcLogValid || rtcLogCount == 0) {
+      request->send(200, "text/plain; charset=utf-8", "Kein Crash-Log vorhanden.");
+      return;
+    }
+    String out = "=== CRASH LOG (vor letztem Neustart) ===\n";
+    uint8_t start = (rtcLogCount < RTC_LOG_LINES) ? 0 : rtcLogHead;
+    for (uint8_t i = 0; i < rtcLogCount; i++) {
+      out += rtcLog[(start + i) % RTC_LOG_LINES];
+      out += "\n";
+    }
+    // Nach dem Lesen leeren
+    rtcLogValid = false;
+    rtcLogCount = 0;
+    rtcLogHead  = 0;
+    request->send(200, "text/plain; charset=utf-8", out);
+  });
+
+  // POST /save_mqtt_config
+#ifdef ZEDMD_WIFI
+  server->on("/save_mqtt_config", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (request->hasParam("server", true))
+      mqttServer = request->getParam("server", true)->value();
+    if (request->hasParam("port", true))
+      mqttPort = (uint16_t)request->getParam("port", true)->value().toInt();
+    SaveMqttConfig();
+    mqttClient.disconnect();
+    mqttClient.setServer(mqttServer.c_str(), mqttPort);
+    logMsg("MQTT: Server geaendert auf %s:%d", mqttServer.c_str(), mqttPort);
+    request->send(200, "text/plain", "OK");
+  });
+#endif
+
+  // POST /save_weather_config
+  server->on("/save_weather_config", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (request->hasParam("lat", true))
+      weatherLat = request->getParam("lat", true)->value().toFloat();
+    if (request->hasParam("lon", true))
+      weatherLon = request->getParam("lon", true)->value().toFloat();
+    SaveWeatherConfig();
+    forecastAvailable = false;
+    lastWeatherFetch  = 0;
+    logMsg("Wetter: Koordinaten geaendert %.4f / %.4f", weatherLat, weatherLon);
+    request->send(200, "text/plain", "OK");
+  });
+
   // Route to return the current settings as JSON
   server->on("/get_config", HTTP_GET, [](AsyncWebServerRequest *request) {
     String trimmedSsid = ssid;
@@ -1853,6 +2207,8 @@ void StartServer() {
     json += "\"brightness\":" + String(brightness) + ",";
     json += "\"screensaverBrightness\":" + String(screensaverBrightness) + ",";
     json += "\"screensaverDuration\":" + String(screensaverDuration) + ",";
+    json += "\"screensaverShuffle\":" + String(screensaverShuffle ? 1 : 0) + ",";
+    json += "\"screensaverStrictTimer\":" + String(screensaverStrictTimer ? 1 : 0) + ",";
     json += "\"screensaverMode\":" + String(screensaverMode) + ",";
     json += "\"clockR\":" + String(clockR) + ",";
     json += "\"clockG\":" + String(clockG) + ",";
@@ -1863,12 +2219,20 @@ void StartServer() {
     json += "\"scaleMode\":" + String(display->GetCurrentScalingMode()) + ",";
     json += "\"transport\":" + String(transport) + ",";
     json += "\"udpDelay\":" + String(udpDelay) + ",";
-    json += "\"usbSize\":" + String(usbPackageSizeMultiplier) + ",";
-    json += "\"panelClkphase\":" + String(panelClkphase) + ",";
-    json += "\"panelI2sspeed\":" + String(panelI2sspeed) + ",";
-    json += "\"panelLatchBlanking\":" + String(panelLatchBlanking) + ",";
-    json += "\"panelMinRefreshRate\":" + String(panelMinRefreshRate) + ",";
-    json += "\"panelDriver\":" + String(panelDriver);
+    json += "\"usbSize\":" + String(usbPackageSizeMultiplier);
+#ifdef ZEDMD_WIFI
+    json += ",\"mqttServer\":\"" + mqttServer + "\"";
+    json += ",\"mqttPort\":" + String(mqttPort);
+#endif
+    json += ",\"weatherLat\":" + String(weatherLat, 4);
+    json += ",\"weatherLon\":" + String(weatherLon, 4);
+#ifdef DISPLAY_LED_MATRIX
+    json += ",\"panelClkphase\":" + String(panelClkphase);
+    json += ",\"panelI2sspeed\":" + String(panelI2sspeed);
+    json += ",\"panelLatchBlanking\":" + String(panelLatchBlanking);
+    json += ",\"panelMinRefreshRate\":" + String(panelMinRefreshRate);
+    json += ",\"panelDriver\":" + String(panelDriver);
+#endif
     json += "}";
     request->send(200, "application/json", json);
   });
@@ -1931,17 +2295,30 @@ void StartServer() {
         }
       });
 
-  // GET /screensaver_files
+  // GET /screensaver_files?offset=0
   server->on("/screensaver_files", HTTP_GET, [](AsyncWebServerRequest *request) {
     String json = "[";
-    for (uint8_t i = 0; i < screensaverCount; i++) {
-      if (i > 0) json += ",";
-      String name = screensaverFiles[i];
-      name = name.substring(name.lastIndexOf('/') + 1);
-      json += "\"" + name + "\"";
+    if (screensaverFilesMutex && xSemaphoreTake(screensaverFilesMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+      uint16_t offset = 0;
+      if (request->hasParam("offset"))
+        offset = (uint16_t)constrain(request->getParam("offset")->value().toInt(), 0, (int)screensaverCount);
+      uint16_t end = min((uint16_t)(offset + 20), screensaverCount);
+      for (uint16_t i = offset; screensaverFiles && i < end; i++) {
+        if (i > offset) json += ",";
+        json += "\"" + String(screensaverFiles[i]) + "\"";
+      }
+      xSemaphoreGive(screensaverFilesMutex);
     }
     json += "]";
     request->send(200, "application/json", json);
+  });
+
+  // GET /screensaver_folder_count — geladene Dateianzahl direkt aus screensaverCount
+  server->on("/screensaver_folder_count", HTTP_GET, [](AsyncWebServerRequest *request) {
+    uint16_t count = screensaverCount;
+    uint16_t showing = min((uint16_t)20, count);
+    request->send(200, "application/json",
+      "{\"total\":" + String(count) + ",\"showing\":" + String(showing) + "}");
   });
 
   // GET /delete_screensaver?file=xxx
@@ -1950,7 +2327,7 @@ void StartServer() {
       String filename = "/screensaver/" + request->getParam("file")->value();
       if (LittleFS.exists(filename)) {
         LittleFS.remove(filename);
-        LoadScreensaverFiles();
+        screensaverReloadNeeded = true;
         request->send(200, "text/plain", "Deleted");
       } else {
         request->send(404, "text/plain", "File not found");
@@ -1963,20 +2340,20 @@ void StartServer() {
   // POST /upload_screensaver
   server->on("/upload_screensaver", HTTP_POST,
     [](AsyncWebServerRequest *request) {
+      screensaverReloadNeeded = true;
       request->send(200, "text/plain", "Upload OK");
-      LoadScreensaverFiles();
     },
     [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
       static File uploadFile;
+      static String targetPath;
       if (index == 0) {
-        String path = "/screensaver/" + filename;
-        uploadFile = LittleFS.open(path, "w");
+        targetPath = "/screensaver/" + filename;
+        uploadFile = LittleFS.open(targetPath + ".tmp", "w");
       }
-      if (uploadFile) {
-        uploadFile.write(data, len);
-      }
+      if (uploadFile) uploadFile.write(data, len);
       if (final && uploadFile) {
         uploadFile.close();
+        LittleFS.rename(targetPath + ".tmp", targetPath);
       }
     }
   );
@@ -1999,7 +2376,8 @@ void StartServer() {
     if (request->hasParam("mode", true)) {
       screensaverMode = request->getParam("mode", true)->value().toInt();
       clockColorChanged = true;  // Sofortige Neuzeichnung beim Moduswechsel
-      screensaverReloadNeeded = true;
+      weatherPhaseStart = 0;     // Phase-Timer zurücksetzen
+      weatherPage = 0;
       request->send(200, "text/plain", "OK");
       SaveScreensaverMode();
     } else {
@@ -2024,6 +2402,8 @@ void StartServer() {
   server->on("/save_screensaver_brightness", HTTP_POST, [](AsyncWebServerRequest *request) {
     if (request->hasParam("screensaverBrightness", true)) {
       screensaverBrightness = request->getParam("screensaverBrightness", true)->value().toInt();
+      GetDisplayObject()->SetBrightness(screensaverBrightness);
+      clockColorChanged = true;
       SaveScreensaverLum();
       request->send(200, "text/plain", "Screensaver brightness saved");
     } else {
@@ -2042,6 +2422,96 @@ void StartServer() {
     }
   });
 
+  // POST /save_screensaver_shuffle
+  server->on("/save_screensaver_shuffle", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (request->hasParam("screensaverShuffle", true)) {
+      screensaverShuffle = request->getParam("screensaverShuffle", true)->value().toInt() != 0;
+      SaveScreensaverShuffle();
+      if (screensaverCount > 1) {
+        screensaverIndex = 0;
+        if (screensaverShuffle) shuffleScreensaverFiles();
+        else sortScreensaverFiles();
+      }
+      request->send(200, "text/plain", "OK");
+    } else {
+      request->send(400, "text/plain", "Missing parameter");
+    }
+  });
+
+  // POST /save_screensaver_strict_timer
+  server->on("/save_screensaver_strict_timer", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (request->hasParam("screensaverStrictTimer", true)) {
+      screensaverStrictTimer = request->getParam("screensaverStrictTimer", true)->value().toInt() != 0;
+      SaveScreensaverStrictTimer();
+      request->send(200, "text/plain", "OK");
+    } else {
+      request->send(400, "text/plain", "Missing parameter");
+    }
+  });
+
+  // GET /screensaver_current — aktuell angezeigte Datei
+  server->on("/screensaver_current", HTTP_GET, [](AsyncWebServerRequest *request) {
+    // Force-Play hat Vorrang vor normalem Screensaver-Index
+    String path = currentlyPlayingFile.length() > 0 ? currentlyPlayingFile :
+                  (screensaverCount > 0 ? String(screensaverFiles[screensaverIndex]) : "");
+    int slash = path.lastIndexOf('/');
+    String fname = (slash >= 0) ? path.substring(slash + 1) : path;
+    bool fav = isFavorite(path.c_str());
+    bool ign = isIgnored(path.c_str());
+    String json = "{\"path\":\"" + path + "\",\"name\":\"" + fname +
+                  "\",\"favorite\":" + String(fav ? "true" : "false") +
+                  ",\"ignored\":"   + String(ign ? "true" : "false") + "}";
+    request->send(200, "application/json", json);
+  });
+
+  // POST /toggle_favorite
+  server->on("/toggle_favorite", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (request->hasParam("path", true)) {
+      String path = request->getParam("path", true)->value();
+      toggleFavorite(path.c_str());
+      bool fav = isFavorite(path.c_str());
+      request->send(200, "application/json",
+        "{\"favorite\":" + String(fav ? "true" : "false") + "}");
+    } else {
+      request->send(400, "text/plain", "Missing parameter");
+    }
+  });
+
+  // GET /get_favorites — Liste aller Favoriten
+  server->on("/get_favorites", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain; charset=utf-8", screensaverFavorites);
+  });
+
+  // POST /play_file — GIF direkt abspielen
+  server->on("/play_file", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (request->hasParam("path", true)) {
+      forcePlayFile = request->getParam("path", true)->value();
+      __sync_synchronize();
+      forcePlayPending = true;
+      request->send(200, "text/plain", "OK");
+    } else {
+      request->send(400, "text/plain", "Missing parameter");
+    }
+  });
+
+  // POST /toggle_ignore
+  server->on("/toggle_ignore", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (request->hasParam("path", true)) {
+      String path = request->getParam("path", true)->value();
+      toggleIgnore(path.c_str());
+      bool ign = isIgnored(path.c_str());
+      request->send(200, "application/json",
+        "{\"ignored\":" + String(ign ? "true" : "false") + "}");
+    } else {
+      request->send(400, "text/plain", "Missing parameter");
+    }
+  });
+
+  // GET /get_ignores — Liste aller ignorierten Dateien
+  server->on("/get_ignores", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain; charset=utf-8", screensaverIgnore);
+  });
+
   // GET /fs_info — Filesystem Speicherinfo
   server->on("/fs_info", HTTP_GET, [](AsyncWebServerRequest *request) {
     String json = "{";
@@ -2052,52 +2522,130 @@ void StartServer() {
     request->send(200, "application/json", json);
   });
 
+  // GET /sd_info — SD-Karte Speicherinfo (gecacht vom Boot)
+  server->on("/sd_info", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String json = "{";
+    json += "\"available\":" + String(sdCardAvailable ? "true" : "false") + ",";
+    json += "\"total\":" + String((uint32_t)(sdTotalBytes / 1024)) + ",";
+    json += "\"used\":"  + String((uint32_t)(sdUsedBytes  / 1024)) + ",";
+    json += "\"free\":"  + String((uint32_t)((sdTotalBytes - sdUsedBytes) / 1024));
+    json += "}";
+    request->send(200, "application/json", json);
+  });
+
+  // POST /eject_sd — SD-Karte sicher aushängen
+  server->on("/eject_sd", HTTP_POST, [](AsyncWebServerRequest *request) {
+    SD.end();
+    sdCardAvailable = false;
+    sdTotalBytes = 0;
+    sdUsedBytes  = 0;
+    cachedSDFolders = "[]";
+    if (screensaverPaths.length() > 0) {
+      screensaverPaths = "";
+      SaveScreensaverPaths();
+      screensaverReloadNeeded = true;
+    }
+    request->send(200, "text/plain", "OK");
+  });
+
   // GET /sd_folders — gibt gecachten Status zurück, kein SD Zugriff im Webserver Task!
   server->on("/sd_folders", HTTP_GET, [](AsyncWebServerRequest *request) {
     sdRefreshNeeded = true;  // loop() refresht SD im nächsten Durchlauf
     String json = "{";
     json += "\"available\":" + String(sdCardAvailable ? "true" : "false") + ",";
-    json += "\"currentPath\":\"" + screensaverPath + "\",";
+    json += "\"currentPaths\":\"" + screensaverPaths + "\",";
     json += "\"folders\":" + cachedSDFolders;
     json += "}";
     request->send(200, "application/json", json);
   });
 
-  // POST /set_screensaver_path
-  server->on("/set_screensaver_path", HTTP_POST, [](AsyncWebServerRequest *request) {
-    if (request->hasParam("path", true)) {
-      screensaverPath = request->getParam("path", true)->value();
-      screensaverPath.trim();
+  // POST /set_screensaver_paths
+  server->on("/set_screensaver_paths", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (request->hasParam("paths", true)) {
+      screensaverPaths = request->getParam("paths", true)->value();
+      screensaverPaths.trim();
       screensaverIndex = 0;
-      LoadScreensaverFiles();      // Sofort laden — Web-UI bekommt korrekte Liste
-      screensaverReloadNeeded = true;  // Main-Loop informieren (SavePath + Reload)
+      screensaverReloadNeeded = true;
       request->send(200, "text/plain", "OK");
     } else {
       request->send(400, "text/plain", "Missing parameter");
     }
   });
 
-  // POST /upload_sd — Upload auf SD Karte
-  server->on("/upload_sd", HTTP_POST,
+  // POST /cancel_scan — SD-Scan abbrechen
+  server->on("/cancel_scan", HTTP_POST, [](AsyncWebServerRequest *request) {
+    cancelSdScan = true;
+    screensaverPaths = "";
+    screensaverReloadNeeded = true;
+    request->send(200, "text/plain", "OK");
+  });
+
+  // ── GIF-Audio Verwaltung (/GifAudio/ auf SD) ─────────────────────────────────
+
+  server->on("/gif_audio_files", HTTP_GET, [](AsyncWebServerRequest *request) {
+    gifAudioRefreshNeeded = true;  // loop() baut Cache neu
+    request->send(200, "application/json", cachedGifAudioFiles);
+  });
+
+  server->on("/gif_audio_upload", HTTP_POST,
     [](AsyncWebServerRequest *request) {
-      request->send(200, "text/plain", "Upload OK");
-      screensaverReloadNeeded = true;
+      request->send(200, "text/plain", "OK");
     },
     [](AsyncWebServerRequest *request, String filename, size_t index,
        uint8_t *data, size_t len, bool final) {
       static File uploadFile;
+      static String targetPath;
       if (!sdCardAvailable) return;
       if (index == 0) {
-        String folder = screensaverPath.length() > 0 ? screensaverPath : "/screensaver";
-        if (!folder.startsWith("/")) folder = "/" + folder;
-        if (!SD.exists(folder)) SD.mkdir(folder);
-        String path = folder + "/" + filename;
-        uploadFile = SD.open(path, FILE_WRITE);
-        Serial.printf("SD Upload: %s\n", path.c_str());
+        if (!SD.exists(GIF_AUDIO_DIR)) SD.mkdir(GIF_AUDIO_DIR);
+        targetPath = String(GIF_AUDIO_DIR) + "/" + filename;
+        uploadFile = SD.open((targetPath + ".tmp").c_str(), FILE_WRITE);
       }
       if (uploadFile) uploadFile.write(data, len);
       if (final && uploadFile) {
         uploadFile.close();
+        SD.rename(targetPath + ".tmp", targetPath);
+      }
+    }
+  );
+
+  server->on("/gif_audio_delete", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!request->hasParam("name", true)) {
+      request->send(400, "text/plain", "Missing name");
+      return;
+    }
+    String path = String(GIF_AUDIO_DIR) + "/" + request->getParam("name", true)->value();
+    SD.remove(path.c_str());
+    request->send(200, "text/plain", "OK");
+  });
+
+  // POST /upload_sd — Upload auf SD Karte
+  server->on("/upload_sd", HTTP_POST,
+    [](AsyncWebServerRequest *request) {
+      InvalidateAllFolderCaches();
+      screensaverReloadNeeded = true;
+      request->send(200, "text/plain", "Upload OK");
+    },
+    [](AsyncWebServerRequest *request, String filename, size_t index,
+       uint8_t *data, size_t len, bool final) {
+      static File uploadFile;
+      static String targetPath;
+      if (!sdCardAvailable) return;
+      if (index == 0) {
+        int comma = screensaverPaths.indexOf(',');
+        String firstPath = (comma >= 0) ? screensaverPaths.substring(0, comma) : screensaverPaths;
+        firstPath.trim();
+        String folder = firstPath.length() > 0 ? firstPath : "/screensaver";
+        if (!folder.startsWith("/")) folder = "/" + folder;
+        if (!SD.exists(folder)) SD.mkdir(folder);
+        targetPath = folder + "/" + filename;
+        uploadFile = SD.open(targetPath + ".tmp", FILE_WRITE);
+        Serial.printf("SD Upload: %s\n", targetPath.c_str());
+      }
+      if (uploadFile) uploadFile.write(data, len);
+      if (final && uploadFile) {
+        uploadFile.close();
+        SD.rename(targetPath + ".tmp", targetPath);
         Serial.println("SD Upload: done");
       }
     }
@@ -2112,38 +2660,24 @@ void StartServer() {
     request->send(LittleFS, "/admin.html", "text/html");
   });
 
-  // GET /sd_files — SD Dateien in einem Ordner
+  // GET /sd_files — SD Dateien in einem Ordner (gecacht; loop() baut Cache)
   server->on("/sd_files", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String json = "[";
-    if (sdCardAvailable && request->hasParam("folder")) {
+    if (request->hasParam("folder")) {
       String folder = "/" + request->getParam("folder")->value();
-      File dir = SD.open(folder);
-      if (dir && dir.isDirectory()) {
-        bool first = true;
-        File f = dir.openNextFile();
-        while (f) {
-          if (!f.isDirectory()) {
-            const char* fname = f.name();
-            if (fname && fname[0] != '.') {
-              if (!first) json += ",";
-              json += "\"" + String(fname) + "\"";
-              first = false;
-            }
-          }
-          f.close();
-          f = dir.openNextFile();
-        }
-        dir.close();
+      if (folder != cachedSdFilesFolder) {
+        cachedSdFilesFolder = folder;
+        cachedSdFiles       = "[]";  // ungültig → loop() baut neu
       }
+      sdFilesRefreshNeeded = true;
     }
-    json += "]";
-    request->send(200, "application/json", json);
+    request->send(200, "application/json", cachedSdFiles);
   });
 
   // GET /delete_sd_file — SD Datei löschen
   server->on("/delete_sd_file", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (sdCardAvailable && request->hasParam("folder") && request->hasParam("file")) {
       String path = "/" + request->getParam("folder")->value() + "/" + request->getParam("file")->value();
+      InvalidateAllFolderCaches();
       SD.remove(path) ?
         request->send(200, "text/plain", "OK") :
         request->send(500, "text/plain", "Delete failed");
@@ -2183,6 +2717,7 @@ void StartServer() {
   });
 
   // POST /save_panel_settings
+#ifdef DISPLAY_LED_MATRIX
   server->on("/save_panel_settings", HTTP_POST, [](AsyncWebServerRequest *request) {
     if (request->hasParam("panelClkphase", true))
       panelClkphase = request->getParam("panelClkphase", true)->value().toInt();
@@ -2205,6 +2740,7 @@ void StartServer() {
     sv("/panel_driver.val", panelDriver);
     request->send(200, "text/plain", "OK");
   });
+#endif  // DISPLAY_LED_MATRIX
 
   // POST /upload_file — Upload HTML files to LittleFS root (admin only)
   server->on("/upload_file", HTTP_POST,
@@ -2217,22 +2753,142 @@ void StartServer() {
     [](AsyncWebServerRequest *request, String filename, size_t index,
        uint8_t *data, size_t len, bool final) {
       static File uploadFile;
+      static String targetPath;
       if (!filename.endsWith(".html") && !filename.endsWith(".htm")) return;
       if (index == 0) {
-        uploadFile = LittleFS.open("/" + filename, "w");
+        targetPath = "/" + filename;
+        uploadFile = LittleFS.open(targetPath + ".tmp", "w");
       }
       if (uploadFile) uploadFile.write(data, len);
-      if (final && uploadFile) uploadFile.close();
+      if (final && uploadFile) {
+        uploadFile.close();
+        LittleFS.rename(targetPath + ".tmp", targetPath);
+      }
     }
   );
+
+  // POST /ota — Firmware-Update über WiFi (admin only)
+  server->on("/ota", HTTP_POST,
+    [](AsyncWebServerRequest *request) {
+      if (!request->authenticate("admin", "zedmd1234")) {
+        return request->requestAuthentication();
+      }
+      bool success = !Update.hasError();
+      AsyncWebServerResponse *response = request->beginResponse(
+          200, "text/plain", success ? "OK — Reboot..." : Update.errorString());
+      response->addHeader("Connection", "close");
+      request->send(response);
+      if (success) {
+        delay(500);
+        ESP.restart();
+      }
+    },
+    [](AsyncWebServerRequest *request, String filename, size_t index,
+       uint8_t *data, size_t len, bool final) {
+      static bool authOk = false;
+      if (index == 0) {
+        authOk = request->authenticate("admin", "zedmd1234");
+        if (authOk) {
+          logMsg("OTA: Start %s", filename.c_str());
+          Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH);
+        }
+      }
+      if (authOk && Update.isRunning()) Update.write(data, len);
+      if (final && authOk) {
+        if (Update.end(true)) {
+          logMsg("OTA: Erfolgreich (%u Bytes)", index + len);
+        } else {
+          logMsg("OTA: Fehler — %s", Update.errorString());
+        }
+      }
+    }
+  );
+
+  // ── Config Export / Import ────────────────────────────────────────────────
+
+  server->on("/config_transfer.html", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(LittleFS, "/config_transfer.html", "text/html");
+  });
+
+  server->on("/export_config", HTTP_GET, [](AsyncWebServerRequest *request) {
+    static const char* configFiles[] = {
+      "/wifi_config.txt", "/lum.val", "/rgb_order.val", "/transport.val",
+      "/screensaver_path.val", "/screensaver_mode.val", "/screensaver_lum.val",
+      "/screensaver_duration.val", "/screensaver_shuffle.val",
+      "/screensaver_strict_timer.val", "/screensaver_favorites.txt",
+      "/screensaver_ignore.txt", "/clock_colors.val",
+      "/mqtt_config.val", "/weather_config.val",
+#ifdef WEBRADIO_ENABLED
+      "/radio_presets.json",
+#endif
+      nullptr
+    };
+    String json = "{\"v\":1,\"files\":{";
+    bool first = true;
+    for (int i = 0; configFiles[i] != nullptr; i++) {
+      File f = LittleFS.open(configFiles[i], "r");
+      if (!f) continue;
+      if (!first) json += ",";
+      first = false;
+      json += "\"";
+      json += configFiles[i];
+      json += "\":\"";
+      while (f.available()) {
+        char hex[3];
+        snprintf(hex, sizeof(hex), "%02x", (uint8_t)f.read());
+        json += hex;
+      }
+      json += "\"";
+      f.close();
+    }
+    json += "}}";
+    request->send(200, "application/json", json);
+  });
+
+  server->on("/import_config", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!request->hasParam("data", true)) {
+      request->send(400, "text/plain", "Missing data");
+      return;
+    }
+    String json = request->getParam("data", true)->value();
+    // Einfacher Parser: sucht "\"/<key>\":\"<hex>\""
+    int pos = 0;
+    int written = 0;
+    while (true) {
+      int keyStart = json.indexOf("\"/", pos);
+      if (keyStart < 0) break;
+      int keyEnd = json.indexOf("\":\"", keyStart);
+      if (keyEnd < 0) break;
+      int valStart = keyEnd + 3;
+      int valEnd   = json.indexOf("\"", valStart);
+      if (valEnd < 0) break;
+      String path = json.substring(keyStart + 1, keyEnd);
+      String hex  = json.substring(valStart, valEnd);
+      File f = LittleFS.open(path, "w");
+      if (f) {
+        for (int i = 0; i + 1 < (int)hex.length(); i += 2) {
+          char buf[3] = { hex[i], hex[i+1], 0 };
+          f.write((uint8_t)strtol(buf, nullptr, 16));
+        }
+        f.close();
+        written++;
+      }
+      pos = valEnd + 1;
+    }
+    request->send(200, "text/plain", String(written) + " Dateien importiert");
+  });
+
+#ifdef WEBRADIO_ENABLED
+  radioRegisterRoutes(server);
+#endif
 
   server->begin();
   serverRunning = true;
 }
 
 void StartWiFi() {
-  char apSSID[15];
-  sprintf(apSSID, "ZeDMD-WiFi-%04X", shortId);
+  char apSSID[17];
+  snprintf(apSSID, sizeof(apSSID), "ZeDMD-WiFi-%04X", shortId);
   const char *apPassword = "zedmd1234";
   bool softAPFallback = false;
   IPAddress ip;
@@ -2339,21 +2995,27 @@ void InitNTP() {
   struct tm timeinfo;
   if (getLocalTime(&timeinfo, 5000)) {
     ntpSynced = true;
-    Serial.println("NTP sync OK");
+    logMsg("NTP sync OK");
   } else {
-    Serial.println("NTP sync FAILED");
+    logMsg("NTP sync FAILED");
   }
 #endif
 }
 
 void SaveScreensaverMode() {
   File f = LittleFS.open("/screensaver_mode.val", "w");
-  if (f) { f.write(screensaverMode); f.close(); }
+  f.write(screensaverMode);
+  f.close();
 }
 
 void LoadScreensaverMode() {
   File f = LittleFS.open("/screensaver_mode.val", "r");
-  if (f) { screensaverMode = f.read(); f.close(); }
+  if (!f) {
+    SaveScreensaverMode();
+    return;
+  }
+  screensaverMode = f.read();
+  f.close();
 }
 
 // ── 7-Segment Ziffer zeichnen ─────────────────────────────────────────────
@@ -2401,6 +3063,71 @@ void DrawSegDigit(int x, int y, int digit, uint8_t r, uint8_t g, uint8_t b) {
   if (s & 0b1000000) drawH(x+1, y+h/2-1, w-2);  // g: mitte
 }
 
+#ifdef WEBRADIO_ENABLED
+void DisplayRadio() {
+  static char     lastStation[64]  = "";
+  static char     lastTitle[128]   = "";
+  static uint32_t lastScroll       = 0;
+  static int      scrollOffset     = 0;
+  static int      lastScrollOffset = -1;
+
+  static char stationSnap[64]  = "Radio";
+  static char titleSnap[128]   = "Verbinde...";
+  if (radioStringMutex && xSemaphoreTake(radioStringMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+    if (radioStationName[0]) strlcpy(stationSnap, radioStationName, sizeof(stationSnap));
+    else strlcpy(stationSnap, "Radio", sizeof(stationSnap));
+    if (radioTrackTitle[0])  strlcpy(titleSnap,   radioTrackTitle,  sizeof(titleSnap));
+    else strlcpy(titleSnap, "Verbinde...", sizeof(titleSnap));
+    xSemaphoreGive(radioStringMutex);
+  }
+  const char* station = stationSnap;
+  const char* title   = titleSnap;
+  bool needRedraw = false;
+
+  if (strcmp(lastStation, station) != 0) {
+    strlcpy(lastStation, station, sizeof(lastStation));
+    needRedraw = true;
+  }
+  if (strcmp(lastTitle, title) != 0) {
+    strlcpy(lastTitle, title, sizeof(lastTitle));
+    scrollOffset = 0; lastScrollOffset = -1;
+    needRedraw = true;
+  }
+  int titleLen = strlen(title);
+  if (titleLen > 32) {
+    uint32_t now = millis();
+    if (now - lastScroll > 220) {
+      scrollOffset = (scrollOffset + 1) % (titleLen - 32 + 7);
+      lastScroll   = now;
+    }
+    if (scrollOffset != lastScrollOffset) { lastScrollOffset = scrollOffset; needRedraw = true; }
+  }
+  if (!needRedraw) return;
+
+  display->SetBrightness(screensaverBrightness);
+  display->ClearScreen();
+
+  char stBuf[33];
+  strlcpy(stBuf, station, sizeof(stBuf));
+  display->DisplayText(stBuf, max(0, (TOTAL_WIDTH - (int)strlen(stBuf) * 4) / 2), 2, 255, 200, 50);
+
+  for (int x = 0; x < TOTAL_WIDTH; x++)
+    display->DrawPixel(x, 11, 60, 60, 60);
+
+  if (titleLen <= 32) {
+    display->DisplayText(title, max(0, (TOTAL_WIDTH - titleLen * 4) / 2), 14, 200, 200, 200);
+  } else {
+    int startIdx = min(scrollOffset, titleLen);
+    char scrollBuf[33] = {};
+    strlcpy(scrollBuf, title + startIdx, (size_t)min(32, titleLen - startIdx) + 1);
+    display->DisplayText(scrollBuf, 0, 14, 200, 200, 200);
+  }
+
+  display->DisplayText("LIVE", TOTAL_WIDTH - 16, 24, 220, 40, 40);
+  Render();
+}
+#endif
+
 // Doppelpunkt zeichnen
 void DrawColon(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
   for (int i = 0; i < 2; i++)
@@ -2440,13 +3167,10 @@ void DisplayClock() {
   int m1 = timeinfo.tm_min / 10;
   int m2 = timeinfo.tm_min % 10;
 
-  // Zentriert auf 128 Pixel: 4 Ziffern × 11px + Doppelpunkt 4px = 48px
-  // Start X = (128 - 48) / 2 = 40 ... oder linksbündig ab x=4
   int startX = 4;
-  int startY = 5;  // 5px von oben, 7px Platz unten für Datum
+  int startY = 5;
 
-  // Führende Null bei Stunden weglassen (optional — hier: immer anzeigen)
-  DrawSegDigit(startX,      startY, h1, clockR, clockG, clockB);
+  if (h1 > 0) DrawSegDigit(startX,      startY, h1, clockR, clockG, clockB);
   DrawSegDigit(startX + 11, startY, h2, clockR, clockG, clockB);
   DrawColon(   startX + 23, startY,     clockR, clockG, clockB);
   DrawSegDigit(startX + 27, startY, m1, clockR, clockG, clockB);
@@ -2477,6 +3201,536 @@ void LoadClockColors() {
     dateR  = f.read(); dateG  = f.read(); dateB  = f.read();
     f.close();
   }
+}
+
+// ── MQTT + Wetter Konfiguration ───────────────────────────────────────────────
+
+#ifdef ZEDMD_WIFI
+void SaveMqttConfig() {
+  File f = LittleFS.open("/mqtt_config.txt", "w");
+  if (!f) return;
+  f.println(mqttServer);
+  f.println(mqttPort);
+  f.close();
+}
+void LoadMqttConfig() {
+  File f = LittleFS.open("/mqtt_config.txt", "r");
+  if (!f) { SaveMqttConfig(); return; }
+  mqttServer = f.readStringUntil('\n'); mqttServer.trim();
+  mqttPort   = (uint16_t)f.readStringUntil('\n').toInt();
+  f.close();
+}
+#endif
+
+void SaveWeatherConfig() {
+  File f = LittleFS.open("/weather_config.txt", "w");
+  if (!f) return;
+  f.println(weatherLat, 6);
+  f.println(weatherLon, 6);
+  f.close();
+}
+void LoadWeatherConfig() {
+  File f = LittleFS.open("/weather_config.txt", "r");
+  if (!f) { SaveWeatherConfig(); return; }
+  weatherLat = f.readStringUntil('\n').toFloat();
+  weatherLon = f.readStringUntil('\n').toFloat();
+  f.close();
+}
+
+// ── Wetter-Feature (Modus 3) ─────────────────────────────────────────────────
+
+struct WeatherInfo { const char* text; uint8_t icon; };
+
+WeatherInfo GetWeatherInfo(uint16_t code, bool isDay = true) {
+  if (!isDay && (code == 0 || code == 1)) return {"Klar",        6};
+  if (!isDay && code == 2)                return {"Teils bew.",  7};
+  if (code == 0)                       return {"Sonnig",        0};
+  if (code == 1)                       return {"Heiter",        0};
+  if (code == 2)                       return {"Teils bew.",    1};
+  if (code == 3)                       return {"Bedeckt",       2};
+  if (code == 45 || code == 48)        return {"Nebel",         2};
+  if (code >= 51 && code <= 57)        return {"Nieselregen",   3};
+  if (code >= 61 && code <= 67)        return {"Regen",         3};
+  if (code >= 71 && code <= 77)        return {"Schnee",        4};
+  if (code >= 80 && code <= 82)        return {"Schauer",       3};
+  if (code >= 85 && code <= 86)        return {"Schneeschr.",   4};
+  if (code >= 95)                      return {"Gewitter",      5};
+  return {"Unbekannt", 2};
+}
+
+void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
+  if (idx >= 8) idx = 2;
+  // Layer 1: Hauptform (Sonne, Wolke, Flocke, Mond, Mond+Wolke)
+  static const uint8_t L1[8][8] = {
+    // 0: Sonne
+    {0b00100100, 0b00011000, 0b01111110, 0b11111111,
+     0b11111111, 0b01111110, 0b00011000, 0b00100100},
+    // 1: Kleine Sonne oben-links (Teils bewölkt)
+    {0b01100000, 0b11100000, 0b01100000, 0b00000000,
+     0b00000000, 0b00000000, 0b00000000, 0b00000000},
+    // 2: Wolke
+    {0b00000000, 0b00111000, 0b01111110, 0b11111111,
+     0b11111111, 0b01111110, 0b00000000, 0b00000000},
+    // 3: Wolke (obere Hälfte)
+    {0b00111100, 0b01111110, 0b11111111, 0b11111111,
+     0b00000000, 0b00000000, 0b00000000, 0b00000000},
+    // 4: Schneeflocke
+    {0b00010000, 0b01010100, 0b00111000, 0b11111111,
+     0b00111000, 0b01010100, 0b00010000, 0b00000000},
+    // 5: Wolke (obere Hälfte)
+    {0b00111100, 0b01111110, 0b11111111, 0b11111111,
+     0b00000000, 0b00000000, 0b00000000, 0b00000000},
+    // 6: Mond (Mondsichel)
+    {0b00111100, 0b01110000, 0b11100000, 0b11100000,
+     0b11100000, 0b11100000, 0b01110000, 0b00111100},
+    // 7: Mond+Wolke — Wolke unten
+    {0b00000000, 0b00000000, 0b00000000, 0b00000000,
+     0b00011100, 0b00111110, 0b01111111, 0b00000000},
+  };
+  static const uint8_t C1[8][3] = {
+    {255, 210,   0},  // Sonne - gelb
+    {255, 210,   0},  // Sonne (teils) - gelb
+    {155, 155, 165},  // Wolke - grau
+    {155, 155, 165},  // Wolke - grau
+    {200, 230, 255},  // Schnee - weißlich
+    {155, 155, 165},  // Wolke - grau
+    {200, 220, 255},  // Mond - weißlich-blau
+    {155, 155, 165},  // Wolke (Mond+Wolke) - grau
+  };
+  // Layer 2: Überlagerte Form mit eigener Farbe (Wolke, Regen, Blitz, Mond)
+  static const uint8_t L2[8][8] = {
+    // 0: (keine)
+    {0, 0, 0, 0, 0, 0, 0, 0},
+    // 1: Wolke über die Sonne
+    {0b00000000, 0b00000000, 0b00001100, 0b00111110,
+     0b01111111, 0b01111111, 0b00111110, 0b00000000},
+    // 2: (keine)
+    {0, 0, 0, 0, 0, 0, 0, 0},
+    // 3: Regentropfen
+    {0b00000000, 0b00000000, 0b00000000, 0b00000000,
+     0b01000100, 0b00100010, 0b01000100, 0b00100010},
+    // 4: (keine)
+    {0, 0, 0, 0, 0, 0, 0, 0},
+    // 5: Blitz
+    {0b00000000, 0b00000000, 0b00000000, 0b00000000,
+     0b00011100, 0b00111000, 0b01110000, 0b00000000},
+    // 6: Mond — keine Overlay
+    {0, 0, 0, 0, 0, 0, 0, 0},
+    // 7: Mond-Sichel oben-links als Overlay
+    {0b01110000, 0b11000000, 0b11000000, 0b01110000,
+     0b00000000, 0b00000000, 0b00000000, 0b00000000},
+  };
+  static const uint8_t C2[8][3] = {
+    {  0,   0,   0},
+    {170, 170, 175},  // Wolke - hell-grau
+    {  0,   0,   0},
+    {100, 160, 255},  // Regen - blau
+    {  0,   0,   0},
+    {255, 210,   0},  // Blitz - gelb
+    {  0,   0,   0},  // Mond - keine Overlay
+    {200, 220, 255},  // Mond-Sichel - weißlich-blau
+  };
+
+  auto drawLayer = [&](const uint8_t bmp[8], uint8_t r, uint8_t g, uint8_t b) {
+    for (int row = 0; row < 8; row++) {
+      uint8_t mask = bmp[row];
+      if (!mask) continue;
+      for (int col = 0; col < 8; col++) {
+        if (mask & (0x80 >> col)) {
+          int px = x + col * scale, py = y + row * scale;
+          for (int dy = 0; dy < scale; dy++)
+            for (int dx = 0; dx < scale; dx++)
+              display->DrawPixel(px+dx, py+dy, r, g, b);
+        }
+      }
+    }
+  };
+  drawLayer(L1[idx], C1[idx][0], C1[idx][1], C1[idx][2]);
+  drawLayer(L2[idx], C2[idx][0], C2[idx][1], C2[idx][2]);
+}
+
+void fetchWeather() {
+#ifdef ZEDMD_WIFI
+  if (!wifiActive || WiFi.status() != WL_CONNECTED) return;
+  lastWeatherFetch = millis();
+  logMsg("Wetter: Fetch-Start, Heap frei=%u intern-max=%u",
+         esp_get_free_heap_size(),
+         heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+
+  // Response-Body in PSRAM — verhindert 20-30 KB Allokation im internen SRAM-Heap
+  const size_t WX_BUF = 32768;
+  char* body = (char*)heap_caps_malloc(WX_BUF, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (!body) { logMsg("Wetter: PSRAM-Puffer fehlgeschlagen"); return; }
+
+  WiFiClient client;
+  HTTPClient http;
+  // HTTP (kein TLS) — Open-Meteo unterstuetzt plain HTTP fuer Embedded-Geraete;
+  // interner RAM reicht nicht fuer mbedTLS-Handshake wenn Audio-Codec aktiv ist
+  char urlBuf[320];
+  snprintf(urlBuf, sizeof(urlBuf),
+    "http://api.open-meteo.com/v1/forecast"
+    "?latitude=%.4f&longitude=%.4f"
+    "&current=temperature_2m,relative_humidity_2m,weather_code,pressure_msl,wind_speed_10m,is_day"
+    "&daily=temperature_2m_max&hourly=weather_code"
+    "&timezone=Europe%%2FBerlin&forecast_days=4",
+    weatherLat, weatherLon);
+
+  http.begin(client, urlBuf);
+  http.setTimeout(8000);
+  int httpCode = http.GET();
+  if (httpCode == HTTP_CODE_OK) {
+    int bodyLen = http.getStream().readBytes(body, (int)WX_BUF - 1);
+    body[bodyLen] = '\0';
+
+    // Helfer: sucht key ab searchFrom, gibt Wert nach ':' als float zurück
+    auto extractFloat = [&](const char* key, const char* searchFrom) -> float {
+      const char* p = strstr(searchFrom, key);
+      if (!p) return -999.0f;
+      p = strchr(p, ':');
+      if (!p) return -999.0f;
+      p++;
+      while (*p == ' ') p++;
+      return atof(p);
+    };
+    auto extractInt = [&](const char* key, const char* searchFrom) -> int {
+      const char* p = strstr(searchFrom, key);
+      if (!p) return -1;
+      p = strchr(p, ':');
+      if (!p) return -1;
+      p++;
+      while (*p == ' ') p++;
+      return atoi(p);
+    };
+
+    // Nur im "current":{} Block suchen
+    const char* curStart = strstr(body, "\"current\":{");
+    if (!curStart) curStart = strstr(body, "\"current\": {");
+    if (curStart) {
+      int isDay = extractInt("\"is_day\"", curStart);
+      if (isDay >= 0) weatherIsDay = (isDay == 1);
+      int code = extractInt("\"weather_code\"", curStart);
+      if (code >= 0) {
+        weatherCode = (uint16_t)code;
+        lastWeatherFetch = millis();
+        if (millis() - lastMqttWeather > 10UL * 60UL * 1000UL) {
+          float temp = extractFloat("\"temperature_2m\"", curStart);
+          if (temp > -900.0f) {
+            weatherTemp      = temp;
+            weatherHumidity  = (uint8_t)max(0, extractInt("\"relative_humidity_2m\"", curStart));
+            float pres       = extractFloat("\"pressure_msl\"", curStart);
+            weatherPressure  = (pres > 0) ? (uint16_t)pres : 0;
+            float wind       = extractFloat("\"wind_speed_10m\"", curStart);
+            weatherWindSpeed = (wind > 0) ? wind : 0.0f;
+          }
+        }
+      }
+    }
+
+    // Tagesvorhersage: stündlicher 12:00-Wert (realistischer als daily worst-case)
+    const char* hourlyStart = strstr(body, "\"hourly\":{");
+    if (!hourlyStart) hourlyStart = strstr(body, "\"hourly\": {");
+    const char* dailyStart  = strstr(body, "\"daily\":{");
+    if (!dailyStart)  dailyStart  = strstr(body, "\"daily\": {");
+
+    if (hourlyStart && dailyStart) {
+      auto extractArrayVal = [&](const char* key, const char* searchFrom, int idx) -> float {
+        const char* p = strstr(searchFrom, key);
+        if (!p) return -999.0f;
+        p = strchr(p, '[');
+        if (!p) return -999.0f;
+        p++;
+        for (int i = 0; i < idx; i++) {
+          p = strchr(p, ',');
+          if (!p) return -999.0f;
+          p++;
+        }
+        while (*p == ' ') p++;
+        return atof(p);
+      };
+      bool ok = true;
+      const int noonIdx[3] = {36, 60, 84};  // 12:00-Uhr-Indizes für Tage 1-3
+      for (int i = 0; i < 3; i++) {
+        float code = extractArrayVal("\"weather_code\"",     hourlyStart, noonIdx[i]);
+        float tmax = extractArrayVal("\"temperature_2m_max\"", dailyStart, i + 1);
+        if (code < -900.0f || tmax < -900.0f) { ok = false; break; }
+        forecastCode[i]    = (uint16_t)roundf(code);
+        forecastTempMax[i] = (int8_t)roundf(tmax);
+      }
+      if (ok) {
+        __sync_synchronize();
+        forecastAvailable = true;
+        logMsg("Wetter: Vorhersage OK (%d/%d/%d)", forecastCode[0], forecastCode[1], forecastCode[2]);
+      } else {
+        logMsg("Wetter: Vorhersage Parsing fehlgeschlagen");
+      }
+    } else {
+      logMsg("Wetter: Kein hourly/daily-Block in Antwort");
+    }
+  } else {
+    logMsg("Wetter: HTTP Fehler %d", httpCode);
+  }
+  http.end();
+  free(body);
+#endif
+}
+
+// Läuft auf eigenem Task mit 20 KB Stack — gibt dem TLS-Handshake genug Stack-Platz
+void weatherFetchTask(void* pvParams) {
+  fetchWeather();
+  weatherFetchRunning = false;
+  vTaskDelete(NULL);
+}
+
+// Startet fetchWeather() im eigenen Task; verhindert Doppelstarts
+// Stack aus PSRAM — interner SRAM ist beim Webradio-Betrieb nahezu erschöpft
+void triggerWeatherFetch() {
+#ifdef ZEDMD_WIFI
+  if (weatherFetchRunning) return;
+  weatherFetchRunning = true;
+  static StaticTask_t wxTaskBuf;
+  static StackType_t* wxStack = nullptr;
+  if (!wxStack) {
+    wxStack = (StackType_t*)heap_caps_malloc(20480, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  }
+  if (!wxStack ||
+      !xTaskCreateStatic(weatherFetchTask, "wxFetch", 20480 / sizeof(StackType_t),
+                         NULL, 1, wxStack, &wxTaskBuf)) {
+    weatherFetchRunning = false;
+    logMsg("Wetter: Task-Start fehlgeschlagen");
+  }
+#endif
+}
+
+void DisplayWeather() {
+#ifdef ZEDMD_WIFI
+  display->SetBrightness(screensaverBrightness);
+  display->ClearScreen();
+
+  WeatherInfo wi = GetWeatherInfo(weatherCode, weatherIsDay);
+
+  // Layout:
+  //  y=2:    Temperatur (links) + Datum (rechts) — volle Breite, über dem Icon
+  //  y=8-23: Icon 16x16 (x=1), daneben Text ab x=19
+  //  y=12:   Beschreibung (x=19)
+  //  y=24:   Feuchte + Luftdruck (volle Breite, unter dem Icon)
+
+  // Icon 16x16 (vertikal zentriert y=8)
+  DrawWeatherIcon(wi.icon, 1, 8);
+
+  // Zeile 1: Temperatur links + Datum rechts
+  char tempStr[12];
+  snprintf(tempStr, sizeof(tempStr), "%.1f C", weatherTemp);
+  display->DisplayText(tempStr, 0, 2, clockR, clockG, clockB, 1);
+
+  struct tm timeinfo;
+  if (getLocalTime(&timeinfo)) {
+    const char* days[] = {"So","Mo","Di","Mi","Do","Fr","Sa"};
+    char dateStr[16];
+    snprintf(dateStr, sizeof(dateStr), "%s %02d.%02d.%02d",
+      days[timeinfo.tm_wday], timeinfo.tm_mday,
+      timeinfo.tm_mon + 1, timeinfo.tm_year % 100);
+    int dateX = TOTAL_WIDTH - (int)(strlen(dateStr) * 4) - 1;
+    display->DisplayText(dateStr, dateX, 2, dateR, dateG, dateB, 1);
+  }
+
+  // Zeile 2: Beschreibung (rechts vom Icon)
+  display->DisplayText(wi.text, 19, 12, dateR, dateG, dateB, 1);
+
+  // Zeile 3: Feuchte + Luftdruck (volle Breite unter Icon)
+  char humStr[18];
+  snprintf(humStr, sizeof(humStr), "%u%%  %uhPa", weatherHumidity, weatherPressure);
+  display->DisplayText(humStr, 0, 24, dateR, dateG, dateB, 1);
+
+  Render();
+#endif
+}
+
+void DisplayClockWeather() {
+#ifdef ZEDMD_WIFI
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) return;
+
+  static int  lastCWMin         = -1;
+  static int  lastCWHour        = -1;
+  static bool lastWeatherAvail  = false;
+  if (!clockColorChanged &&
+      timeinfo.tm_min  == lastCWMin  &&
+      timeinfo.tm_hour == lastCWHour &&
+      lastWeatherAvail == weatherAvailable) {
+    for (int y = 0; y < TOTAL_HEIGHT; y++)
+      display->DrawPixel(53, y, 100, 100, 100);
+    return;
+  }
+  clockColorChanged  = false;
+  lastCWMin          = timeinfo.tm_min;
+  lastCWHour         = timeinfo.tm_hour;
+  lastWeatherAvail   = weatherAvailable;
+
+  display->SetBrightness(screensaverBrightness);
+  display->ClearScreen();
+
+  // ── Linke Seite: Uhr (x=0..52) ─────────────────────────────────────
+  const char* days[] = {"So","Mo","Di","Mi","Do","Fr","Sa"};
+  char dateStr[16];
+  snprintf(dateStr, sizeof(dateStr), "%s %02d.%02d.%02d",
+    days[timeinfo.tm_wday], timeinfo.tm_mday,
+    timeinfo.tm_mon + 1, timeinfo.tm_year % 100);
+
+  int h1 = timeinfo.tm_hour / 10;
+  int h2 = timeinfo.tm_hour % 10;
+  int m1 = timeinfo.tm_min  / 10;
+  int m2 = timeinfo.tm_min  % 10;
+
+  // 7-Segment-Ziffern (y=3), 10×20px je Ziffer — keine führende Null
+  int startX = 0, startY = 3;
+  if (h1 > 0) DrawSegDigit(startX,      startY, h1, clockR, clockG, clockB);
+  DrawSegDigit(startX + 11, startY, h2, clockR, clockG, clockB);
+  DrawColon(   startX + 23, startY,     clockR, clockG, clockB);
+  DrawSegDigit(startX + 27, startY, m1, clockR, clockG, clockB);
+  DrawSegDigit(startX + 38, startY, m2, clockR, clockG, clockB);
+
+  // Datum unten links (y=25)
+  display->DisplayText(dateStr, 2, 25, dateR, dateG, dateB, 1);
+
+  // ── Trennlinie x=53 ──────────────────────────────────────────────────
+  for (int y = 0; y < TOTAL_HEIGHT; y++)
+    display->DrawPixel(53, y, 100, 100, 100);
+
+  // ── Rechte Seite: Wetter (x=64..127) ────────────────────────────────
+  bool mqttStale = (lastMqttWeather > 0 &&
+                    millis() - lastMqttWeather > 30UL * 60UL * 1000UL);
+  if (weatherAvailable && !mqttStale) {
+    WeatherInfo wi = GetWeatherInfo(weatherCode, weatherIsDay);
+
+    // Icon 16x16 (x=55, y=3)
+    DrawWeatherIcon(wi.icon, 55, 3, 2);
+
+    // Temperatur-Farbe nach Bereich
+    int tempInt = (int)roundf(weatherTemp);
+    uint8_t tR, tG, tB;
+    if      (tempInt < -10) { tR=0;   tG=0;   tB=120; }
+    else if (tempInt <= 0)  { tR=0;   tG=0;   tB=220; }
+    else if (tempInt <= 10) { tR=0;   tG=180; tB=255; }
+    else if (tempInt <= 15) { tR=255; tG=210; tB=0;   }
+    else if (tempInt <= 25) { tR=255; tG=120; tB=0;   }
+    else if (tempInt <= 30) { tR=255; tG=0;  tB=0;  }
+    else                    { tR=180; tG=0;   tB=0;   }
+
+    // Grosse Temp-Ziffern (y=3, 20px hoch) ab x=72
+    int tx = 72;
+    if (weatherTemp < -0.5f) {
+      for (int dx = 0; dx < 5; dx++)
+        for (int dy = 0; dy < 2; dy++)
+          display->DrawPixel(tx + dx, 12 + dy, tR, tG, tB);
+      tx += 6;
+      tempInt = -tempInt;
+    }
+    if (tempInt >= 10) {
+      DrawSegDigit(tx, 3, tempInt / 10, tR, tG, tB);
+      tx += 11;
+    }
+    DrawSegDigit(tx, 3, tempInt % 10, tR, tG, tB);
+    tx += 10;
+    display->DisplayText("C", tx + 1, 5, tR, tG, tB, 1);
+
+    // Beschreibung (y=25)
+    display->DisplayText(wi.text, 55, 25, dateR, dateG, dateB, 1);
+
+    // H/W/P-Spalte rechts (x=101 = 27px vom Rand, y=2/11/20)
+    char humStr[8];
+    snprintf(humStr, sizeof(humStr), "H:%u%%", weatherHumidity);
+    display->DisplayText(humStr, 101, 2, dateR, dateG, dateB, 1);
+    char windStr[9];
+    snprintf(windStr, sizeof(windStr), "W:%dkm", (int)roundf(weatherWindSpeed));
+    display->DisplayText(windStr, 101, 11, dateR, dateG, dateB, 1);
+    char presStr[10];
+    snprintf(presStr, sizeof(presStr), "P:%u", weatherPressure);
+    display->DisplayText(presStr, 101, 20, dateR, dateG, dateB, 1);
+  } else if (mqttStale) {
+    display->DisplayText("MQTT", 66, 10, 255, 80, 0, 1);
+    display->DisplayText("fehlt", 64, 18, 255, 80, 0, 1);
+  } else {
+    display->DisplayText("Kein", 64, 10, dateR, dateG, dateB, 1);
+    display->DisplayText("Wetter", 61, 18, dateR, dateG, dateB, 1);
+  }
+
+  Render();
+#endif
+}
+
+void DisplayWeatherForecast() {
+#ifdef ZEDMD_WIFI
+  if (!forecastAvailable) return;
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) return;
+
+  static uint16_t lastFCode[3] = {0xFFFF, 0xFFFF, 0xFFFF};
+  static int8_t   lastFTmax[3] = {-99, -99, -99};
+  bool changed = clockColorChanged;
+  for (int i = 0; i < 3; i++)
+    if (lastFCode[i] != forecastCode[i] || lastFTmax[i] != forecastTempMax[i]) { changed = true; break; }
+  if (!changed) {
+    for (int y = 0; y < TOTAL_HEIGHT; y++) {
+      display->DrawPixel(42, y, 100, 100, 100);
+      display->DrawPixel(85, y, 100, 100, 100);
+    }
+    return;
+  }
+  clockColorChanged = false;
+  for (int i = 0; i < 3; i++) { lastFCode[i] = forecastCode[i]; lastFTmax[i] = forecastTempMax[i]; }
+
+  display->SetBrightness(screensaverBrightness);
+  display->ClearScreen();
+
+  const char* dayNames[] = {"So","Mo","Di","Mi","Do","Fr","Sa"};
+  const int cellX[3] = {0, 43, 86};
+
+  for (int y = 0; y < TOTAL_HEIGHT; y++) {
+    display->DrawPixel(42, y, 100, 100, 100);
+    display->DrawPixel(85, y, 100, 100, 100);
+  }
+
+  for (int i = 0; i < 3; i++) {
+    int cx = cellX[i];
+    int dayOfWeek = (timeinfo.tm_wday + 1 + i) % 7;
+    WeatherInfo wi = GetWeatherInfo(forecastCode[i]);
+    int tempInt = (int)forecastTempMax[i];
+
+    uint8_t tR, tG, tB;
+    if      (tempInt < -10) { tR=0;   tG=0;   tB=120; }
+    else if (tempInt <= 0)  { tR=0;   tG=0;   tB=220; }
+    else if (tempInt <= 10) { tR=0;   tG=180; tB=255; }
+    else if (tempInt <= 15) { tR=255; tG=210; tB=0;   }
+    else if (tempInt <= 25) { tR=255; tG=120; tB=0;   }
+    else if (tempInt <= 30) { tR=255; tG=0;  tB=0;  }
+    else                    { tR=180; tG=0;   tB=0;   }
+
+    // Tagname oben, zentriert
+    const char* dn = dayNames[dayOfWeek];
+    display->DisplayText(dn, cx + (42 - (int)strlen(dn) * 4) / 2, 0, dateR, dateG, dateB, 1);
+
+    // Icon 8x8 links, Digits rechts daneben — gleiche Proportionen wie Hauptseite
+    DrawWeatherIcon(wi.icon, cx + 2, 5, 1);
+
+    int tx = cx + 11;
+    if (forecastTempMax[i] < 0) {
+      for (int dx = 0; dx < 4; dx++)
+        display->DrawPixel(tx + dx, 14, tR, tG, tB);
+      tx += 5;
+      tempInt = -tempInt;
+    }
+    if (tempInt >= 10) { DrawSegDigit(tx, 5, tempInt / 10, tR, tG, tB); tx += 11; }
+    DrawSegDigit(tx, 5, tempInt % 10, tR, tG, tB);
+    tx += 10;
+    display->DisplayText("C", tx + 1, 7, tR, tG, tB, 1);
+
+    // Beschreibung unten, zentriert
+    int descWidth = (int)strlen(wi.text) * 4;
+    display->DisplayText(wi.text, cx + max(0, (42 - descWidth) / 2), 26, dateR, dateG, dateB, 1);
+  }
+
+  Render();
+#endif
 }
 
 void SaveScreensaverLum() {
@@ -2511,9 +3765,106 @@ void LoadScreensaverDuration() {
   f.close();
 }
 
+void SaveScreensaverShuffle() {
+  File f = LittleFS.open("/screensaver_shuffle.val", "w");
+  f.write((uint8_t)screensaverShuffle);
+  f.close();
+}
+
+void LoadScreensaverShuffle() {
+  File f = LittleFS.open("/screensaver_shuffle.val", "r");
+  if (!f) { SaveScreensaverShuffle(); return; }
+  screensaverShuffle = (bool)f.read();
+  f.close();
+}
+
+
+
+void SaveScreensaverStrictTimer() {
+  File f = LittleFS.open("/screensaver_strict_timer.val", "w");
+  f.write((uint8_t)screensaverStrictTimer);
+  f.close();
+}
+
+void LoadScreensaverStrictTimer() {
+  File f = LittleFS.open("/screensaver_strict_timer.val", "r");
+  if (!f) { SaveScreensaverStrictTimer(); return; }
+  screensaverStrictTimer = (bool)f.read();
+  f.close();
+}
+
+void shuffleScreensaverFiles() {
+  if (screensaverCount <= 1) return;
+  for (uint16_t i = screensaverCount - 1; i > 0; i--) {
+    uint16_t j = (uint16_t)(esp_random() % (i + 1));
+    char tmp[128];
+    memcpy(tmp, screensaverFiles[i], 128);
+    memcpy(screensaverFiles[i], screensaverFiles[j], 128);
+    memcpy(screensaverFiles[j], tmp, 128);
+  }
+}
+
+void sortScreensaverFiles() {
+  if (screensaverCount < 2) return;
+  esp_task_wdt_reset();
+
+  // Index-Array sortieren (2 Byte/Eintrag) statt 128-Byte-Blöcke verschieben
+  uint16_t* idx = (uint16_t*)heap_caps_malloc(screensaverCount * sizeof(uint16_t),
+                                                MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (!idx) return;
+  for (uint16_t i = 0; i < screensaverCount; i++) idx[i] = i;
+
+  std::sort(idx, idx + screensaverCount, [](uint16_t a, uint16_t b) {
+    const char* na = strrchr(screensaverFiles[a], '/');
+    const char* nb = strrchr(screensaverFiles[b], '/');
+    na = na ? na + 1 : screensaverFiles[a];
+    nb = nb ? nb + 1 : screensaverFiles[b];
+    return strcasecmp(na, nb) < 0;
+  });
+
+  // Sortierte Reihenfolge einmalig sequenziell umkopieren
+#ifdef BOARD_HAS_PSRAM
+  char (*tmp)[128] = (char (*)[128])heap_caps_malloc(screensaverCount * 128,
+                                                      MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+#else
+  char (*tmp)[128] = (char (*)[128])malloc(screensaverCount * 128);
+#endif
+  if (!tmp) { free(idx); return; }
+  for (uint16_t i = 0; i < screensaverCount; i++) memcpy(tmp[i], screensaverFiles[idx[i]], 128);
+  memcpy(screensaverFiles, tmp, (size_t)screensaverCount * 128);
+  free(tmp);
+  free(idx);
+  esp_task_wdt_reset();
+}
+
+uint16_t nextScreensaverIndex() {
+  if (screensaverCount <= 1) return 0;
+  if (!screensaverShuffle) return (screensaverIndex + 1) % screensaverCount;
+  uint16_t next = screensaverIndex + 1;
+  if (next >= screensaverCount) {
+    shuffleScreensaverFiles();
+    next = 0;
+  }
+  return next;
+}
+
 void InitSDCard() {
-  Serial.printf("InitSDCard: SCK=%d MISO=%d MOSI=%d CS=%d\n",
-                SD_SCK, SD_MISO, SD_MOSI, SD_CS);
+  bool mounted = false;
+
+#ifdef SD_MMC_BUILD
+  logMsg("InitSDCard: SDMMC CLK=%d CMD=%d DATA=%d", SD_MMC_CLK_PIN, SD_MMC_CMD_PIN, SD_MMC_DATA_PIN);
+  SD_MMC.setPins(SD_MMC_CLK_PIN, SD_MMC_CMD_PIN, SD_MMC_DATA_PIN);
+  for (uint8_t i = 0; i < 4; i++) {
+    if (SD_MMC.begin("/sdcard", true)) {  // true = 1-bit Modus
+      mounted = true;
+      break;
+    }
+    logMsg("SD: Mount-Versuch %d fehlgeschlagen...", i + 1);
+    SD_MMC.end();
+    delay(750);
+  }
+#else
+  logMsg("InitSDCard: SCK=%d MISO=%d MOSI=%d CS=%d", SD_SCK, SD_MISO, SD_MOSI, SD_CS);
 
   // CS Pin explizit auf HIGH setzen vor SPI Init
   pinMode(SD_CS, OUTPUT);
@@ -2530,65 +3881,330 @@ void InitSDCard() {
   uint32_t spiSpeed = 4000000;  // 4MHz für Standard ESP32
 #endif
 
-  bool mounted = false;
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < 4; i++) {
     if (SD.begin(SD_CS, spiSD, spiSpeed)) {
       mounted = true;
       break;
     }
-    Serial.printf("SD: Mount-Versuch %d fehlgeschlagen...\n", i + 1);
+    logMsg("SD: Mount-Versuch %d fehlgeschlagen...", i + 1);
     SD.end();
-    delay(500);
+    delay(750);  // mehr Zeit fuer SD-Karte nach Soft-Reset
   }
+#endif
 
   if (mounted) {
     sdCardAvailable = true;
-    Serial.println("SD Card OK!");
-    Serial.printf("SD Size: %llu MB\n", SD.cardSize() / (1024 * 1024));
+    sdTotalBytes = SD.cardSize();
+    sdUsedBytes  = SD.usedBytes();
+    logMsg("SD Card OK! Size: %llu MB, Used: %llu MB",
+           sdTotalBytes / (1024*1024), sdUsedBytes / (1024*1024));
   } else {
     sdCardAvailable = false;
-    Serial.println("SD Card FAILED!");
+    sdTotalBytes = 0;
+    sdUsedBytes  = 0;
+    logMsg("SD Card FAILED!");
   }
 }
 
-void SaveScreensaverPath() {
+void SaveScreensaverPaths() {
   File f = LittleFS.open("/screensaver_path.val", "w");
   if (f) {
-    f.print(screensaverPath);
+    f.print(screensaverPaths);
     f.close();
   }
 }
 
-void LoadScreensaverPath() {
+void LoadScreensaverPaths() {
   File f = LittleFS.open("/screensaver_path.val", "r");
   if (f) {
-    screensaverPath = f.readString();
-    screensaverPath.trim();
+    screensaverPaths = f.readString();
+    screensaverPaths.trim();
     f.close();
   } else {
-    screensaverPath = "";
+    screensaverPaths = "";
   }
 }
 
+// ── Favoriten ────────────────────────────────────────────────────────────────
+bool isFavorite(const char* path) {
+  String p = String(path) + "\n";
+  return screensaverFavorites.indexOf(p) >= 0;
+}
+
+void saveFavorites() {
+  File f = LittleFS.open("/screensaver_favorites.txt", "w");
+  if (f) { f.print(screensaverFavorites); f.close(); }
+}
+
+void toggleFavorite(const char* path) {
+  String p = String(path) + "\n";
+  int idx = screensaverFavorites.indexOf(p);
+  if (idx >= 0) screensaverFavorites.remove(idx, p.length());
+  else          screensaverFavorites += p;
+  saveFavorites();
+}
+
+void LoadFavorites() {
+  File f = LittleFS.open("/screensaver_favorites.txt", "r");
+  if (f) { screensaverFavorites = f.readString(); f.close(); }
+}
+
+// ── Ignore-Liste ──────────────────────────────────────────────────────────────
+bool isIgnored(const char* path) {
+  String p = String(path) + "\n";
+  return screensaverIgnore.indexOf(p) >= 0;
+}
+
+void saveIgnore() {
+  File f = LittleFS.open("/screensaver_ignore.txt", "w");
+  if (f) { f.print(screensaverIgnore); f.close(); }
+}
+
+void toggleIgnore(const char* path) {
+  String p = String(path) + "\n";
+  int idx = screensaverIgnore.indexOf(p);
+  if (idx >= 0) screensaverIgnore.remove(idx, p.length());
+  else          screensaverIgnore += p;
+  saveIgnore();
+}
+
+void LoadIgnore() {
+  File f = LittleFS.open("/screensaver_ignore.txt", "r");
+  if (f) { screensaverIgnore = f.readString(); f.close(); }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Dateilisten-Cache ─────────────────────────────────────────────────────────
+void addScreensaverFile(const String& path) {
+  if (isIgnored(path.c_str())) return;
+  if (screensaverCount >= screensaverFilesCapacity) {
+    uint16_t newCap = screensaverFilesCapacity == 0 ? 32 : screensaverFilesCapacity * 2;
+    char (*newBuf)[128];
+#ifdef BOARD_HAS_PSRAM
+    newBuf = (char (*)[128])heap_caps_realloc(screensaverFiles, newCap * 128,
+                                               MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+#else
+    newBuf = (char (*)[128])realloc(screensaverFiles, newCap * 128);
+#endif
+    if (!newBuf) return;
+    screensaverFiles = newBuf;
+    screensaverFilesCapacity = newCap;
+  }
+  strncpy(screensaverFiles[screensaverCount], path.c_str(), 127);
+  screensaverFiles[screensaverCount][127] = '\0';
+  screensaverCount++;
+}
+
+// Cache-Dateiname aus Ordnerpfad ableiten
+String folderCacheKey(const String& path) {
+  String key = path;
+  key.replace("/", "_");
+  key.replace(" ", "_");
+  key.replace(":", "_");
+  if (key.length() > 20) key = key.substring(key.length() - 20);
+  return "/sc_" + key + ".bin";
+}
+
+// Einzelnen Ordner aus Cache laden — 0 = Cache-Miss
+uint16_t TryLoadFolderCache(const String& sdPath) {
+  String cacheFile = folderCacheKey(sdPath);
+  File f = LittleFS.open(cacheFile, "r");
+  if (!f) return 0;
+  uint16_t countBefore = screensaverCount;
+  while (f.available()) {
+    String line = f.readStringUntil('\n');
+    line.trim();
+    if (line.length() > 0) addScreensaverFile(line);
+  }
+  f.close();
+  uint16_t loaded = screensaverCount - countBefore;
+  logMsg("Cache[%s]: %d Dateien geladen", sdPath.c_str(), loaded);
+  return loaded;
+}
+
+// Einzelnen Ordner in Cache schreiben
+void SaveFolderCache(const String& sdPath, uint16_t fromIndex, uint16_t count) {
+  String cacheFile = folderCacheKey(sdPath);
+  File f = LittleFS.open(cacheFile, "w");
+  if (!f) { logMsg("Cache: Konnte %s nicht schreiben", cacheFile.c_str()); return; }
+  for (uint16_t i = fromIndex; i < fromIndex + count; i++) f.println(screensaverFiles[i]);
+  f.close();
+  logMsg("Cache[%s]: %d Dateien gespeichert", sdPath.c_str(), count);
+}
+
+// Alle Ordner-Caches löschen
+void InvalidateAllFolderCaches() {
+  LittleFS.remove("/screensaver_cache.txt");  // alter globaler Cache
+  File root = LittleFS.open("/");
+  if (!root) return;
+  File f = root.openNextFile();
+  while (f) {
+    String name = String(f.name());
+    if (name.startsWith("sc_") && name.endsWith(".bin")) {
+      f.close();
+      LittleFS.remove("/" + name);
+      logMsg("Cache: %s geloescht", name.c_str());
+    } else {
+      f.close();
+    }
+    f = root.openNextFile();
+  }
+  root.close();
+}
+
+// Stubs für alte Aufrufe
+void SaveScreensaverCache() {}
+bool TryLoadScreensaverCache() { return false; }
+// ─────────────────────────────────────────────────────────────────────────────
+
 void LoadScreensaverFiles() {
+  // Alten Puffer atomar austauschen — Webserver-Callbacks lesen screensaverFiles unter Mutex
+  if (screensaverFilesMutex) {
+    xSemaphoreTake(screensaverFilesMutex, portMAX_DELAY);
+    char (*oldBuf)[128] = screensaverFiles;
+    screensaverFiles         = nullptr;
+    screensaverCount         = 0;
+    screensaverFilesCapacity = 0;
+    xSemaphoreGive(screensaverFilesMutex);
+    if (oldBuf) free(oldBuf);
+  } else {
+    free(screensaverFiles);
+    screensaverFiles         = nullptr;
+    screensaverCount         = 0;
+    screensaverFilesCapacity = 0;
+  }
   screensaverCount = 0;
 
-  // SD Karte — gewählter Pfad
-  if (sdCardAvailable && screensaverPath.length() > 0) {
-    String sdPath = screensaverPath;
-    if (!sdPath.startsWith("/")) sdPath = "/" + sdPath;
-    File dir = SD.open(sdPath);
-    if (dir && dir.isDirectory()) {
+  // Datei hinzufügen — wächst dynamisch (verdoppelt bei Bedarf)
+  // Favoriten-Modus: Pfade direkt aus Favoritenliste laden
+  if (screensaverPaths == "FAV") {
+    String remaining = screensaverFavorites;
+    while (remaining.length() > 0) {
+      int nl = remaining.indexOf('\n');
+      String p = (nl >= 0) ? remaining.substring(0, nl) : remaining;
+      remaining = (nl >= 0) ? remaining.substring(nl + 1) : "";
+      p.trim();
+      if (p.length() == 0) continue;
+      if (p.startsWith("SD:") && !sdCardAvailable) continue;  // SD nicht verfügbar → überspringen
+      addScreensaverFile(p);
+    }
+    logMsg("LoadScreensaver: %d Favoriten geladen", screensaverCount);
+    if (screensaverCount > 0) goto done;
+    // Keine Favoriten verfügbar → LittleFS Fallback
+    logMsg("LoadScreensaver: Keine Favoriten verfügbar, Fallback auf LittleFS");
+  }
+
+  // Alle gewählten Pfade (kommagetrennt); "FS:" = LittleFS /screensaver/
+  if (screensaverPaths.length() > 0) {
+    String remaining = screensaverPaths;
+    while (remaining.length() > 0) {
+      int comma = remaining.indexOf(',');
+      String entry = (comma >= 0) ? remaining.substring(0, comma) : remaining;
+      remaining = (comma >= 0) ? remaining.substring(comma + 1) : "";
+      entry.trim();
+      if (entry.length() == 0) continue;
+
+      // LittleFS /screensaver/ einlesen
+      if (entry == "FS:") {
+        if (!LittleFS.exists("/screensaver")) LittleFS.mkdir("/screensaver");
+        File fsDir = LittleFS.open("/screensaver");
+        if (fsDir) {
+          uint16_t countBefore = screensaverCount;
+          File f = fsDir.openNextFile();
+          while (f) {
+            if (!f.isDirectory()) {
+              const char* fname = f.name();
+              if (fname && fname[0] != '.') {
+                String name = String(fname);
+                name.trim();
+                if (name.endsWith(".raw") || name.endsWith(".gif") || name.endsWith(".GIF"))
+                  addScreensaverFile("FS:/screensaver/" + name);
+              }
+            }
+            f.close();
+            f = fsDir.openNextFile();
+          }
+          fsDir.close();
+          logMsg("LoadScreensaver: %d Dateien aus LittleFS geladen", screensaverCount - countBefore);
+        }
+        continue;
+      }
+
+      if (!sdCardAvailable) { logMsg("LoadScreensaver: SD nicht verfügbar, überspringe %s", entry.c_str()); continue; }
+      String sdPath = entry;
+      if (!sdPath.startsWith("/")) sdPath = "/" + sdPath;
+
+      // FIX 11: Pro-Ordner-Cache versuchen — kein Scan nötig wenn Cache vorhanden
+      uint16_t cached = TryLoadFolderCache(sdPath);
+      if (cached > 0) continue;
+
+      // Cache-Miss — SD scannen
+      logMsg("LoadScreensaver: SD Pfad=%s (kein Cache, scanne...)", sdPath.c_str());
+      File dir = SD.open(sdPath);
+      if (dir && dir.isDirectory()) {
+        char pathBuf[128];
+        uint16_t scanned = 0;
+        uint16_t countBefore = screensaverCount;
+        File f = dir.openNextFile();
+        while (f) {
+          if (cancelSdScan) { f.close(); dir.close(); cancelSdScan = false; goto done; }
+          if (!f.isDirectory()) {
+            const char* fname = f.name();
+            if (fname && fname[0] != '.') {
+              const char* dot = strrchr(fname, '.');
+              if (dot) {
+                char ext[8]; strncpy(ext, dot, 7); ext[7] = '\0';
+                for (char* p = ext; *p; p++) *p = tolower((unsigned char)*p);
+                if (strcmp(ext, ".gif") == 0 || strcmp(ext, ".raw") == 0) {
+                  snprintf(pathBuf, sizeof(pathBuf), "SD:%s/%s", sdPath.c_str(), fname);
+                  addScreensaverFile(pathBuf);
+                }
+              }
+            }
+          }
+          f.close();
+          esp_task_wdt_reset();
+          if ((++scanned % 50) == 0) {
+#ifdef WEBRADIO_ENABLED
+            if (!radioIsPlaying) {
+#endif
+              char msg[24];
+              snprintf(msg, sizeof(msg), "Lese SD %d", scanned);
+              display->DisplayText(msg, 32, 13, 255, 180, 0);
+              Render();
+#ifdef WEBRADIO_ENABLED
+            }
+#endif
+          }
+          f = dir.openNextFile();
+        }
+        dir.close();
+        uint16_t newFiles = screensaverCount - countBefore;
+        logMsg("LoadScreensaver: %d Dateien aus %s geladen", newFiles, sdPath.c_str());
+        // FIX 11: Ordner-Cache speichern für nächsten Boot
+        if (newFiles > 0) SaveFolderCache(sdPath, countBefore, newFiles);
+      } else {
+        logMsg("LoadScreensaver: Ordner nicht gefunden: %s", sdPath.c_str());
+      }
+    }
+    logMsg("LoadScreensaver: %d Dateien gesamt geladen", screensaverCount);
+  }
+
+  // Fallback 1 → LittleFS /screensaver
+  if (screensaverCount == 0) {
+    logMsg("LoadScreensaver: Fallback auf LittleFS");
+    if (!LittleFS.exists("/screensaver")) LittleFS.mkdir("/screensaver");
+    File dir = LittleFS.open("/screensaver");
+    if (dir) {
       File f = dir.openNextFile();
       while (f) {
         if (!f.isDirectory()) {
           const char* fname = f.name();
-          if (fname && fname[0] != '.') {  // Versteckte Dateien ignorieren
+          if (fname && fname[0] != '.') {
             String name = String(fname);
             name.trim();
-            if ((name.endsWith(".raw") || name.endsWith(".gif") ||
-                 name.endsWith(".GIF")) && screensaverCount < 20) {
-              screensaverFiles[screensaverCount++] = "SD:" + sdPath + "/" + name;
+            if (name.endsWith(".raw") || name.endsWith(".gif") || name.endsWith(".GIF")) {
+              addScreensaverFile("FS:/screensaver/" + name);
             }
           }
         }
@@ -2598,32 +4214,19 @@ void LoadScreensaverFiles() {
       dir.close();
     }
   }
-
-  // Fallback 1 → LittleFS /screensaver
-  if (screensaverCount == 0) {
-    if (!LittleFS.exists("/screensaver")) {
-      LittleFS.mkdir("/screensaver");
-    }
-    File dir = LittleFS.open("/screensaver");
-    File f = dir.openNextFile();
-    while (f) {
-      if (!f.isDirectory()) {
-        const char* fname = f.name();
-        if (fname && fname[0] != '.') {  // Versteckte Dateien ignorieren
-          String name = String(fname);
-          name.trim();
-          if ((name.endsWith(".raw") || name.endsWith(".gif") ||
-               name.endsWith(".GIF")) && screensaverCount < 20) {
-            screensaverFiles[screensaverCount++] = "FS:/screensaver/" + name;
-          }
-        }
-      }
-      f.close();
-      f = dir.openNextFile();
-    }
-    dir.close();
-  }
   // Fallback 2 → logo.raw/logoHD.raw wird in ScreenSaver() direkt geladen
+done:
+  logMsg("LoadScreensaver: %d Dateien, Shuffle=%s", screensaverCount, screensaverShuffle ? "ja" : "nein");
+  if (screensaverShuffle && screensaverCount > 1) shuffleScreensaverFiles();
+  else if (screensaverCount > 1) sortScreensaverFiles();
+  // Neuen Puffer unter Mutex sichtbar machen — ab hier kann der Webserver lesen
+  if (screensaverFilesMutex) {
+    xSemaphoreTake(screensaverFilesMutex, portMAX_DELAY);
+    screensaverIndex = 0;
+    xSemaphoreGive(screensaverFilesMutex);
+  } else {
+    screensaverIndex = 0;
+  }
 }
 
 // Listet alle Ordner auf der SD Karte
@@ -2636,8 +4239,10 @@ String GetSDFolders() {
   if (!root.isDirectory()) { root.close(); return "[]"; }
 
   bool first = true;
+  int scanned = 0;
   File f = root.openNextFile();
-  while (f) {
+  while (f && scanned < 500) {
+    scanned++;
     if (f.isDirectory()) {
       String name = String(f.name());
       name.trim();
@@ -2652,6 +4257,7 @@ String GetSDFolders() {
     esp_task_wdt_reset();
     f = root.openNextFile();
   }
+  if (f) f.close();
   root.close();
   json += "]";
   return json;
@@ -2660,7 +4266,12 @@ String GetSDFolders() {
 void setup() {
   Serial.begin(115200);
   delay(2000);
-  Serial.println("=== ZeDMD booting ===");
+  // PSRAM-Puffer und Mutexe früh allozieren — vor Audio/WiFi/Codec-Initialisierungen
+  logBuffer             = (char (*)[LOG_LINE_LEN])heap_caps_calloc(
+                            LOG_LINES, LOG_LINE_LEN, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  uncompressBuffer      = (uint8_t*)heap_caps_malloc(2048, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  screensaverFilesMutex = xSemaphoreCreateMutex();
+  logMsg("=== ZeDMD booting ===");
   esp_log_level_set("*", ESP_LOG_NONE);
 
   // (Re-)Initialize global state variables that might have survived a restart
@@ -2708,12 +4319,21 @@ void setup() {
     LoadDebug();
     LoadScreensaverLum();
     LoadScreensaverDuration();
+    LoadScreensaverShuffle();
+    LoadScreensaverStrictTimer();
     LoadScreensaverMode();
     LoadClockColors();
+#ifdef ZEDMD_WIFI
+    LoadMqttConfig();
+#endif
+    LoadWeatherConfig();
+    LoadFavorites();
+    LoadIgnore();
     InitSDCard();
+    if (!sdCardAvailable) sdCardWarningPending = true;
     cachedSDFolders = GetSDFolders();  // Cache beim Boot befüllen
-    LoadScreensaverPath();
-    LoadScreensaverFiles();
+    LoadScreensaverPaths();
+    screensaverReloadNeeded = true;  // Dateien im Hauptloop laden (nach Display+WiFi Init)
     LoadUdpDelay();
 #ifdef ZEDMD_HD_HALF
     LoadYOffset();
@@ -2747,7 +4367,7 @@ void setup() {
       if (debug) {
         display->DisplayText("Reboot in 30 seconds ...", 0, 24, 255, 0, 0);
         for (uint8_t i = 29; i > 0; i--) {
-          sleep(1);
+          vTaskDelay(pdMS_TO_TICKS(1000));
           DisplayNumber(i, 2, 40, 24, 255, 0, 0);
         }
         Restart();
@@ -2761,7 +4381,7 @@ void setup() {
       display->DisplayText("hardware.", 0, 12, 255, 0, 0);
       display->DisplayText("Reboot in 30 seconds ...", 0, 24, 255, 0, 0);
       for (uint8_t i = 29; i > 0; i--) {
-        sleep(1);
+        vTaskDelay(pdMS_TO_TICKS(1000));
         DisplayNumber(i, 2, 40, 24, 255, 0, 0);
       }
       Restart();
@@ -2784,6 +4404,29 @@ void setup() {
       while (1);
     }
     memset(renderBuffer[i], 0, TOTAL_BYTES);
+  }
+
+  // SD card warning NACH renderBuffer-Allokation — Render() braucht valide Buffer!
+  if (sdCardWarningPending) {
+    display->DisplayText("SD card not found!", 0, 0, 255, 80, 0);
+    bool hasLittleFSFiles = LittleFS.exists("/screensaver");
+    if (hasLittleFSFiles) {
+      File dir = LittleFS.open("/screensaver");
+      hasLittleFSFiles = false;
+      if (dir) {
+        File f = dir.openNextFile();
+        if (f) { hasLittleFSFiles = true; f.close(); }
+        dir.close();
+      }
+    }
+    if (hasLittleFSFiles)
+      display->DisplayText("Fallback: LittleFS aktiv", 0, 8, 255, 80, 0);
+    else
+      display->DisplayText("Check SD card and restart.", 0, 8, 255, 80, 0);
+    Render();
+    delay(4000);
+    display->ClearScreen();
+    Render();
   }
 
 #ifndef DISPLAY_RM67162_AMOLED
@@ -3051,6 +4694,15 @@ void setup() {
     case TRANSPORT_WIFI_TCP: {
       StartWiFi();
       InitNTP();  // NTP nach WiFi Start
+#ifdef WEBRADIO_ENABLED
+      radioInit();
+#endif
+      mqttClient.setServer(mqttServer.c_str(), mqttPort);
+      mqttClient.setCallback(onMqttMessage);
+      mqttClient.setBufferSize(2048);
+      vTaskDelay(pdMS_TO_TICKS(1000));  // WiFi-Stack nach Verbindungsaufbau stabilisieren
+      mqttConnect();
+      xTaskCreatePinnedToCore(mqttTask, "mqttTask", 8192, NULL, 1, NULL, 0);
       break;
     }
 
@@ -3081,20 +4733,84 @@ void loop() {
   CheckMenuButton();
 
   // Screensaver Dateien neu laden wenn Pfad geändert wurde
-  if (screensaverReloadNeeded) {
+  // screensaverLoadRunning verhindert Re-Entrant-Aufruf bei schnellen Pfadwechseln
+  if (screensaverReloadNeeded && !screensaverLoadRunning) {
     screensaverReloadNeeded = false;
-    SaveScreensaverPath();
+    screensaverLoadRunning  = true;
+    SaveScreensaverPaths();
+    display->DisplayText("Lade...   ", 52, 13, 180, 180, 180);
+    Render();
     LoadScreensaverFiles();
+    screensaverLoadRunning = false;
+    if (screensaverCount > 0 && sdCardAvailable) {
+      display->DisplayText("SD OK     ", 40, 13, 0, 255, 100);
+    } else {
+      display->DisplayText("LittleFS  ", 40, 13, 180, 180, 180);
+    }
+    Render();
+    vTaskDelay(pdMS_TO_TICKS(800));
   }
 
   // SD Karte refreshen und Cache aktualisieren
   if (sdRefreshNeeded) {
     sdRefreshNeeded = false;
+#ifdef SD_MMC_BUILD
+    SD_MMC.end();
+#else
     SD.end();
     spiSD.end();
-    delay(100);
+#endif
+    vTaskDelay(pdMS_TO_TICKS(100));
     InitSDCard();
     cachedSDFolders = GetSDFolders();
+  }
+
+  // GIF-Audio-Dateiliste cachen (statt SD-I/O im Webserver-Callback)
+  if (gifAudioRefreshNeeded && sdCardAvailable) {
+    gifAudioRefreshNeeded = false;
+    String json = "[";
+    if (!SD.exists(GIF_AUDIO_DIR)) SD.mkdir(GIF_AUDIO_DIR);
+    File dir = SD.open(GIF_AUDIO_DIR);
+    bool first = true;
+    while (File f = dir.openNextFile()) {
+      String name = String(f.name());
+      uint32_t sz = f.size();
+      f.close();
+      if (!name.startsWith(".")) {
+        if (!first) json += ",";
+        json += "{\"name\":\"" + name + "\",\"size\":" + String(sz) + "}";
+        first = false;
+      }
+    }
+    dir.close();
+    json += "]";
+    cachedGifAudioFiles = json;
+  }
+
+  // SD-Dateiliste für gewählten Ordner cachen
+  if (sdFilesRefreshNeeded && sdCardAvailable && cachedSdFilesFolder.length() > 0) {
+    sdFilesRefreshNeeded = false;
+    String json = "[";
+    File dir = SD.open(cachedSdFilesFolder);
+    if (dir && dir.isDirectory()) {
+      bool first = true;
+      File f = dir.openNextFile();
+      while (f) {
+        if (!f.isDirectory()) {
+          const char* fname = f.name();
+          if (fname && fname[0] != '.') {
+            if (!first) json += ",";
+            json += "\"" + String(fname) + "\"";
+            first = false;
+          }
+        }
+        f.close();
+        f = dir.openNextFile();
+      }
+      dir.close();
+    }
+    json += "]";
+    cachedSdFiles = json;
   }
 
   // WiFi Reconnect wenn Verbindung verloren
@@ -3103,6 +4819,7 @@ void loop() {
     vTaskDelay(pdMS_TO_TICKS(1000));
     return;
   }
+
 
   if (!transportActive) {
     if (wifiActive && !serverRunning) {
@@ -3129,19 +4846,19 @@ void loop() {
     if (250 == logoWaitCounter) {  // USB: 25s PPUC → Screensaver
 #endif
       screensaverIndex = 0;
-      screensaverTickCounter = 0;
+      screensaverRAWShowStart = 0;
       if (screensaverCount > 0) {
-        String firstFile = screensaverFiles[0];
+        String firstFile = String(screensaverFiles[0]);
         if (firstFile.endsWith(".gif") || firstFile.endsWith(".GIF")) {
           display->SetBrightness(screensaverBrightness);
-          uint32_t endTime = millis() + (uint32_t)screensaverDuration * 1000;
-          while (millis() < endTime && !transportActive) {
-            PlayGIF(firstFile, endTime);
-            yield();
-          }
+          bool isMixedMode = (screensaverMode == 2 || screensaverMode == 4);
+          uint32_t endTime = screensaverStrictTimer ? (millis() + (uint32_t)screensaverDuration * 1000) : 0;
+          bool loopUntilEnd = screensaverStrictTimer || (screensaverPaused && !isMixedMode);
+          PlayGIF(firstFile, endTime, true, loopUntilEnd);
           if (transportActive) return;
-          screensaverIndex = 1 % screensaverCount;
-          String nextFile = screensaverFiles[screensaverIndex];
+          if (screensaverReloadNeeded) return;
+          screensaverIndex = nextScreensaverIndex();
+          String nextFile = String(screensaverFiles[screensaverIndex]);
           if (!nextFile.endsWith(".gif") && !nextFile.endsWith(".GIF")) {
             ScreenSaver();
           }
@@ -3161,6 +4878,42 @@ void loop() {
 
     // ── Screensaver / Clock Logik ─────────────────────────────────────────
     if (logoWaitCounter > ssThreshold) {
+
+#ifdef WEBRADIO_ENABLED
+      if (radioIsPlaying && radioDisplayActive) {
+        DisplayRadio();
+        vTaskDelay(pdMS_TO_TICKS(100));
+        return;
+      }
+#endif
+
+      // Direkt angewähltes GIF/RAW sofort abspielen (vor allen Modus-Checks)
+      if (forcePlayPending && forcePlayFile.length() > 0) {
+        forcePlayPending = false;
+        String f = forcePlayFile;
+        forcePlayFile = "";
+        currentlyPlayingFile = f;  // für screensaver_current Endpoint
+        for (uint16_t i = 0; i < screensaverCount; i++) {
+          if (String(screensaverFiles[i]) == f) { screensaverIndex = i; break; }
+        }
+        display->SetBrightness(screensaverBrightness);
+        if (f.endsWith(".gif") || f.endsWith(".GIF")) {
+          PlayGIF(f, 0, true, false);
+        } else {
+          // RAW-Datei direkt anzeigen
+          File rawF;
+          if (f.startsWith("SD:"))       rawF = SD.open(f.substring(3), "r");
+          else if (f.startsWith("FS:"))  rawF = LittleFS.open(f.substring(3), "r");
+          else                           rawF = LittleFS.open(f, "r");
+          if (rawF) {
+            rawF.read(renderBuffer[currentRenderBuffer], TOTAL_BYTES);
+            rawF.close();
+            Render();
+          }
+        }
+        if (transportActive) return;
+        if (screensaverReloadNeeded) return;
+      }
 
       // Modus 1: Clock only
       if (screensaverMode == 1) {
@@ -3187,31 +4940,131 @@ void loop() {
         }
       }
 
-      // Modus 0 oder 2 (Screensaver Teil): GIF/RAW abspielen
+      // Modus 3: Uhr + Wetter gleichzeitig
+      if (screensaverMode == 3) {
+        uint32_t now = millis();
+        uint32_t weatherInterval = forecastAvailable ? (15UL * 60UL * 1000UL) : (2UL * 60UL * 1000UL);
+        if (lastWeatherFetch == 0 ? (now > 30000UL) : ((now - lastWeatherFetch) >= weatherInterval)) {
+          triggerWeatherFetch();
+        }
+        if (forecastAvailable) {
+          if (weatherPhaseStart == 0) weatherPhaseStart = now;
+          if ((now - weatherPhaseStart) >= 15000UL) {
+            weatherPage = (weatherPage == 0) ? 1 : 0;
+            weatherPhaseStart = now;
+            clockColorChanged = true;
+          }
+        }
+        if (weatherPage == 1) {
+          DisplayWeatherForecast();
+        } else {
+          DisplayClockWeather();
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        return;
+      }
+
+      // Modus 4: Uhr+Wetter + Screensaver (im Wechsel)
+      if (screensaverMode == 4) {
+        uint32_t now = millis();
+        uint32_t weatherInterval = forecastAvailable ? (15UL * 60UL * 1000UL) : (2UL * 60UL * 1000UL);
+        if (lastWeatherFetch == 0 ? (now > 30000UL) : ((now - lastWeatherFetch) >= weatherInterval)) {
+          triggerWeatherFetch();
+        }
+        if (weatherPhaseStart == 0) weatherPhaseStart = now;
+        if ((now - weatherPhaseStart) >= (uint32_t)screensaverDuration * 1000) {
+          if (!forecastAvailable) {
+            weatherPage = (weatherPage == 0) ? 2 : 0;
+          } else {
+            weatherPage = (weatherPage + 1) % 3;  // 0→1→2→0
+          }
+          weatherPhaseStart = now;
+          clockColorChanged = true;
+        }
+        if (weatherPage == 0) {
+          DisplayClockWeather();
+          vTaskDelay(pdMS_TO_TICKS(1000));
+          return;
+        }
+        if (weatherPage == 1) {
+          DisplayWeatherForecast();
+          vTaskDelay(pdMS_TO_TICKS(1000));
+          return;
+        }
+        // weatherPage == 2: Screensaver-Phase fällt durch zum GIF-Code unten
+      }
+
+      // Direkt angewähltes GIF/RAW sofort abspielen
+      if (forcePlayPending && forcePlayFile.length() > 0) {
+        forcePlayPending = false;
+        String f = forcePlayFile;
+        forcePlayFile = "";
+        currentlyPlayingFile = f;  // für screensaver_current Endpoint
+        for (uint16_t i = 0; i < screensaverCount; i++) {
+          if (String(screensaverFiles[i]) == f) { screensaverIndex = i; break; }
+        }
+        display->SetBrightness(screensaverBrightness);
+        if (f.endsWith(".gif") || f.endsWith(".GIF")) {
+          PlayGIF(f, 0, true, false);
+        } else {
+          File rawF;
+          if (f.startsWith("SD:"))       rawF = SD.open(f.substring(3), "r");
+          else if (f.startsWith("FS:"))  rawF = LittleFS.open(f.substring(3), "r");
+          else                           rawF = LittleFS.open(f, "r");
+          if (rawF) {
+            rawF.read(renderBuffer[currentRenderBuffer], TOTAL_BYTES);
+            rawF.close();
+            Render();
+          }
+        }
+        if (transportActive) return;
+        if (screensaverReloadNeeded) return;
+      }
+
+      // Modus 0, 2 oder 4 (Screensaver Teil): GIF/RAW abspielen
       if (screensaverCount > 0) {
-        String currentFile = screensaverFiles[screensaverIndex];
+        currentlyPlayingFile = "";  // normaler Screensaver übernimmt
+        String currentFile = String(screensaverFiles[screensaverIndex]);
         if (currentFile.endsWith(".gif") || currentFile.endsWith(".GIF")) {
           display->SetBrightness(screensaverBrightness);
-          uint32_t endTime = millis() + (uint32_t)screensaverDuration * 1000;
-          while (millis() < endTime && !transportActive) {
-            PlayGIF(currentFile, endTime);
-            yield();
-          }
+          bool isMixedMode = (screensaverMode == 2 || screensaverMode == 4);
+          // Paused+nicht-gemischt: endlos loopen; sonst immer duration-Sekunden loopen
+          // Strict: kann GIF mid-frame abschneiden; Non-strict: gleich, aber GIF läuft mind. einmal durch
+          uint32_t endTime = (screensaverPaused && !isMixedMode) ? 0 : (millis() + (uint32_t)screensaverDuration * 1000);
+          bool loopUntilEnd = true;
+          PlayGIF(currentFile, endTime, true, loopUntilEnd);
           if (transportActive) return;
+          if (screensaverReloadNeeded) return;
+          display->ClearScreen();
+          memset(renderBuffer[currentRenderBuffer], 0, TOTAL_BYTES);
+          if (NUM_RENDER_BUFFERS > 1)
+            memset(renderBuffer[lastRenderBuffer], 0, TOTAL_BYTES);
+          Render();
+          if (screensaverMode == 4) {
+            weatherPhaseStart = millis();
+            weatherPage = 0;
+            clockColorChanged = true;
+          }
           if (!screensaverPaused) {
-            screensaverTickCounter = 0;
-            screensaverIndex = (screensaverIndex + 1) % screensaverCount;
-            String nextFile = screensaverFiles[screensaverIndex];
+            screensaverRAWShowStart = 0;
+            screensaverIndex = nextScreensaverIndex();
+            String nextFile = String(screensaverFiles[screensaverIndex]);
             if (!nextFile.endsWith(".gif") && !nextFile.endsWith(".GIF")) {
               ScreenSaver();
             }
           }
         } else {
-          screensaverTickCounter++;
-          if (!screensaverPaused && screensaverTickCounter >= screensaverDuration * 5) {
-            screensaverTickCounter = 0;
-            screensaverIndex = (screensaverIndex + 1) % screensaverCount;
+          if (screensaverRAWShowStart == 0) screensaverRAWShowStart = millis();
+          if (!screensaverPaused &&
+              (millis() - screensaverRAWShowStart) >= (uint32_t)screensaverDuration * 1000) {
+            screensaverRAWShowStart = 0;
+            screensaverIndex = nextScreensaverIndex();
             ScreenSaver();
+            if (screensaverMode == 4) {
+              weatherPhaseStart = millis();
+              weatherPage = 0;
+              clockColorChanged = true;
+            }
           }
         }
       } else if (screensaverMode == 0) {

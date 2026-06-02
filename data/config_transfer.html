@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>ZeDMD Config Transfer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #121212; color: #e0e0e0; font-family: Arial, sans-serif;
+           display: flex; flex-direction: column; align-items: center; padding: 20px; }
+    header { width: 100%; max-width: 500px; display: flex; align-items: center;
+             gap: 12px; margin-bottom: 24px; }
+    header a { color: #888; text-decoration: none; font-size: 0.85em; }
+    header h1 { font-size: 1.1em; }
+    .card { background: #1e1e1e; border-radius: 10px; padding: 20px;
+            width: 100%; max-width: 500px; margin-bottom: 16px; }
+    .card h2 { font-size: 0.9em; color: #888; text-transform: uppercase;
+               letter-spacing: 0.05em; margin-bottom: 14px; }
+    .card p { font-size: 0.85em; color: #aaa; margin-bottom: 14px; line-height: 1.5; }
+    .btn { display: block; width: 100%; padding: 11px;
+           background: #e64; color: #fff; border: none; border-radius: 8px;
+           font-size: 0.95em; cursor: pointer; text-align: center; }
+    .btn:disabled { background: #444; color: #888; cursor: default; }
+    .btn-sec { background: #333; color: #ccc; margin-top: 8px; }
+    input[type=file] { display: none; }
+    #importLabel { display: block; width: 100%; padding: 11px; background: #333;
+                   color: #ccc; border-radius: 8px; font-size: 0.95em;
+                   cursor: pointer; text-align: center; margin-bottom: 8px; }
+    #importLabel:hover { background: #444; }
+    #fileName { font-size: 0.8em; color: #666; margin-bottom: 10px; text-align: center; }
+    #status { margin-top: 14px; font-size: 0.85em; padding: 10px; border-radius: 6px;
+              display: none; }
+    #status.ok  { background: #1a3a1a; color: #6f6; }
+    #status.err { background: #3a1a1a; color: #f66; }
+  </style>
+</head>
+<body>
+<header>
+  <a href="/">← ZeDMD</a>
+  <h1>&#128260; Config Transfer</h1>
+</header>
+
+<div class="card">
+  <h2>Export — Einstellungen sichern</h2>
+  <p>L&auml;dt alle Konfigurationsdateien als JSON-Datei herunter.<br>
+     WiFi, Helligkeit, Screensaver, Uhr, MQTT, Wetter, Radio-Presets.</p>
+  <button class="btn" onclick="exportConfig()">&#8659; Einstellungen exportieren</button>
+</div>
+
+<div class="card">
+  <h2>Import — Einstellungen einspielen</h2>
+  <p>W&auml;hle eine vorher exportierte JSON-Datei und spiele sie ein.<br>
+     Das Board startet danach neu.</p>
+  <label id="importLabel" for="fileInput">&#128193; JSON-Datei ausw&auml;hlen</label>
+  <input type="file" id="fileInput" accept=".json" onchange="fileSelected(this)">
+  <div id="fileName">Keine Datei ausgew&auml;hlt</div>
+  <button class="btn" id="importBtn" onclick="importConfig()" disabled>&#8657; Einstellungen importieren</button>
+</div>
+
+<div id="status"></div>
+
+<script>
+  let selectedFile = null;
+
+  async function exportConfig() {
+    try {
+      const r = await fetch('/export_config');
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'zedmd_config.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      showStatus('Export erfolgreich.', true);
+    } catch(e) {
+      showStatus('Export fehlgeschlagen: ' + e.message, false);
+    }
+  }
+
+  function fileSelected(input) {
+    selectedFile = input.files[0] || null;
+    document.getElementById('fileName').textContent = selectedFile ? selectedFile.name : 'Keine Datei ausgewählt';
+    document.getElementById('importBtn').disabled = !selectedFile;
+  }
+
+  async function importConfig() {
+    if (!selectedFile) return;
+    if (!confirm('Alle gespeicherten Einstellungen werden überschrieben. Fortfahren?')) return;
+    try {
+      const text = await selectedFile.text();
+      const fd = new FormData();
+      fd.append('data', text);
+      const r = await fetch('/import_config', { method: 'POST', body: fd });
+      const msg = await r.text();
+      showStatus(msg + ' — Board startet neu...', r.ok);
+      if (r.ok) setTimeout(() => fetch('/restart', { method: 'POST' }), 1500);
+    } catch(e) {
+      showStatus('Import fehlgeschlagen: ' + e.message, false);
+    }
+  }
+
+  function showStatus(msg, ok) {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = ok ? 'ok' : 'err';
+    el.style.display = 'block';
+  }
+</script>
+</body>
+</html>

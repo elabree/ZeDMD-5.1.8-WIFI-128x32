@@ -56,6 +56,14 @@ pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overfl
 <!-- Display Settings -->
 <div class="section">
   <h2>Display Settings</h2>
+  <label>Display Brightness: <span id="brightness-value">–</span></label>
+  <div style="display:flex; align-items:center; gap:8px; margin-bottom:15px;">
+    <span>&#x1F311;</span>
+    <input type="range" id="brightness" name="brightness" min="1" max="15"
+      style="flex:1; margin:0;" oninput="updateBrightness()">
+    <span>&#x2600;</span>
+  </div>
+  <div class="status" id="brightness-status"></div>
   <label>RGB Order</label>
   <select id="rgb-order" onchange="saveRGB()">
     <option value="0">R, G, B</option>
@@ -106,6 +114,41 @@ pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overfl
   <button onclick="savePanelSettings()">Save Panel Settings</button>
 </div>
 
+<!-- MQTT Konfiguration -->
+<div class="section">
+  <h2>MQTT Server</h2>
+  <label>Server IP</label>
+  <input type="text" id="mqtt-server" placeholder="192.168.178.206">
+  <label>Port</label>
+  <input type="number" id="mqtt-port" min="1" max="65535" value="1883">
+  <div class="status" id="mqtt-status"></div>
+  <button onclick="saveMqttConfig()">Save MQTT Config</button>
+</div>
+
+<!-- Wetter Koordinaten -->
+<div class="section">
+  <h2>Wetter Koordinaten (Open-Meteo)</h2>
+  <label>Breitengrad (Latitude)</label>
+  <input type="number" id="weather-lat" step="0.0001" placeholder="52.3202">
+  <label>Längengrad (Longitude)</label>
+  <input type="number" id="weather-lon" step="0.0001" placeholder="10.4011">
+  <div class="status" id="weather-config-status"></div>
+  <button onclick="saveWeatherConfig()">Save Weather Config</button>
+</div>
+
+<!-- Firmware OTA Update -->
+<div class="section">
+  <h2>Firmware Update (OTA)</h2>
+  <p style="color:#aaa; font-size:0.85em;">Upload firmware .bin — device reboots automatically on success.</p>
+  <label>Select firmware .bin</label>
+  <input type="file" id="ota-file" accept=".bin">
+  <div id="ota-progress-wrap" style="display:none; margin:8px 0;">
+    <progress id="ota-progress" value="0" max="100" style="width:100%;"></progress>
+  </div>
+  <div class="status" id="ota-status"></div>
+  <button class="green" onclick="uploadOTA()">&#x2191; Flash Firmware</button>
+</div>
+
 <!-- Web File Update -->
 <div class="section">
   <h2>Update Web Files</h2>
@@ -129,6 +172,7 @@ pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overfl
 <script>
 window.onload = function() {
   fetch('/get_config').then(function(r) { return r.json(); }).then(function(d) {
+    if (d.brightness !== undefined) { document.getElementById('brightness').value = d.brightness; document.getElementById('brightness-value').innerText = d.brightness; }
     document.getElementById('ssid').value = d.ssid || '';
     document.getElementById('port').value = d.port || 3333;
     document.getElementById('rgb-order').value = d.rgbOrder || 0;
@@ -140,6 +184,10 @@ window.onload = function() {
     if (d.panelLatchBlanking !== undefined) document.getElementById('latch').value = d.panelLatchBlanking;
     if (d.panelMinRefreshRate !== undefined) document.getElementById('minrefresh').value = d.panelMinRefreshRate;
     if (d.panelDriver !== undefined) document.getElementById('driver').value = d.panelDriver;
+    if (d.mqttServer !== undefined) document.getElementById('mqtt-server').value = d.mqttServer;
+    if (d.mqttPort   !== undefined) document.getElementById('mqtt-port').value   = d.mqttPort;
+    if (d.weatherLat !== undefined) document.getElementById('weather-lat').value  = d.weatherLat;
+    if (d.weatherLon !== undefined) document.getElementById('weather-lon').value  = d.weatherLon;
     fetchScalingModes(d.scaleMode);
   });
   fetch('/get_version').then(function(r) { return r.text(); }).then(function(v) {
@@ -176,6 +224,13 @@ function saveWiFi() {
 function resetWiFi() {
   if (!confirm('Reset WiFi settings?')) return;
   fetch('/reset_wifi', {method:'POST'}).then(function() { location.reload(); });
+}
+
+function updateBrightness() {
+  var val = document.getElementById('brightness').value;
+  document.getElementById('brightness-value').innerText = val;
+  fetch('/save_brightness', { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body: 'brightness=' + val })
+    .then(function(r) { document.getElementById('brightness-status').innerText = r.ok ? 'Saved' : 'Error'; });
 }
 
 function saveRGB() {
@@ -261,6 +316,108 @@ function uploadHtmlFile() {
       }
     })
     .catch(function() { status.innerText = '✗ Upload error.'; status.style.color = 'red'; });
+}
+
+function saveMqttConfig() {
+  var params = new URLSearchParams();
+  params.append('server', document.getElementById('mqtt-server').value.trim());
+  params.append('port',   document.getElementById('mqtt-port').value);
+  fetch('/save_mqtt_config', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: params.toString()})
+    .then(function(r) {
+      var el = document.getElementById('mqtt-status');
+      el.innerText = r.ok ? '✓ Gespeichert' : '✗ Fehler';
+      el.style.color = r.ok ? 'green' : 'red';
+    });
+}
+
+function saveWeatherConfig() {
+  var params = new URLSearchParams();
+  params.append('lat', document.getElementById('weather-lat').value);
+  params.append('lon', document.getElementById('weather-lon').value);
+  fetch('/save_weather_config', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: params.toString()})
+    .then(function(r) {
+      var el = document.getElementById('weather-config-status');
+      el.innerText = r.ok ? '✓ Gespeichert — Wetter wird neu geladen' : '✗ Fehler';
+      el.style.color = r.ok ? 'green' : 'red';
+    });
+}
+
+function uploadOTA() {
+  var file = document.getElementById('ota-file').files[0];
+  var status = document.getElementById('ota-status');
+  var progressWrap = document.getElementById('ota-progress-wrap');
+  var progress = document.getElementById('ota-progress');
+  if (!file) { status.innerText = 'Please select a .bin file.'; status.style.color = 'red'; return; }
+  if (!file.name.endsWith('.bin')) { status.innerText = 'Only .bin files allowed.'; status.style.color = 'red'; return; }
+  if (!confirm('Flash ' + file.name + ' (' + Math.round(file.size/1024) + ' KB)?\nThe device will reboot after the update.')) return;
+
+  var fd = new FormData();
+  fd.append('file', file, file.name);
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', '/ota', true);
+  xhr.setRequestHeader('Authorization', 'Basic ' + btoa('admin:zedmd1234'));
+
+  var uploadedFully = false;
+
+  xhr.upload.onprogress = function(e) {
+    if (e.lengthComputable) {
+      var pct = Math.round(e.loaded / e.total * 100);
+      progress.value = pct;
+      status.innerText = 'Uploading... ' + pct + '%';
+      status.style.color = '#aaa';
+      if (pct === 100) {
+        uploadedFully = true;
+        status.innerText = 'Flashing... please wait';
+      }
+    }
+  };
+
+  function waitForReboot() {
+    status.innerText = '✓ Update OK — waiting for device...';
+    status.style.color = 'green';
+    var attempts = 0;
+    var timer = setInterval(function() {
+      attempts++;
+      fetch('/get_version').then(function(r) { return r.text(); }).then(function(v) {
+        clearInterval(timer);
+        status.innerText = '✓ Device is back online — Firmware: ' + v;
+        status.style.color = 'green';
+      }).catch(function() {
+        if (attempts > 20) {
+          clearInterval(timer);
+          status.innerText = '⚠ Device not responding after reboot — check manually.';
+          status.style.color = 'orange';
+        }
+      });
+    }, 3000);
+  }
+
+  xhr.onload = function() {
+    progressWrap.style.display = 'none';
+    if (xhr.status === 200 && xhr.responseText.indexOf('OK') === 0) {
+      waitForReboot();
+    } else {
+      status.innerText = '✗ Update failed: ' + xhr.responseText;
+      status.style.color = 'red';
+    }
+  };
+
+  xhr.onerror = function() {
+    progressWrap.style.display = 'none';
+    if (uploadedFully) {
+      waitForReboot();
+    } else {
+      status.innerText = '✗ Connection lost before upload completed.';
+      status.style.color = 'red';
+    }
+  };
+
+  progressWrap.style.display = 'block';
+  progress.value = 0;
+  status.innerText = 'Starting upload...';
+  status.style.color = '#aaa';
+  xhr.send(fd);
 }
 
 function toggleDebug() {
