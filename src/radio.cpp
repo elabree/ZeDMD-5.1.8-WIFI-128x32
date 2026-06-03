@@ -9,14 +9,15 @@
 static Audio audio;
 
 volatile bool    radioIsPlaying     = false;
-volatile bool    radioDisplayActive = true;
+volatile bool    radioDisplayActive = false;
+uint32_t         radioDisplayUntil  = 0;   // millis()-Zeitstempel; 0 = kein Auto-Aus
 char             radioStationName[64]  = "";
 char             radioTrackTitle[128]  = "";
 SemaphoreHandle_t radioStringMutex    = nullptr;
 uint8_t       radioVolume           = RADIO_DEFAULT_VOLUME;
 RadioPreset   radioPresets[MAX_RADIO_PRESETS];
 int           radioPresetCount   = 0;
-int           radioCurrentPreset = -1;
+volatile int  radioCurrentPreset = -1;
 int           radioLastPreset    = -1;
 
 static char          pendingUrl[256]     = "";
@@ -121,14 +122,19 @@ void radioPlay(const char* url, int presetIndex) {
   radioCurrentPreset = presetIndex;
   if (presetIndex >= 0) { radioLastPreset = presetIndex; saveLastPreset(); }
   radioTrackTitle[0] = '\0';
+  // Display 5 Sekunden beim Start anzeigen
+  radioDisplayActive = true;
+  radioDisplayUntil  = millis() + 5000;
   strlcpy(pendingUrl, url, sizeof(pendingUrl));
-  __sync_synchronize();  // pendingUrl muss vollständig geschrieben sein bevor Core 0 die Flag sieht
+  __sync_synchronize();
   connectPending = true;
 }
 
 void radioStop() {
   stopPending         = true;
   radioIsPlaying      = false;
+  radioDisplayActive  = false;
+  radioDisplayUntil   = 0;
   radioStationName[0] = '\0';
   radioTrackTitle[0]  = '\0';
   radioCurrentPreset  = -1;
@@ -194,12 +200,29 @@ void radioRegisterRoutes(AsyncWebServer* server) {
   });
 
   server->on("/radio_status", HTTP_GET, [](AsyncWebServerRequest *request) {
+    // Snapshots unter Mutex — Core 0 kann radioStationName/radioTrackTitle jederzeit schreiben
+    char stSnap[64]    = "";
+    char titleSnap[128] = "";
+    if (radioStringMutex && xSemaphoreTake(radioStringMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+      strlcpy(stSnap,    radioStationName, sizeof(stSnap));
+      strlcpy(titleSnap, radioTrackTitle,  sizeof(titleSnap));
+      xSemaphoreGive(radioStringMutex);
+    }
+    // Preset-Index einmal lesen (volatile), dann konsistent verwenden
+    int preset = radioCurrentPreset;
+    if (!stSnap[0] && preset >= 0 && preset < radioPresetCount)
+      strlcpy(stSnap, radioPresets[preset].name, sizeof(stSnap));
+    char iconSnap[256] = "";
+    if (preset >= 0 && preset < radioPresetCount)
+      strlcpy(iconSnap, radioPresets[preset].icon_url, sizeof(iconSnap));
+
     String json = "{";
     json += "\"playing\":"       + String((radioIsPlaying || switchingStation) ? "true" : "false") + ",";
-    json += "\"station\":\""     + String(radioStationName)   + "\",";
-    json += "\"title\":\""       + String(radioTrackTitle)    + "\",";
+    json += "\"station\":\""     + String(stSnap)            + "\",";
+    json += "\"title\":\""       + String(titleSnap)         + "\",";
+    json += "\"icon\":\""        + String(iconSnap)          + "\",";
     json += "\"volume\":"        + String(radioVolume)        + ",";
-    json += "\"preset\":"        + String(radioCurrentPreset) + ",";
+    json += "\"preset\":"        + String(preset)             + ",";
     json += "\"lastPreset\":"    + String(radioLastPreset)    + ",";
     json += "\"displayActive\":" + String(radioDisplayActive  ? "true" : "false");
     json += "}";
@@ -234,8 +257,9 @@ void radioRegisterRoutes(AsyncWebServer* server) {
   });
 
   server->on("/radio_display", HTTP_POST, [](AsyncWebServerRequest *request) {
-    if (request->hasParam("active", true))
-      radioDisplayActive = request->getParam("active", true)->value() == "1";
+    // Knopfdruck: Display 10 Sekunden anzeigen, dann automatisch aus
+    radioDisplayActive = true;
+    radioDisplayUntil  = millis() + 10000;
     request->send(200, "text/plain", "OK");
   });
 

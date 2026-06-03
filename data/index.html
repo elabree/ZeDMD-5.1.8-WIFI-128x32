@@ -114,7 +114,7 @@
         input,
         select {
             background-color: #2c2c2c;
-            border: none;
+            border: 1px solid #444;
             color: #ffffff;
             padding: 12px;
             margin-bottom: 15px;
@@ -258,7 +258,7 @@
 <body>
     <div class="scroll-container">
         <div class="container">
-            <h1 style="max-width: 100%; margin-bottom: 20px; display: block; margin: 0 auto;">ZeDMD-WiFi</h1>
+            <h1 style="display: block; margin: 0 auto 20px auto;">ZeDMD-WiFi</h1>
             <img src="ppuc.png" alt="PPUC Logo"
                 style="max-width: 100%; margin-bottom: 20px; display: block; margin: 0 auto;">
             <br>
@@ -266,7 +266,10 @@
                 <!-- Radio Section -->
                 <div class="section">
                     <h2 class="section-header">&#127925; Webradio</h2>
-                    <div style="font-size:0.85em; color:#ccc; margin-bottom:4px; min-height:1.1em;" id="radio-station"></div>
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; min-height:1.1em;">
+                        <img id="radio-icon" src="" alt="" style="width:24px; height:24px; object-fit:contain; border-radius:2px; display:none;">
+                        <span id="radio-station" style="font-size:0.85em; color:#ccc;"></span>
+                    </div>
                     <div style="font-size:0.8em; color:#aaa; margin-bottom:8px; min-height:1em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="radio-track"></div>
                     <div class="slider-container" style="margin-bottom:10px;">
                         <span>&#128263;</span>
@@ -281,8 +284,8 @@
                             &#9654; Play
                         </button>
                         <button id="radio-display-btn" onclick="toggleRadioDisplay()"
-                            style="width:auto; padding:9px 12px; background:#555; font-size:0.85em; margin:0; white-space:nowrap;" title="Display ein/aus">
-                            &#128250;
+                            style="width:auto; padding:9px 12px; background:#555; font-size:0.85em; margin:0; white-space:nowrap;">
+                            &#128250; DMD 10s
                         </button>
                         <a href="/radio.html"
                             style="display:flex; align-items:center; padding:9px 14px; background:#2c3e50; color:#fff; border-radius:4px; text-decoration:none; font-size:0.85em; white-space:nowrap; box-sizing:border-box;">
@@ -310,15 +313,15 @@
                         MP3-Dateien f&uuml;r GIF-Begleitung &mdash; Dateiname muss dem GIF-Namen entsprechen (z.B. <em>demo.gif</em> &rarr; <em>demo.mp3</em>).<br>
                         Ordner auf SD: <code>/GifAudio/</code>
                     </div>
-                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
-                        <label style="background:#2c3e50; padding:8px 14px; border-radius:4px; cursor:pointer; font-size:0.85em;">
-                            &#8679; MP3 hochladen
-                            <input type="file" accept=".mp3,.MP3" multiple style="display:none;"
-                                onchange="gifAudioUpload(this.files)">
-                        </label>
-                        <span id="gif-audio-upload-status" style="font-size:0.8em; color:#aaa;"></span>
+                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                        <input type="file" id="gif-audio-upload-file" accept=".mp3,.MP3" multiple
+                            style="flex:1; background:#2c2c2c; color:#e0e0e0; border:none; padding:8px; border-radius:4px;">
+                        <button onclick="gifAudioUploadBtn()" style="width:auto; padding:10px 16px; white-space:nowrap;">
+                            &#x2191; Upload
+                        </button>
                     </div>
-                    <div id="gif-audio-list" style="font-size:0.82em; color:#ccc;">Lade...</div>
+                    <div id="gif-audio-upload-status" class="status-message" style="margin-bottom:8px;"></div>
+                    <div id="gif-audio-list" style="font-size:0.9em; color:#ccc;">Lade...</div>
                 </div>
 
                 <!-- SD Card / LittleFS Section -->
@@ -361,10 +364,10 @@
                     <!-- Aktuell angezeigte Datei -->
                     <div style="margin-top:14px; padding:10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;">
                         <div style="font-size:0.82em; color:#aaa; margin-bottom:6px;">Aktuell angezeigt:</div>
-                        <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="display:flex; align-items:center; gap:4px;">
                             <span id="current-file-name" style="flex:1; font-size:0.9em; word-break:break-all; color:#e0e0e0;">–</span>
-                            <button id="fav-btn" onclick="toggleFavorite()" style="width:auto; padding:6px 12px; margin:0; font-size:1.2em; background:#555;">☆</button>
-                            <button id="ign-btn" onclick="toggleIgnore()" style="width:auto; padding:6px 12px; margin:0; font-size:1.2em; background:#555;" title="Ignorieren">🚫</button>
+                            <button id="fav-btn" onclick="toggleFavorite()" class="delete-btn" style="margin:0; background:#555;">☆</button>
+                            <button id="ign-btn" onclick="toggleIgnore()" class="delete-btn" style="margin:0; background:#555;" title="Ignorieren">🚫</button>
                         </div>
                     </div>
 
@@ -419,11 +422,33 @@
                         <span id="pause-status" style="font-size:0.85em; color:#aaa;">Running</span>
                     </div>
 
+                    <!-- GIF-Vorschau -->
+                    <div id="gif-preview-box" style="display:none; margin-bottom:10px; padding:8px; background:#111; border:1px solid #555; border-radius:6px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <span id="gif-preview-name" style="font-size:0.8em; color:#aaa; word-break:break-all; flex:1;"></span>
+                            <div style="display:flex; gap:4px; flex-shrink:0;">
+                                <button onclick="playPreviewFile()"
+                                    class="delete-btn" style="margin:0; background:#28a745;" title="Abspielen">▶</button>
+                                <button id="gif-preview-fav-btn" onclick="togglePreviewFavorite()"
+                                    class="delete-btn" style="margin:0; background:#555;" title="Favorit">☆</button>
+                                <button id="gif-preview-ign-btn" onclick="togglePreviewIgnore()"
+                                    class="delete-btn" style="margin:0; background:#555;" title="Ignorieren">🚫</button>
+                                <button onclick="closeGifPreview()"
+                                    class="delete-btn" style="margin:0; background:#555;">✕</button>
+                            </div>
+                        </div>
+                        <div style="text-align:center; background:#000; border-radius:4px; padding:4px; min-height:40px;">
+                            <img id="gif-preview-img" src="" alt=""
+                                 style="image-rendering:pixelated; image-rendering:crisp-edges; max-width:100%; height:auto; display:none;">
+                            <span id="gif-preview-msg" style="font-size:0.8em; color:#666; line-height:32px;"></span>
+                        </div>
+                    </div>
+
                     <label>Active Screensaver Files: <span id="screensaver-file-count" style="color:#aaa; font-weight:normal;"></span></label>
                     <ul class="screensaver-file-list" id="sd-screensaver-file-list">
                         <li><span>Loading...</span></li>
                     </ul>
-                    <div id="ss-pagination" style="display:none; display:flex; gap:8px; align-items:center; margin-top:6px;">
+                    <div id="ss-pagination" style="display:none; gap:8px; align-items:center; margin-top:6px;">
                         <button id="ss-prev-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(-1)">&#9664; Zurück</button>
                         <span id="ss-page-info" style="font-size:0.85em; color:#aaa;"></span>
                         <button id="ss-next-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(1)">Weiter &#9654;</button>
@@ -436,7 +461,7 @@
 
                     <!-- Screensaver Mode -->
                     <label for="screensaver-mode">Display Mode:</label>
-                    <select id="screensaver-mode" onchange="saveScreensaverMode()" style="background:#2c2c2c; color:#e0e0e0; border:1px solid #444; padding:10px; border-radius:4px; width:100%; margin-bottom:10px;">
+                    <select id="screensaver-mode" onchange="saveScreensaverMode()">
                         <option value="0">Nur Screensaver</option>
                         <option value="1">Nur Uhr</option>
                         <option value="2">Uhr + Screensaver</option>
@@ -609,9 +634,10 @@
             xhr.send(`screensaverStrictTimer=${val}`);
         }
 
-        var currentFilePath = '';
-        var cachedFavLines = [];
-        var cachedIgnLines = [];
+        var currentFilePath  = '';
+        var previewCurrentPath = '';
+        var cachedFavLines   = [];
+        var cachedIgnLines   = [];
 
         function refreshFavIgnCache(callback) {
             Promise.all([
@@ -634,7 +660,16 @@
                     var nameEl = document.getElementById('current-file-name');
                     var favBtn = document.getElementById('fav-btn');
                     var ignBtn = document.getElementById('ign-btn');
-                    if (nameEl) nameEl.textContent = data.name || '–';
+                    if (nameEl) {
+                        nameEl.textContent = data.name || '–';
+                        var isGif = currentFilePath.toLowerCase().endsWith('.gif');
+                        nameEl.style.cursor          = isGif ? 'pointer' : 'default';
+                        nameEl.style.textDecoration  = isGif ? 'underline dotted' : 'none';
+                        nameEl.title                 = isGif ? 'Klicken für Vorschau' : '';
+                        nameEl.onclick = isGif
+                            ? function() { showGifPreview(currentFilePath, data.name); }
+                            : null;
+                    }
                     if (favBtn) {
                         favBtn.textContent = data.favorite ? '⭐' : '☆';
                         favBtn.style.background = data.favorite ? '#f0a500' : '#555';
@@ -813,6 +848,123 @@
             });
         }
 
+        function showGifPreview(path, name) {
+            var box    = document.getElementById('gif-preview-box');
+            var img    = document.getElementById('gif-preview-img');
+            var msg    = document.getElementById('gif-preview-msg');
+            var nameEl = document.getElementById('gif-preview-name');
+            if (!box || !img || !msg || !nameEl) return;
+            previewCurrentPath = path;
+            nameEl.textContent = name;
+            var isGif = path.toLowerCase().endsWith('.gif');
+            // Fav- und Ignore-Button-Zustand setzen
+            var favBtn = document.getElementById('gif-preview-fav-btn');
+            if (favBtn) {
+                var isFav = cachedFavLines.indexOf(path) >= 0;
+                favBtn.textContent = isFav ? '⭐' : '☆';
+                favBtn.style.background = isFav ? '#f0a500' : '#555';
+            }
+            var ignBtn = document.getElementById('gif-preview-ign-btn');
+            if (ignBtn) {
+                var isIgn = cachedIgnLines.indexOf(path) >= 0;
+                ignBtn.style.background = isIgn ? '#c0392b' : '#555';
+            }
+
+            function doPreview() {
+                if (isGif) {
+                    img.src = '';  // Reset erzwingt Browser-Reload (animierte GIFs ignorieren sonst src-Änderung)
+                    img.style.display = 'block';
+                    msg.textContent   = '';
+                    img.src = '/gif_preview?path=' + encodeURIComponent(path);
+                    img.onerror = function() {
+                        img.style.display = 'none';
+                        msg.textContent   = 'Vorschau nicht verfügbar (Datei zu groß oder Fehler)';
+                    };
+                } else {
+                    img.style.display = 'none';
+                    img.src           = '';
+                    msg.textContent   = 'RAW-Datei — keine Vorschau möglich';
+                }
+                box.style.display = 'block';
+                box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            doPreview();
+        }
+
+        function closeGifPreview() {
+            var box = document.getElementById('gif-preview-box');
+            var img = document.getElementById('gif-preview-img');
+            if (img) { img.src = ''; img.style.display = 'none'; }
+            if (box) box.style.display = 'none';
+            previewCurrentPath = '';
+        }
+
+        function togglePreviewFavorite() {
+            if (!previewCurrentPath) return;
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/toggle_favorite', true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                    var data = JSON.parse(xhr.responseText);
+                    var favBtn = document.getElementById('gif-preview-fav-btn');
+                    if (favBtn) {
+                        favBtn.textContent = data.favorite ? '⭐' : '☆';
+                        favBtn.style.background = data.favorite ? '#f0a500' : '#555';
+                    }
+                    // Cache + abhängige UI-Elemente aktualisieren
+                    refreshFavIgnCache(function() {
+                        // Fav-Button in der Dateiliste aktualisieren wenn sichtbar
+                        loadSDScreensaverFiles();
+                        // Fav-Button im Aktuell-angezeigt-Block aktualisieren
+                        if (currentFilePath === previewCurrentPath) {
+                            var fb = document.getElementById('fav-btn');
+                            if (fb) {
+                                fb.textContent = data.favorite ? '⭐' : '☆';
+                                fb.style.background = data.favorite ? '#f0a500' : '#555';
+                            }
+                        }
+                        // Favoritenliste refreshen wenn sie offen ist
+                        var panel = document.getElementById('fav-list-panel');
+                        if (panel && panel.style.display !== 'none') loadFavoritesList();
+                    });
+                }
+            };
+            xhr.send('path=' + encodeURIComponent(previewCurrentPath));
+        }
+
+        function togglePreviewIgnore() {
+            if (!previewCurrentPath) return;
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/toggle_ignore', true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                    var data = JSON.parse(xhr.responseText);
+                    var ignBtn = document.getElementById('gif-preview-ign-btn');
+                    if (ignBtn) ignBtn.style.background = data.ignored ? '#c0392b' : '#555';
+                    refreshFavIgnCache(function() {
+                        loadSDScreensaverFiles();
+                        if (currentFilePath === previewCurrentPath) {
+                            var ib = document.getElementById('ign-btn');
+                            if (ib) ib.style.background = data.ignored ? '#c0392b' : '#555';
+                        }
+                        var panel = document.getElementById('ign-list-panel');
+                        if (panel && panel.style.display !== 'none') loadIgnoreList();
+                    });
+                }
+            };
+            xhr.send('path=' + encodeURIComponent(previewCurrentPath));
+        }
+
+        function playPreviewFile() {
+            if (!previewCurrentPath) return;
+            var fd = new FormData();
+            fd.append('path', previewCurrentPath);
+            fetch('/play_file', { method: 'POST', body: fd });
+        }
+
         function togglePresetList() {
             var panel = document.getElementById('preset-list-panel');
             var arrow = document.getElementById('preset-list-arrow');
@@ -841,6 +993,14 @@
                     row.id = 'preset-row-' + idx;
                     row.style.cssText = 'display:flex; align-items:center; gap:8px; padding:5px 4px; border-bottom:1px solid #333; border-radius:3px;'
                         + (isActive ? 'background:#1a3a1a;' : '');
+
+                    if (preset.icon) {
+                        var iconImg = document.createElement('img');
+                        iconImg.src = preset.icon;
+                        iconImg.style.cssText = 'width:20px; height:20px; object-fit:contain; border-radius:2px; flex-shrink:0;';
+                        iconImg.onerror = function() { this.style.display = 'none'; };
+                        row.appendChild(iconImg);
+                    }
 
                     var nameSpan = document.createElement('span');
                     nameSpan.textContent = preset.name || ('Sender ' + (idx + 1));
@@ -1052,15 +1212,16 @@
         var _radioPlaying     = false;
         var _radioPreset      = -1;
         var _radioLastPreset  = -1;
-        var _radioDisplayActive = true;
+        var _radioDisplayActive = false;
         var _radioVolume      = 15;
 
         // ── GIF-Audio ─────────────────────────────────────────────────────────
-        function gifAudioLoad() {
+        function gifAudioLoad(retry) {
             fetch('/gif_audio_files').then(function(r) { return r.json(); }).then(function(files) {
                 var el = document.getElementById('gif-audio-list');
                 if (!el) return;
                 if (files.length === 0) {
+                    if (!retry) { setTimeout(function() { gifAudioLoad(true); }, 1500); return; }
                     el.innerHTML = '<span style="color:#666;">Keine MP3s in /GifAudio/</span>';
                     return;
                 }
@@ -1095,16 +1256,44 @@
                 .then(function() { gifAudioLoad(); });
         }
 
-        function gifAudioUpload(files) {
+        function gifAudioUploadBtn() {
+            var input = document.getElementById('gif-audio-upload-file');
+            if (!input || !input.files || input.files.length === 0) {
+                var s = document.getElementById('gif-audio-upload-status');
+                if (s) { s.innerText = 'Bitte zuerst eine Datei auswählen.'; s.style.color = 'red'; }
+                return;
+            }
+            gifAudioUpload(input.files, function() {
+                input.value = '';
+            });
+        }
+
+        function gifAudioUpload(files, onDone) {
             if (!files || files.length === 0) return;
             var status = document.getElementById('gif-audio-upload-status');
+            var uploaded = 0, errors = 0;
             var i = 0;
             function uploadNext() {
-                if (i >= files.length) { if (status) status.innerText = 'Fertig.'; gifAudioLoad(); return; }
-                var fd = new FormData(); fd.append('file', files[i], files[i].name);
-                if (status) status.innerText = 'Lade ' + files[i].name + '...';
+                if (i >= files.length) {
+                    if (status) {
+                        status.style.color = errors === 0 ? 'green' : 'orange';
+                        status.innerText = errors === 0
+                            ? '✓ ' + uploaded + ' Datei(en) hochgeladen'
+                            : uploaded + ' OK, ' + errors + ' Fehler';
+                    }
+                    gifAudioLoad();
+                    if (onDone) onDone();
+                    return;
+                }
+                var fd = new FormData();
+                fd.append('file', files[i], files[i].name);
+                if (status) {
+                    status.style.color = '#aaa';
+                    status.innerText = 'Lade ' + (i + 1) + '/' + files.length + ': ' + files[i].name;
+                }
                 fetch('/gif_audio_upload', { method: 'POST', body: fd })
-                    .then(function() { i++; uploadNext(); });
+                    .then(function(r) { if (r.ok) uploaded++; else errors++; i++; uploadNext(); })
+                    .catch(function() { errors++; i++; uploadNext(); });
             }
             uploadNext();
         }
@@ -1122,12 +1311,16 @@
             }
         }
 
+        function updateDisplayBtn(active) {
+            var btn = document.getElementById('radio-display-btn');
+            if (!btn) return;
+            btn.innerHTML = active ? '&#128250; DMD: aktiv' : '&#128250; DMD 10s';
+            btn.style.background = active ? '#27ae60' : '#555';
+        }
+
         function toggleRadioDisplay() {
-            _radioDisplayActive = !_radioDisplayActive;
-            var fd = new FormData();
-            fd.append('active', _radioDisplayActive ? '1' : '0');
-            fetch('/radio_display', { method: 'POST', body: fd });
-            document.getElementById('radio-display-btn').style.background = _radioDisplayActive ? '#27ae60' : '#555';
+            fetch('/radio_display', { method: 'POST' });
+            updateDisplayBtn(true);
         }
 
         function toggleRadio() {
@@ -1304,6 +1497,8 @@
                     // SD-Ordner als Toggle-Buttons mit versteckter Checkbox
                     if (data.folders && data.folders.length > 0) {
                         data.folders.forEach(function(folder) {
+                            // GifAudio ist kein Screensaver-Ordner — ausblenden
+                            if (folder.toLowerCase() === 'gifaudio') return;
                             var isSelected = selectedPaths.indexOf(folder) >= 0;
                             var cb = document.createElement('input');
                             cb.type = 'checkbox';
@@ -1419,8 +1614,13 @@
 
         function sdFilePage(dir) {
             var newOffset = sdFileOffset + dir * sdFilePageSize;
-            if (newOffset < 0) newOffset = 0;
-            if (newOffset >= sdFileTotal) return;
+            if (newOffset < 0) {
+                // Wrap: letzte Seite
+                newOffset = Math.floor((sdFileTotal - 1) / sdFilePageSize) * sdFilePageSize;
+            } else if (newOffset >= sdFileTotal) {
+                // Wrap: erste Seite
+                newOffset = 0;
+            }
             sdFileOffset = newOffset;
             loadSDScreensaverFiles();
         }
@@ -1445,6 +1645,15 @@
                                 var li = document.createElement('li');
                                 var span = document.createElement('span');
                                 span.textContent = name;
+                                var isGif = filepath.toLowerCase().endsWith('.gif');
+                                if (isGif) {
+                                    span.style.cursor = 'pointer';
+                                    span.style.textDecoration = 'underline dotted';
+                                    span.title = 'Klicken für Vorschau';
+                                    span.onclick = (function(p, n) {
+                                        return function() { showGifPreview(p, n); };
+                                    })(filepath, name);
+                                }
 
                                 // Favoriten-Button
                                 var isFav = favLines.indexOf(filepath) >= 0;
@@ -1583,28 +1792,34 @@
                     if (d.volume !== undefined) setRadioVolume(d.volume, true);
                     if (d.displayActive !== undefined) {
                         _radioDisplayActive = d.displayActive;
-                        var dBtn = document.getElementById('radio-display-btn');
-                        if (dBtn) dBtn.style.background = _radioDisplayActive ? '#27ae60' : '#555';
+                        updateDisplayBtn(_radioDisplayActive);
                     }
                     var btn     = document.getElementById('radio-toggle-btn');
                     var stEl    = document.getElementById('radio-station');
                     var trackEl = document.getElementById('radio-track');
                     if (!btn) return;
+                    var iconEl = document.getElementById('radio-icon');
                     if (d.playing) {
                         btn.innerHTML = '&#9632; Stop';
                         btn.style.background = '#c0392b';
                         if (stEl)    stEl.innerText   = d.station || '';
                         if (trackEl) trackEl.innerText = d.title   || '';
+                        if (iconEl) {
+                            if (d.icon) { iconEl.src = d.icon; iconEl.style.display = ''; }
+                            else        { iconEl.style.display = 'none'; iconEl.src = ''; }
+                        }
                     } else if (_radioLastPreset >= 0) {
                         btn.innerHTML = '&#9654; Play';
                         btn.style.background = '#27ae60';
                         if (stEl)    stEl.innerText   = 'Gestoppt';
                         if (trackEl) trackEl.innerText = '';
+                        if (iconEl) { iconEl.style.display = 'none'; iconEl.src = ''; }
                     } else {
                         btn.innerHTML = '&#9654; Play';
                         btn.style.background = '#555';
                         if (stEl)    stEl.innerText   = 'Kein Sender gewählt';
                         if (trackEl) trackEl.innerText = '';
+                        if (iconEl) { iconEl.style.display = 'none'; iconEl.src = ''; }
                     }
                     // Preset-Panel aktualisieren wenn es offen ist
                     var panel = document.getElementById('preset-list-panel');

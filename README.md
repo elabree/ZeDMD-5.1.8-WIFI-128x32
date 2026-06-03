@@ -29,7 +29,7 @@ https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/raw/main/docs/images/ZeDMD_WiF
 
 **Internals:**
 
-![Internals](docs/images/IMG_5038.jpeg)
+![Internals](docs/images/IMG_5077.jpeg)
 
 ---
 
@@ -39,11 +39,55 @@ https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/raw/main/docs/images/ZeDMD_WiF
 Stream internet radio stations directly through the ZeDMD's built-in speaker.
 Requires a **MAX98357A I2S amplifier module** — see wiring below.
 
-- Browser-based preset management at `/radio.html`
-- Volume control via slider on the main page
-- Station name and track title scroll on the LED matrix
+- Dedicated station manager at `/radio.html` — search stations via [radio-browser.info](https://www.radio-browser.info), save presets with logo icons
+- Station name, track title and station logo displayed in the web UI
+- Volume control via slider on the main page and the radio page
+- Station name and track title scroll on the LED matrix for 5 seconds when a station starts, then returns to the screensaver — tap "DMD 10s" to show it again
 - Presets survive firmware updates (stored in LittleFS)
 - Stable station switching — no more audio dropout on channel change
+
+> **⚠️ RAM note:** The audio decoder permanently occupies most of the ESP32-S3's internal SRAM. As a consequence, weather data is fetched via plain **http://** (not https://) to avoid TLS out-of-memory crashes. Open-Meteo explicitly supports unencrypted requests for embedded devices — this is intentional and safe.
+
+### GIF Preview in the browser
+Click any GIF filename in the screensaver file list or the "currently shown" field to open a live animated preview directly in the browser — without touching the display. Favourite, ignore and play controls are available inside the preview.
+
+> **Note:** Opening a GIF preview while webradio is playing may cause brief audio stuttering — SD card access and audio streaming share the same CPU core. This is a known limitation.
+
+### GIF Audio
+Play a matching MP3 file from the SD card in sync with an animated GIF screensaver. The filename must match the GIF (e.g. `demo.gif` → `demo.mp3`). Upload audio files via the main page or drop them in `/GifAudio/` on the SD card directly.
+
+> **Note:** GIF audio plays once per GIF cycle — looping is not yet implemented.
+
+### Batocera audio extraction script *(experimental)*
+
+`scripts/extract_gif_audio.sh` extracts the first N seconds of audio from Batocera scraped game videos and saves them as MP3 files ready for ZeDMD.
+
+> ⚠️ **Experimental** — tested on Batocera only. Requires `ffmpeg` and `python3` available on the Batocera system.
+
+**Prerequisites:**
+- Batocera with SSH access
+- `ffmpeg` installed on Batocera (check: `which ffmpeg`)
+- `python3` installed on Batocera (check: `which python3`)
+- Scraped game videos in `gamelist.xml` (`/userdata/roms/<system>/`)
+
+**Usage (run via SSH on Batocera):**
+```bash
+ssh root@batocera.local "bash /tmp/extract_gif_audio.sh [options]"
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--system` | `mame` | ROM system folder name |
+| `--limit` | `10` | Max number of files to extract |
+| `--duration` | `15` | Clip length in seconds |
+| `--out` | `/userdata/zedmd/gif_audio` | Output directory |
+| `--game` | *(all)* | Filter by partial game name |
+
+**Workflow:**
+1. Copy the script to Batocera: `scp scripts/extract_gif_audio.sh root@batocera.local:/tmp/`
+2. Run it via SSH (see above)
+3. Open the output folder in Finder: **Network → batocera → share → zedmd → gif_audio**
+4. Upload the MP3 files via **`http://<ZeDMD-IP>/`** → GIF-Audio section
 
 ### SDMMC Board Support
 Added support for boards with an **onboard SD card via SDMMC interface** (1-bit mode) — no external SPI module required. See pin table below for the required HUB75 cable changes.
@@ -61,11 +105,6 @@ This release includes a comprehensive overhaul of memory management and task saf
 ---
 
 ## 🔜 Planned Features
-
-### GIF Audio *(in preparation)*
-Play an MP3 file from the SD card in sync with an animated GIF screensaver.
-Place matching audio files in `/GifAudio/` on the SD card — the upload UI is already available on the main page.
-The feature is **prepared in firmware** but not yet fully implemented and tested.
 
 ### Stereo Audio *(planned)*
 Stereo output using **two MAX98357A modules** — one for the left channel, one for the right.
@@ -92,12 +131,14 @@ This fork is **WiFi-only** and targets the **ESP32-S3-N16R8** with a **128×32 L
 
 ### All added features
 
-- **WiFi OTA firmware update** — flash new firmware directly via browser (`/admin.html`)
-- **Screensaver** — GIF/RAW slideshow with clock and weather display (Open-Meteo)
+- **WiFi OTA firmware update** — flash new firmware directly via browser (`/admin.html`); firmware version and build ID (git hash) shown on admin page
+- **Screensaver** — GIF/RAW slideshow with clock and weather display (Open-Meteo, plain HTTP for RAM efficiency)
 - **Screensaver management** — favorites, ignore list, alphabetical/random order, strict timer, pause/resume
-- **Improved web interface** — file management, per-file favorite/ignore buttons
+- **GIF Preview** — click any filename to open an animated browser preview; favorite/ignore/play controls inside the preview
+- **GIF Audio** — play a matching MP3 from `/GifAudio/` on the SD card in sync with the screensaver GIF; `scripts/extract_gif_audio.sh` extracts audio from Batocera video files
+- **Improved web interface** — file management, per-file favorite/ignore buttons, pagination with wrap-around
 - **Admin page** — WiFi, display, transport, MQTT, weather settings
-- **Webradio** — internet radio via I2S amplifier (MAX98357A), preset management, volume control
+- **Webradio** — internet radio via I2S amplifier (MAX98357A); station search via [radio-browser.info](https://www.radio-browser.info); preset management with logo icons; LED matrix shows station info for 5 s on start, "DMD 10s" button for on-demand display
 - **Config Export/Import** — full configuration backup and restore via browser (`/config_transfer.html`)
 
 ---
@@ -164,7 +205,7 @@ Access via `http://<IP>/` (main page) and `http://<IP>/admin.html` (admin page).
 | **Weather (Open-Meteo)** | Latitude/longitude for local weather display |
 | **Update Web Files** | Upload index.html / admin.html without full filesystem flash |
 | **Config Export/Import** | Full config backup/restore via `/config_transfer.html` |
-| **Information** | Firmware version with build date, debug info |
+| **Information** | Firmware version, build date and git hash, debug info |
 
 ---
 
@@ -216,11 +257,16 @@ Access via `http://<IP>/` (main page) and `http://<IP>/admin.html` (admin page).
 
 ### Webradio (optional)
 
-Requires a **MAX98357A I2S amplifier module** and a small speaker.
+Requires an **I2S amplifier module** and a small speaker.
 
-**Recommended:**
-- Amplifier: MAX98357A breakout module (e.g. Adafruit #3006 or common clones)
-- Speaker: **8 Ω / 3 W** — e.g. **Visaton FSR 7** (77 mm, excellent sound for the size)
+![MAX98357A module](docs/images/max98357a.jpg)
+
+**Tested amplifier: MAX98357A**
+- Breakout module (e.g. Adafruit #3006 or common clones)
+- Speaker: **8 Ω / 3 W** — e.g. **Visaton FSR 7** (77 mm, good sound for the size)
+- Output power: up to 3 W — adequate for a pinball cabinet at moderate volume
+
+> **Need more volume?** The MAX98357A is a compact, low-cost solution but tops out at 3 W mono. For louder or stereo setups, consider a higher-power I2S amplifier (e.g. TPA3118, TPA3116 or similar) — the I2S wiring and firmware remain identical, only the module changes.
 
 ### MAX98357A Wiring — identical for both builds
 
@@ -251,8 +297,8 @@ Open `http://<IP>/` after flashing — radio controls appear directly on the mai
 |---------|-------------|
 | **▶ / ■** | Play last preset / Stop |
 | **Station buttons** | Start a saved preset directly |
-| **Volume** | Slider on the main page |
-| **Display toggle** | Show/hide radio info on the LED matrix |
+| **Volume** | Slider on the main page and on `/radio.html` |
+| **DMD 10s** | Show station info on the LED matrix for 10 seconds; auto-hides after 5 s when a station starts |
 
 Full preset management at **`http://<IP>/radio.html`**.
 Presets are stored in LittleFS (`/radio_presets.json`) and survive firmware updates.

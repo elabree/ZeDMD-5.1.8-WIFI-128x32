@@ -1983,6 +1983,9 @@ void StartServer() {
                      String(ZEDMD_VERSION_MINOR) + "." +
                      String(ZEDMD_VERSION_PATCH) + ZEDMD_VERSION_SUFFIX +
                      " (" __DATE__ " " __TIME__ ")";
+#ifdef GIT_HASH
+    version += " [" GIT_HASH "]";
+#endif
     request->send(200, "text/plain", version);
   });
 
@@ -2313,6 +2316,48 @@ void StartServer() {
     request->send(200, "application/json", json);
   });
 
+  // GET /gif_preview?path=<SD:|FS:>/<pfad> — GIF-Datei für Browser-Vorschau streamen
+  server->on("/gif_preview", HTTP_GET, [](AsyncWebServerRequest *request) {
+    if (!request->hasParam("path")) {
+      request->send(400, "text/plain", "Missing path");
+      return;
+    }
+    String path = request->getParam("path")->value();
+
+    // LittleFS: direkt senden
+    if (path.startsWith("FS:")) {
+      String fsPath = path.substring(3);
+      if (!LittleFS.exists(fsPath)) { request->send(404, "text/plain", "Not found"); return; }
+      request->send(LittleFS, fsPath, "image/gif");
+      return;
+    }
+
+    // SD: chunked streamen ohne vollständiges RAM-Buffering
+    if (path.startsWith("SD:")) {
+      if (!sdCardAvailable) { request->send(503, "text/plain", "SD not available"); return; }
+      String sdPath = path.substring(3);
+      File f = SD.open(sdPath, "r");
+      if (!f) { request->send(404, "text/plain", "Not found"); return; }
+      if (f.size() > 1024UL * 1024UL) {  // max 1 MB — schützt vor RAM-Überlastung
+        f.close();
+        request->send(413, "text/plain", "File too large for preview");
+        return;
+      }
+      File *pf = new File(f);
+      AsyncWebServerResponse *response = request->beginChunkedResponse("image/gif",
+        [pf](uint8_t *buf, size_t maxLen, size_t) -> size_t {
+          if (!pf->available()) { pf->close(); delete pf; return 0; }
+          return pf->read(buf, maxLen);
+        }
+      );
+      response->addHeader("Cache-Control", "max-age=30");
+      request->send(response);
+      return;
+    }
+
+    request->send(400, "text/plain", "Invalid path prefix");
+  });
+
   // GET /screensaver_folder_count — geladene Dateianzahl direkt aus screensaverCount
   server->on("/screensaver_folder_count", HTTP_GET, [](AsyncWebServerRequest *request) {
     uint16_t count = screensaverCount;
@@ -2550,7 +2595,6 @@ void StartServer() {
 
   // GET /sd_folders — gibt gecachten Status zurück, kein SD Zugriff im Webserver Task!
   server->on("/sd_folders", HTTP_GET, [](AsyncWebServerRequest *request) {
-    sdRefreshNeeded = true;  // loop() refresht SD im nächsten Durchlauf
     String json = "{";
     json += "\"available\":" + String(sdCardAvailable ? "true" : "false") + ",";
     json += "\"currentPaths\":\"" + screensaverPaths + "\",";
@@ -3893,7 +3937,8 @@ void InitSDCard() {
 #endif
 
   if (mounted) {
-    sdCardAvailable = true;
+    sdCardAvailable      = true;
+    gifAudioRefreshNeeded = true;  // Cache beim Start befüllen
     sdTotalBytes = SD.cardSize();
     sdUsedBytes  = SD.usedBytes();
     logMsg("SD Card OK! Size: %llu MB, Used: %llu MB",
@@ -4880,6 +4925,11 @@ void loop() {
     if (logoWaitCounter > ssThreshold) {
 
 #ifdef WEBRADIO_ENABLED
+      // Auto-Aus wenn Timer abgelaufen
+      if (radioDisplayActive && radioDisplayUntil > 0 && millis() >= radioDisplayUntil) {
+        radioDisplayActive = false;
+        radioDisplayUntil  = 0;
+      }
       if (radioIsPlaying && radioDisplayActive) {
         DisplayRadio();
         vTaskDelay(pdMS_TO_TICKS(100));

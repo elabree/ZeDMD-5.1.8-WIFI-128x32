@@ -28,13 +28,14 @@ struct RadioPreset {
 
 extern volatile bool    radioIsPlaying;
 extern volatile bool    radioDisplayActive;
+extern uint32_t         radioDisplayUntil;
 extern char             radioStationName[64];
 extern char             radioTrackTitle[128];
 extern SemaphoreHandle_t radioStringMutex;
 extern uint8_t       radioVolume;
 extern RadioPreset   radioPresets[MAX_RADIO_PRESETS];
 extern int           radioPresetCount;
-extern int           radioCurrentPreset;
+extern volatile int  radioCurrentPreset;
 extern int           radioLastPreset;
 
 void radioInit();

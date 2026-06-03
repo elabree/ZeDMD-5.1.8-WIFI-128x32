@@ -29,7 +29,7 @@ https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/raw/main/docs/images/ZeDMD_WiF
 
 **Innenleben:**
 
-![Internals](docs/images/IMG_5038.jpeg)
+![Internals](docs/images/IMG_5077.jpeg)
 
 ---
 
@@ -39,11 +39,55 @@ https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/raw/main/docs/images/ZeDMD_WiF
 Internetradio direkt über ZeDMD streamen — über einen kleinen integrierten Lautsprecher.
 Erfordert ein **MAX98357A I2S-Verstärkermodul** — Verkabelung siehe unten.
 
-- Preset-Verwaltung über den Browser unter `/radio.html`
-- Lautstärkeregler direkt auf der Hauptseite
-- Sendername und Titelinfo scrollen auf der LED-Matrix
+- Dedizierte Sender-Verwaltungsseite unter `/radio.html` — Sendersuche via [radio-browser.info](https://www.radio-browser.info), Presets mit Logo-Icons speichern
+- Sendername, Titelinfo und Sender-Logo in der Web-Oberfläche angezeigt
+- Lautstärkeregler auf der Haupt- und Radio-Seite
+- Sendername und Titelinfo erscheinen beim Start 5 Sekunden auf der LED-Matrix, dann zurück zum Screensaver — „DMD 10s"-Button für erneute Anzeige
 - Presets überleben Firmware-Updates (gespeichert in LittleFS)
 - Stabiler Senderwechsel — kein Audio-Aussetzer beim Umschalten mehr
+
+> **⚠️ RAM-Hinweis:** Der Audio-Decoder belegt dauerhaft den Großteil des internen SRAM. Deshalb erfolgt der Wetterdaten-Abruf zwingend über unverschlüsseltes **http://** (nicht https://) — ein TLS-Handshake würde einen Out-of-Memory-Absturz verursachen. Open-Meteo unterstützt dies explizit für Embedded-Geräte und liefert ausschließlich öffentliche Daten ohne Auth-Token. Das ist sicher.
+
+### GIF-Vorschau im Browser
+Klick auf einen GIF-Dateinamen in der Screensaver-Dateiliste oder im „Aktuell angezeigt"-Feld öffnet eine animierte Live-Vorschau direkt im Browser — ohne das Display zu berühren. Favorit, Ignorieren und Abspielen sind direkt aus der Vorschau heraus möglich.
+
+> **Hinweis:** Das Öffnen einer GIF-Vorschau während das Webradio läuft kann kurze Audio-Aussetzer verursachen — SD-Zugriff und Audio-Streaming teilen sich denselben CPU-Kern. Bekannte Einschränkung.
+
+### GIF-Audio
+Beim Abspielen eines animierten GIF-Screensavers passend dazu eine MP3-Datei von der SD-Karte abspielen. Der Dateiname muss dem GIF entsprechen (z.B. `demo.gif` → `demo.mp3`). Audiodateien über die Hauptseite hochladen oder direkt in `/GifAudio/` auf der SD-Karte ablegen.
+
+> **Hinweis:** GIF-Audio spielt einmal pro GIF-Zyklus ab — Endlosschleife ist noch nicht implementiert.
+
+### Batocera Audio-Extraktionsskript *(experimentell)*
+
+`scripts/extract_gif_audio.sh` extrahiert die ersten N Sekunden Audio aus Batocera-Scraping-Videos und speichert sie als MP3-Dateien, die direkt für ZeDMD verwendet werden können.
+
+> ⚠️ **Experimentell** — nur auf Batocera getestet. Erfordert `ffmpeg` und `python3` auf dem Batocera-System.
+
+**Voraussetzungen:**
+- Batocera mit SSH-Zugang
+- `ffmpeg` auf Batocera vorhanden (Prüfung: `which ffmpeg`)
+- `python3` auf Batocera vorhanden (Prüfung: `which python3`)
+- Gescrapte Spielvideos in `gamelist.xml` (`/userdata/roms/<system>/`)
+
+**Nutzung (per SSH auf Batocera ausführen):**
+```bash
+ssh root@batocera.local "bash /tmp/extract_gif_audio.sh [Optionen]"
+```
+
+| Option | Standard | Beschreibung |
+|--------|----------|--------------|
+| `--system` | `mame` | ROM-System-Ordnername |
+| `--limit` | `10` | Maximale Anzahl zu extrahierender Dateien |
+| `--duration` | `15` | Clip-Länge in Sekunden |
+| `--out` | `/userdata/zedmd/gif_audio` | Ausgabeverzeichnis |
+| `--game` | *(alle)* | Filter nach Spielname (Teilsuche) |
+
+**Ablauf:**
+1. Skript auf Batocera kopieren: `scp scripts/extract_gif_audio.sh root@batocera.local:/tmp/`
+2. Per SSH ausführen (siehe oben)
+3. Ausgabeordner im Finder öffnen: **Netzwerk → batocera → share → zedmd → gif_audio**
+4. MP3s über **`http://<ZeDMD-IP>/`** → GIF-Audio hochladen
 
 ### SDMMC-Board-Unterstützung
 Unterstützung für Boards mit **onboard SD-Karte via SDMMC-Interface** (1-Bit-Modus) hinzugefügt — kein externes SPI-Modul nötig. Siehe Pin-Tabelle für die erforderlichen HUB75-Kabeländerungen.
@@ -61,11 +105,6 @@ Diese Version enthält eine umfassende Überarbeitung der Speicherverwaltung und
 ---
 
 ## 🔜 Geplante Features
-
-### GIF-Audio *(in Vorbereitung)*
-Beim Abspielen eines animierten GIF-Screensavers passend dazu eine MP3-Datei von der SD-Karte abspielen.
-Passende Audiodateien einfach in `/GifAudio/` auf der SD ablegen — die Upload-UI ist auf der Hauptseite bereits vorhanden.
-Das Feature ist **firmware-seitig vorbereitet**, aber noch nicht vollständig implementiert und getestet.
 
 ### Stereo-Audio *(geplant)*
 Stereo-Ausgabe mit **zwei MAX98357A-Modulen** — eines für den linken, eines für den rechten Kanal.
@@ -92,12 +131,14 @@ Dieser Fork ist **nur WiFi** und zielt auf den **ESP32-S3-N16R8** mit einer **12
 
 ### Alle hinzugefügten Features
 
-- **WiFi OTA Firmware-Update** — neue Firmware direkt über den Browser flashen (`/admin.html`)
-- **Screensaver** — GIF/RAW-Diashow mit Uhrzeit- und Wetteranzeige (Open-Meteo)
+- **WiFi OTA Firmware-Update** — neue Firmware direkt über den Browser flashen (`/admin.html`); Firmware-Version und Build-ID (Git-Hash) auf der Admin-Seite sichtbar
+- **Screensaver** — GIF/RAW-Diashow mit Uhrzeit- und Wetteranzeige (Open-Meteo, plain HTTP aus RAM-Gründen)
 - **Screensaver-Verwaltung** — Favoriten, Ignore-Liste, Alphabetisch/Zufällig, Strict Timer, Pause/Weiter
-- **Verbessertes Webinterface** — Dateiverwaltung, Favoriten-/Ignore-Buttons pro Datei
+- **GIF-Vorschau** — Klick auf Dateinamen öffnet animierte Browser-Vorschau; Favorit/Ignorieren/Abspielen direkt aus der Vorschau
+- **GIF-Audio** — passende MP3 aus `/GifAudio/` synchron zum GIF abspielen; `scripts/extract_gif_audio.sh` extrahiert Audio aus Batocera-Videodateien
+- **Verbessertes Webinterface** — Dateiverwaltung, Favoriten-/Ignore-Buttons pro Datei, Seitenumbruch mit Wrap-Around
 - **Admin-Seite** — WiFi, Display, Transport, MQTT, Wetter-Einstellungen
-- **Webradio** — Internetradio via I2S-Verstärker (MAX98357A), Preset-Verwaltung, Lautstärke
+- **Webradio** — Internetradio via I2S-Verstärker (MAX98357A); Sendersuche via [radio-browser.info](https://www.radio-browser.info); Preset-Verwaltung mit Logo-Icons; LED-Matrix zeigt Senderinfo 5 s beim Start, „DMD 10s"-Button für On-Demand-Anzeige
 - **Konfig Export/Import** — vollständiges Konfigurations-Backup und -Restore über den Browser (`/config_transfer.html`)
 
 ---
@@ -164,7 +205,7 @@ Zugriff über `http://<IP>/` (Hauptseite) und `http://<IP>/admin.html` (Admin-Se
 | **Wetter (Open-Meteo)** | Breitengrad/Längengrad für lokale Wetteranzeige |
 | **Web-Dateien aktualisieren** | index.html / admin.html hochladen ohne vollständigen Filesystem-Flash |
 | **Konfig Export/Import** | Vollständiges Backup/Restore über `/config_transfer.html` |
-| **Information** | Firmware-Version mit Build-Datum, Debug-Info |
+| **Information** | Firmware-Version, Build-Datum und Git-Hash, Debug-Info |
 
 ---
 
@@ -216,11 +257,16 @@ Zugriff über `http://<IP>/` (Hauptseite) und `http://<IP>/admin.html` (Admin-Se
 
 ### Webradio (optional)
 
-Erfordert ein **MAX98357A I2S-Verstärkermodul** und einen kleinen Lautsprecher.
+Erfordert ein **I2S-Verstärkermodul** und einen kleinen Lautsprecher.
 
-**Empfohlen:**
-- Verstärker: MAX98357A Breakout-Modul (z.B. Adafruit #3006 oder handelsübliche Klone)
-- Lautsprecher: **8 Ω / 3 W** — z.B. **Visaton FSR 7** (77 mm, ausgezeichneter Klang für die Größe)
+![MAX98357A Modul](docs/images/max98357a.jpg)
+
+**Getesteter Verstärker: MAX98357A**
+- Breakout-Modul (z.B. Adafruit #3006 oder handelsübliche Klone)
+- Lautsprecher: **8 Ω / 3 W** — z.B. **Visaton FSR 7** (77 mm, guter Klang für die Größe)
+- Ausgangsleistung: bis zu 3 W — ausreichend für moderate Lautstärke im Flippergehäuse
+
+> **Mehr Lautstärke gewünscht?** Der MAX98357A ist eine kompakte, günstige Lösung, stößt aber bei 3 W Mono an seine Grenzen. Für lautere oder Stereo-Setups bieten sich leistungsstärkere I2S-Verstärker an (z.B. TPA3118, TPA3116 o.Ä.) — Verkabelung und Firmware bleiben identisch, nur das Modul wird ausgetauscht.
 
 ### MAX98357A Verkabelung — gleich für beide Builds
 
@@ -251,8 +297,8 @@ Nach dem Flashen erscheinen die Radio-Bedienelemente direkt auf der Hauptseite `
 |---------------|--------------|
 | **▶ / ■** | Letzten Preset abspielen / Stopp |
 | **Sender-Buttons** | Gespeicherten Preset direkt starten |
-| **Lautstärke** | Schieberegler auf der Hauptseite |
-| **Display-Toggle** | Radioinfo auf der LED-Matrix ein-/ausblenden |
+| **Lautstärke** | Schieberegler auf der Haupt- und Radio-Seite |
+| **DMD 10s** | Senderinfo 10 Sekunden auf der LED-Matrix anzeigen; beim Start automatisch 5 s sichtbar |
 
 Vollständige Preset-Verwaltung unter **`http://<IP>/radio.html`**.
 Presets werden in LittleFS gespeichert und überleben Firmware-Updates.

@@ -1,6 +1,17 @@
 Import("env")
 import os, shutil, subprocess
 
+# Git-Hash vor dem Compile als CPPDEFINE setzen
+try:
+    _git_hash = subprocess.check_output(
+        ["git", "-C", env.subst("$PROJECT_DIR"), "rev-parse", "--short", "HEAD"],
+        stderr=subprocess.DEVNULL
+    ).decode().strip()
+except Exception:
+    _git_hash = "unknown"
+
+env.Append(CPPDEFINES=[("GIT_HASH", '\\"' + _git_hash + '\\"')])
+
 def copy_firmware(source, target, env):
     firmware_src = os.path.join(env.subst("$BUILD_DIR"), "firmware.bin")
     if not os.path.exists(firmware_src):
