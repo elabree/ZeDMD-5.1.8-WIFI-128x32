@@ -399,6 +399,9 @@ void addScreensaverFile(const String& path);
 void SaveScreensaverCache();
 bool TryLoadScreensaverCache();
 void InvalidateAllFolderCaches();
+void SaveGifAudioCache();
+bool TryLoadGifAudioCache();
+void InvalidateGifAudioCache();
 String folderCacheKey(const String& path);
 uint16_t TryLoadFolderCache(const String& sdPath);
 void SaveFolderCache(const String& sdPath, uint16_t fromIndex, uint16_t count);
@@ -1051,7 +1054,7 @@ bool PlayGIF(const String &path, uint32_t endTime = 0, bool clearFirst = true, b
 
 #ifdef WEBRADIO_ENABLED
   bool gifAudioActive = false;
-  if (path.startsWith("SD:") && !radioIsPlaying) {
+  if (path.startsWith("SD:") && !radioIsPlaying && !radioUserActive) {
     // Dateiname aus GIF-Pfad extrahieren, Extension tauschen, in /GifAudio/ suchen
     String gifName = path.substring(path.lastIndexOf('/') + 1);
     int dotIdx = gifName.lastIndexOf('.');
@@ -1984,7 +1987,11 @@ void StartServer() {
                      String(ZEDMD_VERSION_PATCH) + ZEDMD_VERSION_SUFFIX +
                      " (" __DATE__ " " __TIME__ ")";
 #ifdef GIT_HASH
-    version += " [" GIT_HASH "]";
+    version += " [" GIT_HASH
+  #ifdef GIT_BRANCH
+    "@" GIT_BRANCH
+  #endif
+    "]";
 #endif
     request->send(200, "text/plain", version);
   });
@@ -2616,7 +2623,7 @@ void StartServer() {
     }
   });
 
-  // POST /cancel_scan — SD-Scan abbrechen
+  // POST /cancel_scan — SD-Scan abbrechen (Screensaver: setzt auch Pfade zurück)
   server->on("/cancel_scan", HTTP_POST, [](AsyncWebServerRequest *request) {
     cancelSdScan = true;
     screensaverPaths = "";
@@ -2624,15 +2631,22 @@ void StartServer() {
     request->send(200, "text/plain", "OK");
   });
 
+  // POST /cancel_gif_audio_scan — GIF-Audio-Scan abbrechen
+  server->on("/cancel_gif_audio_scan", HTTP_POST, [](AsyncWebServerRequest *request) {
+    cancelSdScan = true;
+    request->send(200, "text/plain", "OK");
+  });
+
   // ── GIF-Audio Verwaltung (/GifAudio/ auf SD) ─────────────────────────────────
 
   server->on("/gif_audio_files", HTTP_GET, [](AsyncWebServerRequest *request) {
-    gifAudioRefreshNeeded = true;  // loop() baut Cache neu
     request->send(200, "application/json", cachedGifAudioFiles);
   });
 
   server->on("/gif_audio_upload", HTTP_POST,
     [](AsyncWebServerRequest *request) {
+      InvalidateGifAudioCache();
+      gifAudioRefreshNeeded = true;
       request->send(200, "text/plain", "OK");
     },
     [](AsyncWebServerRequest *request, String filename, size_t index,
@@ -2660,6 +2674,8 @@ void StartServer() {
     }
     String path = String(GIF_AUDIO_DIR) + "/" + request->getParam("name", true)->value();
     SD.remove(path.c_str());
+    InvalidateGifAudioCache();
+    gifAudioRefreshNeeded = true;
     request->send(200, "text/plain", "OK");
   });
 
@@ -3938,7 +3954,7 @@ void InitSDCard() {
 
   if (mounted) {
     sdCardAvailable      = true;
-    gifAudioRefreshNeeded = true;  // Cache beim Start befüllen
+    gifAudioRefreshNeeded = true;  // Cache-Versuch in loop() — nach NTP/MQTT
     sdTotalBytes = SD.cardSize();
     sdUsedBytes  = SD.usedBytes();
     logMsg("SD Card OK! Size: %llu MB, Used: %llu MB",
@@ -4100,6 +4116,65 @@ void InvalidateAllFolderCaches() {
 // Stubs für alte Aufrufe
 void SaveScreensaverCache() {}
 bool TryLoadScreensaverCache() { return false; }
+
+#define GIF_AUDIO_CACHE_FILE "/gif_audio_cache.bin"
+
+void SaveGifAudioCache() {
+  File f = LittleFS.open(GIF_AUDIO_CACHE_FILE, "w");
+  if (!f) { logMsg("GifAudioCache: Schreiben fehlgeschlagen"); return; }
+  // Format: name|size\n
+  String tmp = cachedGifAudioFiles;
+  // Einfaches Parsen des JSON-Arrays ohne ArduinoJson
+  tmp.replace("[", ""); tmp.replace("]", "");
+  while (tmp.length() > 0) {
+    tmp.trim();
+    if (!tmp.startsWith("{")) break;
+    int end = tmp.indexOf('}');
+    if (end < 0) break;
+    String obj = tmp.substring(1, end);
+    tmp = tmp.substring(end + 1);
+    if (tmp.startsWith(",")) tmp = tmp.substring(1);
+    int ni = obj.indexOf("\"name\":\""); if (ni < 0) continue;
+    int ns = ni + 8; int ne = obj.indexOf('"', ns); if (ne < 0) continue;
+    String name = obj.substring(ns, ne);
+    int si = obj.indexOf("\"size\":"); uint32_t sz = 0;
+    if (si >= 0) sz = (uint32_t)obj.substring(si + 7).toInt();
+    f.printf("%s|%u\n", name.c_str(), sz);
+  }
+  f.close();
+  logMsg("GifAudioCache: gespeichert (%s)", GIF_AUDIO_CACHE_FILE);
+}
+
+bool TryLoadGifAudioCache() {
+  File f = LittleFS.open(GIF_AUDIO_CACHE_FILE, "r");
+  if (!f) return false;
+  String json = "[";
+  bool first = true;
+  uint16_t count = 0;
+  while (f.available()) {
+    String line = f.readStringUntil('\n');
+    line.trim();
+    if (line.length() == 0) continue;
+    int sep = line.indexOf('|');
+    String name = (sep >= 0) ? line.substring(0, sep) : line;
+    uint32_t sz  = (sep >= 0) ? (uint32_t)line.substring(sep + 1).toInt() : 0;
+    if (!first) json += ",";
+    json += "{\"name\":\"" + name + "\",\"size\":" + String(sz) + "}";
+    first = false;
+    count++;
+  }
+  f.close();
+  json += "]";
+  if (json == "[]") return false;
+  cachedGifAudioFiles = json;
+  logMsg("Cache[%s]: %d Dateien geladen", GIF_AUDIO_DIR, count);
+  return true;
+}
+
+void InvalidateGifAudioCache() {
+  LittleFS.remove(GIF_AUDIO_CACHE_FILE);
+  logMsg("GifAudioCache: invalidiert");
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 void LoadScreensaverFiles() {
@@ -4813,23 +4888,54 @@ void loop() {
   // GIF-Audio-Dateiliste cachen (statt SD-I/O im Webserver-Callback)
   if (gifAudioRefreshNeeded && sdCardAvailable) {
     gifAudioRefreshNeeded = false;
-    String json = "[";
-    if (!SD.exists(GIF_AUDIO_DIR)) SD.mkdir(GIF_AUDIO_DIR);
-    File dir = SD.open(GIF_AUDIO_DIR);
-    bool first = true;
-    while (File f = dir.openNextFile()) {
-      String name = String(f.name());
-      uint32_t sz = f.size();
-      f.close();
-      if (!name.startsWith(".")) {
-        if (!first) json += ",";
-        json += "{\"name\":\"" + name + "\",\"size\":" + String(sz) + "}";
-        first = false;
+    if (!TryLoadGifAudioCache()) {
+      logMsg("GifAudio: scanne %s ...", GIF_AUDIO_DIR);
+      String json = "[";
+      if (!SD.exists(GIF_AUDIO_DIR)) SD.mkdir(GIF_AUDIO_DIR);
+      File dir = SD.open(GIF_AUDIO_DIR);
+      bool first = true;
+      uint16_t gifAudioCount = 0;
+      bool cancelled = false;
+      while (File f = dir.openNextFile()) {
+        if (cancelSdScan) {
+          f.close();
+          cancelled = true;
+          cancelSdScan = false;
+          break;
+        }
+        String name = String(f.name());
+        uint32_t sz = f.size();
+        f.close();
+        if (!name.startsWith(".")) {
+          if (!first) json += ",";
+          json += "{\"name\":\"" + name + "\",\"size\":" + String(sz) + "}";
+          first = false;
+          gifAudioCount++;
+          if ((gifAudioCount % 50) == 0) {
+#ifdef WEBRADIO_ENABLED
+            if (!radioIsPlaying) {
+#endif
+              char msg[24];
+              snprintf(msg, sizeof(msg), "GifAudio %d", gifAudioCount);
+              display->DisplayText(msg, 20, 13, 255, 180, 0);
+              Render();
+#ifdef WEBRADIO_ENABLED
+            }
+#endif
+          }
+        }
+        esp_task_wdt_reset();
+      }
+      dir.close();
+      if (cancelled) {
+        logMsg("GifAudio: Scan abgebrochen nach %d Dateien", gifAudioCount);
+      } else {
+        json += "]";
+        cachedGifAudioFiles = json;
+        logMsg("GifAudio: %d Dateien gefunden, Cache gespeichert", gifAudioCount);
+        SaveGifAudioCache();
       }
     }
-    dir.close();
-    json += "]";
-    cachedGifAudioFiles = json;
   }
 
   // SD-Dateiliste für gewählten Ordner cachen

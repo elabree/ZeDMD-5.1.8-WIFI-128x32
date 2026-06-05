@@ -27,6 +27,7 @@ struct RadioPreset {
 };
 
 extern volatile bool    radioIsPlaying;
+extern volatile bool    radioUserActive;
 extern volatile bool    radioDisplayActive;
 extern uint32_t         radioDisplayUntil;
 extern char             radioStationName[64];

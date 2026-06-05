@@ -45,6 +45,7 @@ Erfordert ein **MAX98357A I2S-Verstärkermodul** — Verkabelung siehe unten.
 - Sendername und Titelinfo erscheinen beim Start 5 Sekunden auf der LED-Matrix, dann zurück zum Screensaver — „DMD 10s"-Button für erneute Anzeige
 - Presets überleben Firmware-Updates (gespeichert in LittleFS)
 - Stabiler Senderwechsel — kein Audio-Aussetzer beim Umschalten mehr
+- Stream-URLs von radio-browser.info werden automatisch normalisiert (`?ti=`-Playlist-Hinweise werden entfernt, die die Audio-Bibliothek zum Hängen brachten)
 
 > **⚠️ RAM-Hinweis:** Der Audio-Decoder belegt dauerhaft den Großteil des internen SRAM. Deshalb erfolgt der Wetterdaten-Abruf zwingend über unverschlüsseltes **http://** (nicht https://) — ein TLS-Handshake würde einen Out-of-Memory-Absturz verursachen. Open-Meteo unterstützt dies explizit für Embedded-Geräte und liefert ausschließlich öffentliche Daten ohne Auth-Token. Das ist sicher.
 
@@ -55,6 +56,10 @@ Klick auf einen GIF-Dateinamen in der Screensaver-Dateiliste oder im „Aktuell 
 
 ### GIF-Audio
 Beim Abspielen eines animierten GIF-Screensavers passend dazu eine MP3-Datei von der SD-Karte abspielen. Der Dateiname muss dem GIF entsprechen (z.B. `demo.gif` → `demo.mp3`). Audiodateien über die Hauptseite hochladen oder direkt in `/GifAudio/` auf der SD-Karte ablegen.
+
+- Dateiliste wird in LittleFS gecacht — nach dem ersten Boot-Scan laden Neustarts sofort (identischer Mechanismus wie der Screensaver-Datei-Cache)
+- Paginierte Dateiliste in der Web-Oberfläche mit Zurück/Weiter-Buttons (20 Dateien pro Seite)
+- Scan kann per **„Scan abbrechen"**-Button abgebrochen werden, der nach einem Upload erscheint
 
 > **Hinweis:** GIF-Audio spielt einmal pro GIF-Zyklus ab — Endlosschleife ist noch nicht implementiert.
 
@@ -109,19 +114,31 @@ Diese Version enthält eine umfassende Überarbeitung der Speicherverwaltung und
 ### Stereo-Audio *(geplant)*
 Stereo-Ausgabe mit **zwei MAX98357A-Modulen** — eines für den linken, eines für den rechten Kanal.
 
-Der SD-Pin ist **keine aktive Umschaltung**, sondern eine **einmalige feste Verdrahtung**: Modul L bekommt GND und spielt danach immer automatisch den linken Kanal, Modul R bekommt 3,3V und spielt immer den rechten. Der ESP32 sendet einen Stereo-I2S-Datenstrom, jedes Modul filtert seinen Kanal selbst heraus — die Firmware muss nichts umschalten.
+Der SD-Pin fungiert als Spannungspegel-Konfigurationsbrücke beim Start. Da der Chip einen internen 100 kΩ Pull-down-Widerstand besitzt, kann man ihn **nicht** direkt an VCC oder GND für Stereo anschließen. Stattdessen müssen externe Pull-up-Widerstände die korrekten Spannungsfenster einstellen:
 
-> ⚠️ Erfordert Firmware-Anpassung: aktuell wird Mono-I2S ausgegeben. Die Hardware-Verdrahtung ist der einfache Teil — die Stereo-Ausgabe in der Firmware ist noch zu implementieren.
+* **Modul L (linker Kanal):** Benötigt >1,4 V. Einen **100 kΩ** Widerstand von SD nach VCC (3,3V oder 5V) anschließen.
+* **Modul R (rechter Kanal):** Benötigt 0,77 V bis 1,4 V. Einen **220 kΩ** (bei 3,3V) oder **330 kΩ** (bei 5V) Widerstand von SD nach VCC anschließen.
+
+Der ESP32 sendet einen Stereo-I2S-Datenstrom, und jedes Modul dekodiert automatisch seinen zugewiesenen Kanal anhand dieser Widerstandswerte.
 
 | MAX98357A Pin | ESP32-S3 | Hinweis |
 |---------------|----------|---------|
 | BCLK | **GPIO 9** | gemeinsam — beide Module |
 | LRC (WSEL) | **GPIO 14** | gemeinsam — beide Module |
 | DIN | **GPIO 21** | gemeinsam — beide Module |
-| SD — Modul L | **GND** | fest verdrahtet → immer linker Kanal |
-| SD — Modul R | **3,3V** | fest verdrahtet → immer rechter Kanal |
-| VIN | **5V** | jedes Modul separat |
+| SD — Modul L | **100 kΩ nach VCC** | Spannung >1,4 V → **linker Kanal** |
+| SD — Modul R | **220 kΩ/330 kΩ nach VCC** | Spannung ~1 V → **rechter Kanal** |
+| VIN | **5V** oder **3,3V** | jedes Modul separat (passend zur Widerstandsberechnung) |
 | GND | **GND** | jedes Modul separat |
+
+> ⚠️ Erfordert Firmware-Anpassung: aktuell wird Mono-I2S ausgegeben. Die Stereo-Ausgabe in der Firmware ist noch zu implementieren.
+
+> ⚠️ **DISCLAIMER / NICHT GETESTETE HARDWARE-SPEZIFIKATION:**
+> Diese Stereo-Konfiguration ist theoretisch und basiert auf dem MAX98357A-Datenblatt — sie wurde **noch nicht** in der Praxis getestet. Widerstandswerte können je nach Breakout-Board-Klon und dessen internen Pull-ups leichte Anpassungen erfordern. Im Zweifel bitte das Datenblatt zu Rate ziehen.
+> **Auf eigene Gefahr — keinerlei Gewährleistung oder Support!**
+
+### Code-Aufräumen *(steht auf meiner Liste)*
+Der Code ist hier und da ehrlich gesagt etwas gewachsen und durcheinander geraten — ich weiß das. Ich plane irgendwann aufzuräumen, aber wann genau kann ich nicht versprechen. Er funktioniert, und das zählt erstmal.
 
 ---
 
@@ -131,7 +148,7 @@ Dieser Fork ist **nur WiFi** und zielt auf den **ESP32-S3-N16R8** mit einer **12
 
 ### Alle hinzugefügten Features
 
-- **WiFi OTA Firmware-Update** — neue Firmware direkt über den Browser flashen (`/admin.html`); Firmware-Version und Build-ID (Git-Hash) auf der Admin-Seite sichtbar
+- **WiFi OTA Firmware-Update** — neue Firmware direkt über den Browser flashen (`/admin.html`); Firmware-Version mit Build-ID und Branch auf der Admin-Seite sichtbar (Format: `5.1.8-jb (Datum) [abc1234@main]`)
 - **Screensaver** — GIF/RAW-Diashow mit Uhrzeit- und Wetteranzeige (Open-Meteo, plain HTTP aus RAM-Gründen)
 - **Screensaver-Verwaltung** — Favoriten, Ignore-Liste, Alphabetisch/Zufällig, Strict Timer, Pause/Weiter
 - **GIF-Vorschau** — Klick auf Dateinamen öffnet animierte Browser-Vorschau; Favorit/Ignorieren/Abspielen direkt aus der Vorschau
@@ -225,7 +242,7 @@ Zugriff über `http://<IP>/` (Hauptseite) und `http://<IP>/admin.html` (Admin-Se
 | B | 8 | |
 | C | 3 | |
 | D | 42 | |
-| E | 1 | nur bei 1/32 scan (64×64) |
+| E | 1 | nicht genutzt / nur f. 256x64 relevant |
 | OE | 2 | |
 | LAT | 40 | `wifi_sd_webradio` |
 | LAT | **46** | `wifi_sdmmc_webradio` — Kabel umklemmen! |
@@ -264,11 +281,11 @@ Erfordert ein **I2S-Verstärkermodul** und einen kleinen Lautsprecher.
 **Getesteter Verstärker: MAX98357A**
 - Breakout-Modul (z.B. Adafruit #3006 oder handelsübliche Klone)
 - Lautsprecher: **8 Ω / 3 W** — z.B. **Visaton FSR 7** (77 mm, guter Klang für die Größe)
-- Ausgangsleistung: bis zu 3 W — ausreichend für moderate Lautstärke im Flippergehäuse
+- Ausgangsleistung: bis zu 3 W — ausreichend für moderate Lautstärke im Gehäuse
 
-> **Mehr Lautstärke gewünscht?** Der MAX98357A ist eine kompakte, günstige Lösung, stößt aber bei 3 W Mono an seine Grenzen. Für lautere oder Stereo-Setups bieten sich leistungsstärkere I2S-Verstärker an (z.B. TPA3118, TPA3116 o.Ä.) — Verkabelung und Firmware bleiben identisch, nur das Modul wird ausgetauscht.
 
-### MAX98357A Verkabelung — gleich für beide Builds
+
+### MAX98357A Verkabelung — Mono (SD- und SDMMC-Build)
 
 | MAX98357A Pin | ESP32-S3 | Hinweis |
 |---------------|----------|---------|

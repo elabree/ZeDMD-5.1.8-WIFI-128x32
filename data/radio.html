@@ -489,7 +489,7 @@
     // Deduplizierung: pro Stream-URL nur den ersten (höchste Votes) behalten
     const seenUrls = new Set();
     data = data.filter(s => {
-      const url = s.url_resolved || s.url;
+      const url = normalizeStreamUrl(s.url_resolved || s.url);
       if (!url || seenUrls.has(url)) return false;
       seenUrls.add(url);
       return true;
@@ -501,8 +501,8 @@
     }
 
     listEl.innerHTML = data.map(s => {
-      const saved = presets.length >= 20 || presets.some(p => p.url === s.url_resolved || p.url === s.url);
-      const url   = s.url_resolved || s.url;
+      const url   = normalizeStreamUrl(s.url_resolved || s.url);
+      const saved = presets.length >= 20 || presets.some(p => p.url === url);
       const icon  = s.favicon || '';
       const name  = s.name || 'Unbekannt';
       const tags  = [s.state, s.tags].filter(Boolean).join(' · ').substring(0, 60);
@@ -525,6 +525,20 @@
   }
 
   // Helpers
+
+  // Bereinigt radio-browser.info URLs: ?ti=m3u / ?ti=pls sind Server-Hints
+  // die eine Playlist-Datei statt des direkten Streams liefern → Library hängt.
+  function normalizeStreamUrl(url) {
+    if (!url) return url;
+    try {
+      const u = new URL(url);
+      if (u.searchParams.has('ti')) {
+        u.searchParams.delete('ti');
+        url = u.toString().replace(/\?$/, '');
+      }
+    } catch(e) {}
+    return url;
+  }
 
   function esc(s) {
     if (!s) return '';

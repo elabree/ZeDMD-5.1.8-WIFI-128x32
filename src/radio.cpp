@@ -9,6 +9,7 @@
 static Audio audio;
 
 volatile bool    radioIsPlaying     = false;
+volatile bool    radioUserActive    = false;   // true solange User Radio wollte (auch nach EOF)
 volatile bool    radioDisplayActive = false;
 uint32_t         radioDisplayUntil  = 0;   // millis()-Zeitstempel; 0 = kein Auto-Aus
 char             radioStationName[64]  = "";
@@ -28,8 +29,17 @@ static char          gifAudioPath[256]   = "";
 static volatile bool gifAudioPending     = false;
 static volatile bool gifAudioStopPending = false;
 volatile bool        gifAudioPlaying     = false;
+// Grace-Timer: EOF-Callbacks während Verbindungsaufbau ignorieren
+// (Playlist-Auflösung und Redirect feuern EOF bevor der Stream startet)
+static volatile uint32_t switchGraceUntil = 0;
+
+extern void logMsg(const char* fmt, ...);
 
 // ── Callbacks von ESP32-audioI2S ──────────────────────────────────────────────
+
+void audio_info(const char* info) {
+  if (info) logMsg("[audio] %s", info);
+}
 
 void audio_showstationname(const char* info) {
   if (!info || !radioStringMutex) return;
@@ -48,8 +58,16 @@ void audio_showstreamtitle(const char* info) {
 }
 
 void audio_eof_stream(const char* info) {
-  if (gifAudioPlaying)       gifAudioPlaying = false;
-  else if (!switchingStation) radioIsPlaying  = false;
+  logMsg("[radio] eof_stream: \"%s\" grace=%ld", info ? info : "",
+         (long)((int32_t)(switchGraceUntil - millis())));
+  if (gifAudioPlaying) {
+    gifAudioPlaying = false;
+  } else if ((int32_t)(switchGraceUntil - millis()) <= 0) {
+    radioIsPlaying = false;
+    logMsg("[radio] eof_stream: radioIsPlaying -> false");
+  } else {
+    logMsg("[radio] eof_stream: ignoriert (Grace aktiv)");
+  }
 }
 
 // ── Last-Preset-Persistenz (vor Public API — wird von radioInit/radioPlay genutzt) ──
@@ -69,20 +87,37 @@ static void loadLastPreset() {
 static void radioTask(void* params) {
   for (;;) {
     if (stopPending) {
-      stopPending    = false;
-      radioIsPlaying = false;
-      gifAudioPlaying = false;
+      stopPending      = false;
+      radioIsPlaying   = false;
+      radioUserActive  = false;
+      gifAudioPlaying  = false;
+      switchGraceUntil = 0;
+      audio.setVolume(radioVolume);
       audio.stopSong();
     } else if (connectPending) {
+      char localUrl[256];
+      strlcpy(localUrl, pendingUrl, sizeof(localUrl));
+      logMsg("[radio] task: connect -> \"%s\" preset=%d", localUrl, (int)radioCurrentPreset);
       switchingStation = true;
-      connectPending  = false;
-      radioIsPlaying  = false;
-      gifAudioPlaying = false;
+      connectPending   = false;
+      radioIsPlaying   = false;
+      gifAudioPlaying  = false;
+      audio.setVolume(0);       // Mute: PSRAM-Altdaten vom vorherigen Sender unterdrücken
       audio.stopSong();
-      vTaskDelay(pdMS_TO_TICKS(200));
-      audio.connecttohost(pendingUrl);
-      radioIsPlaying   = true;
-      switchingStation = false;
+      vTaskDelay(pdMS_TO_TICKS(500));
+      switchGraceUntil = millis() + 6000;  // 6s Grace für Playlist-Auflösung
+      bool ok = audio.connecttohost(localUrl);
+      logMsg("[radio] task: connecttohost=%d grace=%lu", (int)ok, switchGraceUntil);
+      if (ok) {
+        radioIsPlaying   = true;
+        switchingStation = false;
+        audio.setVolume(radioVolume);
+      } else {
+        radioIsPlaying   = false;
+        switchingStation = false;
+        switchGraceUntil = 0;
+        audio.setVolume(radioVolume);
+      }
     } else if (gifAudioStopPending) {
       gifAudioStopPending = false;
       if (gifAudioPlaying) {
@@ -91,7 +126,7 @@ static void radioTask(void* params) {
       }
     } else if (gifAudioPending) {
       gifAudioPending = false;
-      if (!radioIsPlaying) {
+      if (!radioIsPlaying && !radioUserActive) {
         audio.connecttoFS(SD, gifAudioPath);
         gifAudioPlaying = true;
       }
@@ -118,11 +153,16 @@ void radioInit() {
 }
 
 void radioPlay(const char* url, int presetIndex) {
+  logMsg("[radio] radioPlay: url=\"%s\" preset=%d playing=%d", url, presetIndex, (int)radioIsPlaying);
+  radioUserActive    = true;
   switchingStation   = true;
   radioCurrentPreset = presetIndex;
   if (presetIndex >= 0) { radioLastPreset = presetIndex; saveLastPreset(); }
-  radioTrackTitle[0] = '\0';
-  // Display 5 Sekunden beim Start anzeigen
+  if (radioStringMutex && xSemaphoreTake(radioStringMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+    radioStationName[0] = '\0';
+    radioTrackTitle[0]  = '\0';
+    xSemaphoreGive(radioStringMutex);
+  }
   radioDisplayActive = true;
   radioDisplayUntil  = millis() + 5000;
   strlcpy(pendingUrl, url, sizeof(pendingUrl));
@@ -131,6 +171,7 @@ void radioPlay(const char* url, int presetIndex) {
 }
 
 void radioStop() {
+  radioUserActive     = false;
   stopPending         = true;
   radioIsPlaying      = false;
   radioDisplayActive  = false;
@@ -226,7 +267,9 @@ void radioRegisterRoutes(AsyncWebServer* server) {
     json += "\"lastPreset\":"    + String(radioLastPreset)    + ",";
     json += "\"displayActive\":" + String(radioDisplayActive  ? "true" : "false");
     json += "}";
-    request->send(200, "application/json", json);
+    AsyncWebServerResponse *resp = request->beginResponse(200, "application/json", json);
+    resp->addHeader("Cache-Control", "no-store");
+    request->send(resp);
   });
 
   server->on("/radio_play", HTTP_POST, [](AsyncWebServerRequest *request) {

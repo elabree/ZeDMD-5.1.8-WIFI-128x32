@@ -45,6 +45,7 @@ Requires a **MAX98357A I2S amplifier module** — see wiring below.
 - Station name and track title scroll on the LED matrix for 5 seconds when a station starts, then returns to the screensaver — tap "DMD 10s" to show it again
 - Presets survive firmware updates (stored in LittleFS)
 - Stable station switching — no more audio dropout on channel change
+- Stream URLs from radio-browser.info are automatically normalised (removes `?ti=` playlist hints that caused the audio library to hang)
 
 > **⚠️ RAM note:** The audio decoder permanently occupies most of the ESP32-S3's internal SRAM. As a consequence, weather data is fetched via plain **http://** (not https://) to avoid TLS out-of-memory crashes. Open-Meteo explicitly supports unencrypted requests for embedded devices — this is intentional and safe.
 
@@ -55,6 +56,10 @@ Click any GIF filename in the screensaver file list or the "currently shown" fie
 
 ### GIF Audio
 Play a matching MP3 file from the SD card in sync with an animated GIF screensaver. The filename must match the GIF (e.g. `demo.gif` → `demo.mp3`). Upload audio files via the main page or drop them in `/GifAudio/` on the SD card directly.
+
+- File list is cached in LittleFS — after the first boot scan, subsequent reboots load instantly (same mechanism as the screensaver file cache)
+- Paginated file list in the web UI with previous/next buttons (20 files per page)
+- Scan can be aborted via the **"Scan abbrechen"** button that appears after an upload
 
 > **Note:** GIF audio plays once per GIF cycle — looping is not yet implemented.
 
@@ -109,19 +114,31 @@ This release includes a comprehensive overhaul of memory management and task saf
 ### Stereo Audio *(planned)*
 Stereo output using **two MAX98357A modules** — one for the left channel, one for the right.
 
-The SD pin is **not an active switch** — it is wired once and permanently fixed: Module L gets GND and always outputs the left channel; Module R gets 3.3V and always outputs the right channel. The ESP32 sends a stereo I2S stream and each module automatically filters its own channel — no firmware switching needed.
+The SD pin acts as a voltage-level configuration strap at startup. Because the chip has an internal 100kΩ pulldown resistor, you **cannot** just connect it directly to VCC/GND for stereo. You must use specific external pullup resistors to set the correct voltage windows:
 
-> ⚠️ Requires firmware change: the current build outputs mono I2S. The hardware wiring is the easy part — stereo I2S output in firmware is still to be implemented.
+* **Module L (Left Channel):** Requires >1.4V. Connect a **100kΩ** resistor from SD to VCC (3.3V or 5V).
+* **Module R (Right Channel):** Requires 0.77V to 1.4V. Connect a **220kΩ** (if using 3.3V) or **330kΩ** (if using 5V) resistor from SD to VCC.
+
+The ESP32 sends a stereo I2S stream, and each module automatically decodes its designated channel based on these resistor values.
 
 | MAX98357A Pin | ESP32-S3 | Notes |
 |---------------|----------|-------|
 | BCLK | **GPIO 9** | shared — both modules |
 | LRC (WSEL) | **GPIO 14** | shared — both modules |
 | DIN | **GPIO 21** | shared — both modules |
-| SD — Module L | **GND** | permanently wired → always left channel |
-| SD — Module R | **3.3V** | permanently wired → always right channel |
-| VIN | **5V** | each module separately |
+| SD — Module L | **via 100kΩ to VCC**| Sets voltage > 1.4V → **Left channel** |
+| SD — Module R | **via 220kΩ/330kΩ to VCC**| Sets voltage to ~1V → **Right channel** |
+| VIN | **5V** or **3.3V** | each module separately (must match your resistor calculations) |
 | GND | **GND** | each module separately |
+
+> ⚠️ Requires firmware change: the current build outputs mono I2S. Stereo I2S output in firmware is still to be implemented.
+
+> ⚠️ **DISCLAIMER / UNTESTED HARDWARE SPECIFICATION:**
+> This stereo configuration is theoretical and based on the MAX98357A datasheet — it has **NOT been tested** in practice yet. Resistor values might need minor adjustments depending on your specific breakout board clone and its onboard pullups. When in doubt, consult the datasheet.
+> **Proceed entirely at your own risk — absolutely no warranty or support provided!**
+
+### Code cleanup *(on my list)*
+The code has grown organically and is honestly a bit messy in places — I know. I'm planning to clean things up at some point, but no promises on when. It works, which counts for something.
 
 ---
 
@@ -131,7 +148,7 @@ This fork is **WiFi-only** and targets the **ESP32-S3-N16R8** with a **128×32 L
 
 ### All added features
 
-- **WiFi OTA firmware update** — flash new firmware directly via browser (`/admin.html`); firmware version and build ID (git hash) shown on admin page
+- **WiFi OTA firmware update** — flash new firmware directly via browser (`/admin.html`); firmware version with build ID and branch shown on admin page (format: `5.1.8-jb (date) [abc1234@main]`)
 - **Screensaver** — GIF/RAW slideshow with clock and weather display (Open-Meteo, plain HTTP for RAM efficiency)
 - **Screensaver management** — favorites, ignore list, alphabetical/random order, strict timer, pause/resume
 - **GIF Preview** — click any filename to open an animated browser preview; favorite/ignore/play controls inside the preview
@@ -225,7 +242,7 @@ Access via `http://<IP>/` (main page) and `http://<IP>/admin.html` (admin page).
 | B | 8 | |
 | C | 3 | |
 | D | 42 | |
-| E | 1 | only for 1/32 scan (64×64) |
+| E | 1 | not used - only for 256×64 |
 | OE | 2 | |
 | LAT | 40 | `wifi_sd_webradio` |
 | LAT | **46** | `wifi_sdmmc_webradio` — rewire! |
@@ -264,11 +281,10 @@ Requires an **I2S amplifier module** and a small speaker.
 **Tested amplifier: MAX98357A**
 - Breakout module (e.g. Adafruit #3006 or common clones)
 - Speaker: **8 Ω / 3 W** — e.g. **Visaton FSR 7** (77 mm, good sound for the size)
-- Output power: up to 3 W — adequate for a pinball cabinet at moderate volume
+- Output power: up to 3 W — adequate for a cabinet at moderate volume
 
-> **Need more volume?** The MAX98357A is a compact, low-cost solution but tops out at 3 W mono. For louder or stereo setups, consider a higher-power I2S amplifier (e.g. TPA3118, TPA3116 or similar) — the I2S wiring and firmware remain identical, only the module changes.
 
-### MAX98357A Wiring — identical for both builds
+### MAX98357A Wiring — Mono (SD and SDMMC builds)
 
 | MAX98357A Pin | ESP32-S3 | Notes |
 |---------------|----------|-------|

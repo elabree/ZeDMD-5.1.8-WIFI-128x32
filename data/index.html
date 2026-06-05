@@ -320,8 +320,19 @@
                             &#x2191; Upload
                         </button>
                     </div>
-                    <div id="gif-audio-upload-status" class="status-message" style="margin-bottom:8px;"></div>
-                    <div id="gif-audio-list" style="font-size:0.9em; color:#ccc;">Lade...</div>
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                        <div id="gif-audio-upload-status" class="status-message" style="margin:0; flex:1;"></div>
+                        <button id="cancel-audio-scan-btn" onclick="cancelAudioScan()" style="display:none; width:auto; padding:8px 14px; margin:0; background:#c0392b;">&#x2715; Scan abbrechen</button>
+                    </div>
+                    <label>GIF-Audio Dateien: <span id="gif-audio-count" style="color:#aaa; font-weight:normal;"></span></label>
+                    <ul class="screensaver-file-list" id="gif-audio-list">
+                        <li><span style="color:#666;">Lade...</span></li>
+                    </ul>
+                    <div id="gif-audio-pagination" style="display:none; gap:8px; align-items:center; margin-top:6px;">
+                        <button id="ga-prev-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(-1)">&#9664; Zur&uuml;ck</button>
+                        <span id="gif-audio-page-info" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
+                        <button id="ga-next-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(1)">Weiter &#9654;</button>
+                    </div>
                 </div>
 
                 <!-- SD Card / LittleFS Section -->
@@ -1216,38 +1227,89 @@
         var _radioVolume      = 15;
 
         // ── GIF-Audio ─────────────────────────────────────────────────────────
+        var gifAudioAllFiles = [];
+        var gifAudioOffset   = 0;
+        var gifAudioPageSize = 20;
+
         function gifAudioLoad(retry) {
             fetch('/gif_audio_files').then(function(r) { return r.json(); }).then(function(files) {
-                var el = document.getElementById('gif-audio-list');
-                if (!el) return;
-                if (files.length === 0) {
-                    if (!retry) { setTimeout(function() { gifAudioLoad(true); }, 1500); return; }
-                    el.innerHTML = '<span style="color:#666;">Keine MP3s in /GifAudio/</span>';
-                    return;
-                }
-                el.innerHTML = '';
-                files.forEach(function(f) {
-                    var row = document.createElement('div');
-                    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #333;';
-                    var nameSpan = document.createElement('span');
-                    var nameTxt  = document.createTextNode(f.name + ' ');
-                    var sizeSpan = document.createElement('span');
-                    sizeSpan.style.cssText = 'color:#666;font-size:0.85em;';
-                    sizeSpan.textContent = '(' + Math.round(f.size / 1024) + ' KB)';
-                    nameSpan.appendChild(nameTxt);
-                    nameSpan.appendChild(sizeSpan);
-                    var delBtn = document.createElement('button');
-                    delBtn.textContent = '✕';
-                    delBtn.style.cssText = 'padding:2px 8px;background:#8b1a1a;font-size:0.8em;margin:0;';
-                    delBtn.onclick = (function(name) { return function() { gifAudioDelete(name); }; })(f.name);
-                    row.appendChild(nameSpan);
-                    row.appendChild(delBtn);
-                    el.appendChild(row);
-                });
+                if (files.length === 0 && !retry) { setTimeout(function() { gifAudioLoad(true); }, 1500); return; }
+                gifAudioAllFiles = files;
+                if (gifAudioOffset >= gifAudioAllFiles.length) gifAudioOffset = 0;
+                gifAudioRender();
+                var cancelBtn = document.getElementById('cancel-audio-scan-btn');
+                if (cancelBtn) cancelBtn.style.display = 'none';
             }).catch(function() {
                 var el = document.getElementById('gif-audio-list');
-                if (el) el.innerHTML = '<span style="color:#c0392b;">Fehler beim Laden</span>';
+                if (el) el.innerHTML = '<li><span style="color:#c0392b;">Fehler beim Laden</span></li>';
             });
+        }
+
+        function cancelAudioScan() {
+            var statusEl = document.getElementById('gif-audio-upload-status');
+            var cancelBtn = document.getElementById('cancel-audio-scan-btn');
+            if (statusEl) { statusEl.innerText = 'Scan wird abgebrochen...'; statusEl.style.color = '#e67e22'; }
+            fetch('/cancel_gif_audio_scan', { method: 'POST' })
+                .then(function() {
+                    if (statusEl) { statusEl.innerText = 'Scan abgebrochen'; statusEl.style.color = 'green'; }
+                    if (cancelBtn) cancelBtn.style.display = 'none';
+                    setTimeout(function() { gifAudioLoad(); }, 1500);
+                });
+        }
+
+        function gifAudioRender() {
+            var el = document.getElementById('gif-audio-list');
+            if (!el) return;
+            el.innerHTML = '';
+            var countEl = document.getElementById('gif-audio-count');
+            if (countEl) countEl.textContent = '(' + gifAudioAllFiles.length + ')';
+            if (gifAudioAllFiles.length === 0) {
+                el.innerHTML = '<li><span style="color:#666;">Keine MP3s in /GifAudio/</span></li>';
+                gifAudioUpdatePagination();
+                return;
+            }
+            var page = gifAudioAllFiles.slice(gifAudioOffset, gifAudioOffset + gifAudioPageSize);
+            page.forEach(function(f) {
+                var li = document.createElement('li');
+                var nameSpan = document.createElement('span');
+                nameSpan.appendChild(document.createTextNode(f.name + ' '));
+                var sizeSpan = document.createElement('span');
+                sizeSpan.style.cssText = 'color:#666;font-size:0.85em;';
+                sizeSpan.textContent = '(' + Math.round(f.size / 1024) + ' KB)';
+                nameSpan.appendChild(sizeSpan);
+                var delBtn = document.createElement('button');
+                delBtn.className = 'delete-btn';
+                delBtn.textContent = '🗑';
+                delBtn.onclick = (function(name) { return function() { gifAudioDelete(name); }; })(f.name);
+                li.appendChild(nameSpan);
+                li.appendChild(delBtn);
+                el.appendChild(li);
+            });
+            gifAudioUpdatePagination();
+        }
+
+        function gifAudioPage(dir) {
+            var newOffset = gifAudioOffset + dir * gifAudioPageSize;
+            if (newOffset < 0) {
+                newOffset = Math.floor((gifAudioAllFiles.length - 1) / gifAudioPageSize) * gifAudioPageSize;
+            } else if (newOffset >= gifAudioAllFiles.length) {
+                newOffset = 0;
+            }
+            gifAudioOffset = newOffset;
+            gifAudioRender();
+        }
+
+        function gifAudioUpdatePagination() {
+            var total      = gifAudioAllFiles.length;
+            var pagination = document.getElementById('gif-audio-pagination');
+            var pageInfo   = document.getElementById('gif-audio-page-info');
+            if (!pagination) return;
+            if (total > gifAudioPageSize) {
+                pagination.style.display = 'flex';
+                pageInfo.textContent = (gifAudioOffset + 1) + '–' + Math.min(gifAudioOffset + gifAudioPageSize, total) + ' von ' + total;
+            } else {
+                pagination.style.display = 'none';
+            }
         }
 
         function gifAudioDelete(name) {
@@ -1271,6 +1333,7 @@
         function gifAudioUpload(files, onDone) {
             if (!files || files.length === 0) return;
             var status = document.getElementById('gif-audio-upload-status');
+            var cancelBtn = document.getElementById('cancel-audio-scan-btn');
             var uploaded = 0, errors = 0;
             var i = 0;
             function uploadNext() {
@@ -1278,9 +1341,10 @@
                     if (status) {
                         status.style.color = errors === 0 ? 'green' : 'orange';
                         status.innerText = errors === 0
-                            ? '✓ ' + uploaded + ' Datei(en) hochgeladen'
+                            ? '✓ ' + uploaded + ' Datei(en) hochgeladen — wird gescannt...'
                             : uploaded + ' OK, ' + errors + ' Fehler';
                     }
+                    if (cancelBtn) cancelBtn.style.display = 'inline-block';
                     gifAudioLoad();
                     if (onDone) onDone();
                     return;
@@ -1828,6 +1892,13 @@
             }
             updateRadioBtns();
             setInterval(updateRadioBtns, 5000);
+
+            // Safari BFCache: Seite wird eingefroren/wiederhergestellt statt neu geladen.
+            // _radioLastPreset kann dabei -1 bleiben → Play-Button öffnet radio.html.
+            // pageshow mit persisted=true = Wiederherstellung aus BFCache → neu abfragen.
+            window.addEventListener('pageshow', function(e) {
+                if (e.persisted) { _radioLastPreset = -1; updateRadioBtns(); }
+            });
         };
     </script>
 </body>

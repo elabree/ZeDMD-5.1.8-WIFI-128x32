@@ -10,7 +10,18 @@ try:
 except Exception:
     _git_hash = "unknown"
 
-env.Append(CPPDEFINES=[("GIT_HASH", '\\"' + _git_hash + '\\"')])
+try:
+    _git_branch = subprocess.check_output(
+        ["git", "-C", env.subst("$PROJECT_DIR"), "rev-parse", "--abbrev-ref", "HEAD"],
+        stderr=subprocess.DEVNULL
+    ).decode().strip()
+except Exception:
+    _git_branch = "unknown"
+
+env.Append(CPPDEFINES=[
+    ("GIT_HASH",   '\\"' + _git_hash   + '\\"'),
+    ("GIT_BRANCH", '\\"' + _git_branch + '\\"'),
+])
 
 def copy_firmware(source, target, env):
     firmware_src = os.path.join(env.subst("$BUILD_DIR"), "firmware.bin")
