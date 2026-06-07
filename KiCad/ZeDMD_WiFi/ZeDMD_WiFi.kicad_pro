@@ -39,9 +39,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 0.8,
-          "height": 1.27,
-          "width": 2.54
+          "drill": 0.3,
+          "height": 0.7,
+          "width": 0.7
         },
         "silk_line_width": 0.1,
         "silk_text_italic": false,
@@ -69,7 +69,13 @@
           "thermal_relief_spoke_width": 0.5
         }
       },
-      "diff_pair_dimensions": [],
+      "diff_pair_dimensions": [
+        {
+          "gap": 0.0,
+          "via_gap": 0.0,
+          "width": 0.0
+        }
+      ],
       "drc_exclusions": [],
       "meta": {
         "version": 2
@@ -110,9 +116,9 @@
         "missing_tuning_profile": "warning",
         "net_conflict": "warning",
         "nonmirrored_text_on_back_layer": "warning",
-        "npth_inside_courtyard": "error",
+        "npth_inside_courtyard": "ignore",
         "padstack": "warning",
-        "pth_inside_courtyard": "error",
+        "pth_inside_courtyard": "ignore",
         "shorting_items": "error",
         "silk_edge_clearance": "warning",
         "silk_over_copper": "warning",
@@ -140,11 +146,11 @@
       },
       "rules": {
         "max_error": 0.005,
-        "min_clearance": 0.0,
-        "min_connection": 0.0,
+        "min_clearance": 0.16,
+        "min_connection": 0.16,
         "min_copper_edge_clearance": 0.5,
         "min_groove_width": 0.0,
-        "min_hole_clearance": 0.25,
+        "min_hole_clearance": 0.2,
         "min_hole_to_hole": 0.25,
         "min_microvia_diameter": 0.2,
         "min_microvia_drill": 0.1,
@@ -154,9 +160,9 @@
         "min_text_thickness": 0.08,
         "min_through_hole_diameter": 0.3,
         "min_track_width": 0.2,
-        "min_via_annular_width": 0.1,
+        "min_via_annular_width": 0.19,
         "min_via_diameter": 0.5,
-        "solder_mask_to_copper_clearance": 0.0,
+        "solder_mask_to_copper_clearance": 0.005,
         "use_height_for_length_calcs": true
       },
       "teardrop_options": [
@@ -203,7 +209,9 @@
           "td_width_to_size_filter_ratio": 0.9
         }
       ],
-      "track_widths": [],
+      "track_widths": [
+        0.0
+      ],
       "tuning_pattern_settings": {
         "diff_pair_defaults": {
           "corner_radius_percentage": 80,
@@ -230,7 +238,12 @@
           "spacing": 0.6
         }
       },
-      "via_dimensions": [],
+      "via_dimensions": [
+        {
+          "diameter": 0.0,
+          "drill": 0.0
+        }
+      ],
       "zones_allow_external_fillets": false
     },
     "ipc2581": {
@@ -240,7 +253,7 @@
       "internal_id": "",
       "mfg": "",
       "mpn": "",
-      "sch_revision": ""
+      "sch_revision": "1.0"
     },
     "layer_pairs": [],
     "layer_presets": [],
@@ -449,6 +462,7 @@
       "footprint_filter": "ignore",
       "footprint_link_issues": "warning",
       "four_way_junction": "ignore",
+      "global_label_dangling": "warning",
       "ground_pin_not_ground": "warning",
       "hier_label_mismatch": "error",
       "isolated_pin_label": "warning",
@@ -466,7 +480,7 @@
       "no_connect_dangling": "warning",
       "pin_not_connected": "error",
       "pin_not_driven": "error",
-      "pin_to_pin": "warning",
+      "pin_to_pin": "error",
       "power_pin_not_driven": "error",
       "same_local_global_label": "warning",
       "similar_label_and_power": "warning",
@@ -496,9 +510,9 @@
       {
         "bus_width": 12,
         "clearance": 0.2,
-        "diff_pair_gap": 0.25,
+        "diff_pair_gap": 0.254,
         "diff_pair_via_gap": 0.25,
-        "diff_pair_width": 0.2,
+        "diff_pair_width": 0.25,
         "line_style": 0,
         "microvia_diameter": 0.3,
         "microvia_drill": 0.1,
@@ -506,11 +520,79 @@
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": 2147483647,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.25,
+        "tuning_profile": "",
+        "via_diameter": 0.7,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.2,
+        "diff_pair_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "HUB75",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 2,
+        "schematic_color": "rgb(194, 0, 194)",
+        "track_width": 0.2,
+        "tuning_profile": "",
+        "via_diameter": 0.8,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.2,
+        "diff_pair_gap": 0.3,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.45,
+        "microvia_drill": 0.15,
+        "name": "PWR",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 3,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.35,
+        "tuning_profile": "",
+        "via_diameter": 0.9,
+        "via_drill": 0.5,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.2,
+        "diff_pair_gap": 0.47,
+        "diff_pair_width": 0.8,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "USB",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 1,
+        "schematic_color": "rgb(0, 0, 194)",
         "track_width": 0.2,
         "tuning_profile": "",
         "via_diameter": 0.6,
         "via_drill": 0.3,
         "wire_width": 6
+      },
+      {
+        "clearance": 0.16,
+        "diff_pair_gap": 0.16,
+        "diff_pair_width": 0.2,
+        "microvia_diameter": 0.5,
+        "microvia_drill": 0.25,
+        "name": "USB-Conn",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 0,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.2,
+        "tuning_profile": "",
+        "via_diameter": 0.7,
+        "via_drill": 0.3
       }
     ],
     "meta": {
@@ -518,14 +600,43 @@
     },
     "net_colors": null,
     "netclass_assignments": null,
-    "netclass_patterns": []
+    "netclass_patterns": [
+      {
+        "netclass": "PWR",
+        "pattern": "GND"
+      },
+      {
+        "netclass": "HUB75",
+        "pattern": "/ESP32S3/HUB_*"
+      },
+      {
+        "netclass": "PWR",
+        "pattern": "*ESP_VP*"
+      },
+      {
+        "netclass": "PWR",
+        "pattern": "+5V"
+      },
+      {
+        "netclass": "USB",
+        "pattern": "/ESP32S3/USB_D*"
+      },
+      {
+        "netclass": "USB-Conn",
+        "pattern": "/ESP32S3/CON_D*"
+      }
+    ]
   },
   "pcbnew": {
     "last_paths": {
+      "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "",
+      "plot": "production/",
+      "pos_files": "production/",
       "specctra_dsn": "",
+      "step": "",
+      "svg": "",
       "vrml": ""
     },
     "page_layout_descr_file": ""
@@ -579,13 +690,13 @@
           "group_by": true,
           "label": "Exclude from BOM",
           "name": "${EXCLUDE_FROM_BOM}",
-          "show": true
+          "show": false
         },
         {
           "group_by": true,
           "label": "Exclude from Board",
           "name": "${EXCLUDE_FROM_BOARD}",
-          "show": true
+          "show": false
         },
         {
           "group_by": true,
@@ -597,15 +708,105 @@
           "group_by": false,
           "label": "Datasheet",
           "name": "Datasheet",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "If",
+          "name": "If",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Iv",
+          "name": "Iv",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Pmax",
+          "name": "Pmax",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Power",
+          "name": "Power",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Sim.Device",
+          "name": "Sim.Device",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Sim.Pins",
+          "name": "Sim.Pins",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Tolerance",
+          "name": "Tolerance",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Vf",
+          "name": "Vf",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Vmax",
+          "name": "Vmax",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Voltage",
+          "name": "Voltage",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "dielectric",
+          "name": "dielectric",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Dielectric",
+          "name": "Dielectric",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Beschrijving",
+          "name": "Description",
+          "show": true
+        },
+        {
+          "group_by": false,
+          "label": "#",
+          "name": "${ITEM_NUMBER}",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "LCSC",
+          "name": "LCSC",
           "show": true
         }
       ],
       "filter_string": "",
       "group_symbols": true,
       "include_excluded_from_bom": true,
-      "name": "Default Editing",
+      "name": "",
       "sort_asc": true,
-      "sort_field": "Referentie"
+      "sort_field": "Reference"
     },
     "bus_aliases": {},
     "connection_grid_size": 50.0,
@@ -636,29 +837,45 @@
     "meta": {
       "version": 1
     },
+    "net_format_name": "",
     "page_layout_descr_file": "",
     "plot_directory": "",
     "reuse_designators": true,
+    "space_save_all_events": true,
+    "spice_current_sheet_as_root": false,
+    "spice_external_command": "spice \"%I\"",
+    "spice_model_current_sheet_as_root": true,
+    "spice_save_all_currents": false,
+    "spice_save_all_dissipations": false,
+    "spice_save_all_voltages": false,
     "subpart_first_id": 65,
     "subpart_id_separator": 0,
     "top_level_sheets": [
       {
         "filename": "ZeDMD_WiFi.kicad_sch",
-        "name": "Hoofdblad",
-        "uuid": "d9e56c5a-205b-4175-9709-09dd4d86112e"
+        "name": "ZeDMD_WiFi",
+        "uuid": "f152223e-3e6c-45b9-8918-58617cf6ab29"
       }
     ],
-    "used_designators": "U1",
+    "used_designators": "#PWR15-18,R7,J6,SW6-9,U4",
     "variants": []
   },
   "sheets": [
     [
-      "d9e56c5a-205b-4175-9709-09dd4d86112e",
-      "Hoofdblad"
+      "f152223e-3e6c-45b9-8918-58617cf6ab29",
+      "ZeDMD_WiFi"
     ],
     [
-      "0f6c2a0b-a2f8-47c3-a496-f64dbc6cb6c6",
-      "ESP32-S3-N16R8"
+      "b1f6633d-5b2a-4fbb-91ae-77527bd388a5",
+      "ESP32S3"
+    ],
+    [
+      "de14592e-84cd-44fd-b758-98842de6cca7",
+      "ZeDMD"
+    ],
+    [
+      "0d5b77dd-1f19-4a49-b5af-7a1f60d4704f",
+      "ESP32-S3-DevKitC-1-N16R8"
     ]
   ],
   "text_variables": {},
