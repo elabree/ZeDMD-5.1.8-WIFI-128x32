@@ -1,0 +1,60 @@
+(kicad_sch
+	(version 20260306)
+	(generator "eeschema")
+	(generator_version "10.0")
+	(uuid "d9e56c5a-205b-4175-9709-09dd4d86112e")
+	(paper "A4")
+	(lib_symbols)
+	(sheet
+		(at 113.03 80.01)
+		(size 90.17 52.07)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "0f6c2a0b-a2f8-47c3-a496-f64dbc6cb6c6")
+		(property "Sheetname" "ESP32-S3-N16R8"
+			(at 113.03 79.2984 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "ESP32-S3-N16R8.kicad_sch"
+			(at 113.03 132.6646 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "ZeDMD_WiFi"
+				(path "/d9e56c5a-205b-4175-9709-09dd4d86112e"
+					(page "2")
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
+)

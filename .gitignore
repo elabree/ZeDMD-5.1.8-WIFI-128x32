@@ -3,7 +3,9 @@
 /.vscode/
 /.claude/
 *.bak
+*.tmp
 *.old
 CLAUDE.md
 /reference/
+
 PROJECT_STATUS.md
