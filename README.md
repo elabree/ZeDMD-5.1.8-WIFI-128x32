@@ -47,7 +47,7 @@ Requires a **MAX98357A I2S amplifier module** — see wiring below.
 - Stable station switching — no more audio dropout on channel change
 - Stream URLs from radio-browser.info are automatically normalised (removes `?ti=` playlist hints that caused the audio library to hang)
 
-> **⚠️ RAM note:** The audio decoder permanently occupies most of the ESP32-S3's internal SRAM. As a consequence, weather data is fetched via plain **http://** (not https://) to avoid TLS out-of-memory crashes. Open-Meteo explicitly supports unencrypted requests for embedded devices — this is intentional and safe.
+> **⚠️ Weather API:** Open-Meteo is accessed via HTTP instead of HTTPS. TLS handshakes consistently caused memory-related crashes in the web radio build. Since Open-Meteo provides public data without requiring a login, HTTPS is not necessary here.
 
 ### GIF Preview in the browser
 Click any GIF filename in the screensaver file list or the "currently shown" field to open a live animated preview directly in the browser — without touching the display. Favourite, ignore and play controls are available inside the preview.
