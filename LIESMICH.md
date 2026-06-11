@@ -47,7 +47,7 @@ Erfordert ein **MAX98357A I2S-Verstärkermodul** — Verkabelung siehe unten.
 - Stabiler Senderwechsel — kein Audio-Aussetzer beim Umschalten mehr
 - Stream-URLs von radio-browser.info werden automatisch normalisiert (`?ti=`-Playlist-Hinweise werden entfernt, die die Audio-Bibliothek zum Hängen brachten)
 
-> **⚠️ RAM-Hinweis:** Der Audio-Decoder belegt dauerhaft den Großteil des internen SRAM. Deshalb erfolgt der Wetterdaten-Abruf zwingend über unverschlüsseltes **http://** (nicht https://) — ein TLS-Handshake würde einen Out-of-Memory-Absturz verursachen. Open-Meteo unterstützt dies explizit für Embedded-Geräte und liefert ausschließlich öffentliche Daten ohne Auth-Token. Das ist sicher.
+**⚠️ Wetter-API:** Open-Meteo wird über HTTP statt HTTPS abgefragt. TLS-Handshakes führten im Webradio-Build immer zu Speicher-Abstürzen. Da Open-Meteo öffentliche Daten ohne Login liefert, ist HTTPS hier nicht nötig.
 
 ### GIF-Vorschau im Browser
 Klick auf einen GIF-Dateinamen in der Screensaver-Dateiliste oder im „Aktuell angezeigt"-Feld öffnet eine animierte Live-Vorschau direkt im Browser — ohne das Display zu berühren. Favorit, Ignorieren und Abspielen sind direkt aus der Vorschau heraus möglich.
