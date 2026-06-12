@@ -63,6 +63,38 @@ Beim Abspielen eines animierten GIF-Screensavers passend dazu eine MP3-Datei von
 
 > **Hinweis:** GIF-Audio spielt einmal pro GIF-Zyklus ab — Endlosschleife ist noch nicht implementiert.
 
+### Batocera Spielstart/Spielende-Trigger
+
+`scripts/batocera_game_start.sh` und `scripts/batocera_game_stop.sh` triggern die GIF-Audio-Wiedergabe auf dem ZeDMD wenn ein Spiel auf Batocera startet oder endet. Das DMD empfängt weiterhin Live-Frames vom Emulator wie gewohnt — diese Scripts steuern nur den Audio-Layer.
+
+**Funktionsweise:**
+- Spielstart: Batocera schickt den ROM-Namen an ZeDMD → ZeDMD spielt die passende MP3 aus `/GifAudio/` auf der SD-Karte
+- Spielende: ZeDMD stoppt die Wiedergabe
+- Namenskonvention: ROM-Dateiname ohne Extension → `medieval_madness.zip` → `medieval_madness.mp3`
+
+**Einrichtung:**
+1. Beide Scripts öffnen und `IP_ZEDMD` auf die feste IP des ZeDMD setzen
+2. Auf Batocera kopieren:
+   ```bash
+   scp scripts/batocera_game_start.sh root@batocera.local:/userdata/system/scripts/gameStart.sh
+   scp scripts/batocera_game_stop.sh root@batocera.local:/userdata/system/scripts/gameStop.sh
+   ```
+3. Passende MP3-Dateien auf der SD-Karte unter `/GifAudio/` ablegen
+
+> ⚠️ **Falls auf Batocera bereits ein `gameStart.sh` existiert** (z.B. von einem anderen Projekt), dieses **nicht ersetzen** — den `curl`-Aufruf aus dem Script stattdessen an die bestehende Datei anhängen.
+
+### Batocera WiFi-Streaming *(experimentell)*
+
+Batoceras DMD-Server streamt standardmäßig nur an ein einzelnes USB-DMD. Um gleichzeitig an ein WiFi-ZeDMD zu senden, muss manuell eine zweite `dmdserver`-Instanz eingerichtet werden.
+
+Eine vollständige Schritt-für-Schritt-Anleitung — inklusive Dual-DMD-Marquee-Steuerung, Attract-/Playing-Modi und Troubleshooting — gibt es hier:
+
+📄 **[docs/batocera-dual-dmd.md](docs/batocera-dual-dmd.md)**
+
+> ⚠️ Getestet mit Batocera **v42**. Batocera v43 brachte Änderungen, die dieses Setup möglicherweise nicht mehr funktionsfähig machen.
+
+---
+
 ### Batocera Audio-Extraktionsskript *(experimentell)*
 
 `scripts/extract_gif_audio.sh` extrahiert die ersten N Sekunden Audio aus Batocera-Scraping-Videos und speichert sie als MP3-Dateien, die direkt für ZeDMD verwendet werden können.
@@ -111,31 +143,29 @@ Diese Version enthält eine umfassende Überarbeitung der Speicherverwaltung und
 
 ## 🔜 Geplante Features
 
-### Stereo-Audio *(geplant)*
-Stereo-Ausgabe mit **zwei MAX98357A-Modulen** — eines für den linken, eines für den rechten Kanal.
+### Stereo-Audio *(getestet mit SDMMC-Build)*
+Stereo-Ausgabe mit **zwei MAX98357A-Modulen** — eines für den linken, eines für den rechten Kanal. Getestet mit dem SDMMC-Build und zwei MAX98357A-Breakout-Boards.
 
-Der SD-Pin fungiert als Spannungspegel-Konfigurationsbrücke beim Start. Da der Chip einen internen 100 kΩ Pull-down-Widerstand besitzt, kann man ihn **nicht** direkt an VCC oder GND für Stereo anschließen. Stattdessen müssen externe Pull-up-Widerstände die korrekten Spannungsfenster einstellen:
+Der SD-Pin ist eine Spannungspegel-Kanalwahl-Brücke. Die folgenden Werte wurden gemessen und bestätigt für MAX98357A-Breakout-Boards, die bereits einen **1 MΩ Widerstand von SD nach Vin** onboard haben. Bei abweichender Boardbestückung gelten diese Werte nicht — immer Schaltplan des eigenen Boards prüfen und Spannung messen, bevor etwas angeschlossen wird.
 
-* **Modul L (linker Kanal):** Benötigt >1,4 V. Einen **100 kΩ** Widerstand von SD nach VCC (3,3V oder 5V) anschließen.
-* **Modul R (rechter Kanal):** Benötigt 0,77 V bis 1,4 V. Einen **220 kΩ** (bei 3,3V) oder **330 kΩ** (bei 5V) Widerstand von SD nach VCC anschließen.
+* **Modul L (linker Kanal):** **100 kΩ** Widerstand von SD nach VCC (3,3V oder 5V).
+* **Modul R (rechter Kanal):** **370 kΩ** Widerstand von SD nach VCC (3,3V oder 5V).
 
-Der ESP32 sendet einen Stereo-I2S-Datenstrom, und jedes Modul dekodiert automatisch seinen zugewiesenen Kanal anhand dieser Widerstandswerte.
+Die ESP32-audioI2S-Bibliothek gibt bei Stereo-Quelldateien nativ Stereo-I2S aus. Jedes Modul dekodiert automatisch seinen zugewiesenen Kanal anhand der SD-Pin-Spannung.
 
 | MAX98357A Pin | ESP32-S3 | Hinweis |
 |---------------|----------|---------|
 | BCLK | **GPIO 9** | gemeinsam — beide Module |
 | LRC (WSEL) | **GPIO 14** | gemeinsam — beide Module |
 | DIN | **GPIO 21** | gemeinsam — beide Module |
-| SD — Modul L | **100 kΩ nach VCC** | Spannung >1,4 V → **linker Kanal** |
-| SD — Modul R | **220 kΩ/330 kΩ nach VCC** | Spannung ~1 V → **rechter Kanal** |
-| VIN | **5V** oder **3,3V** | jedes Modul separat (passend zur Widerstandsberechnung) |
+| SD — Modul L | **100 kΩ nach VCC** | → **linker Kanal** |
+| SD — Modul R | **370 kΩ nach VCC** | → **rechter Kanal** |
+| VIN | **5V** oder **3,3V** | jedes Modul separat |
 | GND | **GND** | jedes Modul separat |
 
-> ⚠️ Erfordert Firmware-Anpassung: aktuell wird Mono-I2S ausgegeben. Die Stereo-Ausgabe in der Firmware ist noch zu implementieren.
-
-> ⚠️ **DISCLAIMER / NICHT GETESTETE HARDWARE-SPEZIFIKATION:**
-> Diese Stereo-Konfiguration ist theoretisch und basiert auf dem MAX98357A-Datenblatt — sie wurde **noch nicht** in der Praxis getestet. Widerstandswerte können je nach Breakout-Board-Klon und dessen internen Pull-ups leichte Anpassungen erfordern. Im Zweifel bitte das Datenblatt zu Rate ziehen.
-> **Auf eigene Gefahr — keinerlei Gewährleistung oder Support!**
+> ⚠️ **DISCLAIMER:**
+> Diese Widerstandswerte wurden experimentell mit einem spezifischen MAX98357A-Breakout-Board ermittelt, das einen 1 MΩ Widerstand von SD nach Vin onboard hat. Andere Board-Varianten können andere Werte erfordern. **Immer das MAX98357A-Datenblatt lesen, den Schaltplan des eigenen Boards prüfen und Spannungen messen, bevor etwas angeschlossen wird.**
+> **Nutzung auf eigene Gefahr — keinerlei Gewährleistung oder Haftung.**
 
 ### Code-Aufräumen *(steht auf meiner Liste)*
 Der Code ist hier und da ehrlich gesagt etwas gewachsen und durcheinander geraten — ich weiß das. Ich plane irgendwann aufzuräumen, aber wann genau kann ich nicht versprechen. Er funktioniert, und das zählt erstmal.
@@ -161,6 +191,14 @@ Dieser Fork ist **nur WiFi** und zielt auf den **ESP32-S3-N16R8** mit einer **12
 ---
 
 ## Hardware — ESP32-S3-N16R8 Hinweis
+
+### 💡 Stromversorgung
+
+Der ZeDMD kann je nach Betrieb ganz schön Strom ziehen — besonders wenn helle GIFs laufen, gleichzeitig Webradio streamt und WiFi aktiv ist. Ein einfacher Laptop-USB-Port oder ein billiges Handy-Ladegerät liefern dafür manchmal nicht genug stabilen Strom, was sich in unerwarteten Neustarts oder einem unstabilen Bild äußern kann.
+
+**Bei merkwürdigem Verhalten: ein ordentliches 5V/2A-USB-Netzteil verwenden** (so eines wie bei einem guten Handy oder Tablet dabei ist). Wie viel Strom wirklich gebraucht wird, hängt stark vom Inhalt ab — dunkle GIFs ohne Audio brauchen deutlich weniger als alles auf Vollbetrieb.
+
+---
 
 ### ⚠️ Kein 5V am VIN-Pin (IN-OUT Lötbrücke)
 

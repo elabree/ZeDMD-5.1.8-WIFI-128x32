@@ -74,7 +74,6 @@
     }
     .vol-row label { font-size: 0.85em; color: #aaa; white-space: nowrap; }
     .vol-row input[type=range] { flex: 1; accent-color: #e64; }
-    .vol-val { font-size: 0.85em; width: 28px; text-align: right; }
     .display-row {
       display: flex; align-items: center; gap: 10px;
     }
@@ -228,11 +227,6 @@
 
   <!-- Controls -->
   <div class="controls">
-    <div class="vol-row">
-      <label>Lautst&auml;rke</label>
-      <input type="range" id="volSlider" min="0" max="21" value="15" oninput="onVolChange(this.value)">
-      <span class="vol-val" id="volVal">15</span>
-    </div>
     <div class="display-row">
       <label>Display-Anzeige</label>
       <button class="toggle-btn" id="displayToggle" onclick="toggleDisplay()">10s anzeigen</button>
@@ -264,7 +258,6 @@
 
 <script>
   let currentPlaying = null;
-  let volDebounce = null;
   let displayActive = false;
   let presets = [];
 
@@ -310,11 +303,6 @@
     } else {
       iconEl.style.display = 'none';
       iconPh.style.display = 'flex';
-    }
-
-    if (d.volume !== undefined) {
-      document.getElementById('volSlider').value = d.volume;
-      document.getElementById('volVal').textContent = d.volume;
     }
 
     if (d.displayActive !== undefined) {
@@ -365,17 +353,6 @@
     setTimeout(fetchStatus, 400);
   }
 
-  // Lautstärke
-
-  function onVolChange(val) {
-    document.getElementById('volVal').textContent = val;
-    clearTimeout(volDebounce);
-    volDebounce = setTimeout(() => {
-      const fd = new FormData();
-      fd.append('vol', val);
-      fetch('/radio_volume', { method: 'POST', body: fd });
-    }, 250);
-  }
 
   // Display-Toggle
 

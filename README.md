@@ -63,6 +63,38 @@ Play a matching MP3 file from the SD card in sync with an animated GIF screensav
 
 > **Note:** GIF audio plays once per GIF cycle — looping is not yet implemented.
 
+### Batocera game start/stop trigger
+
+`scripts/batocera_game_start.sh` and `scripts/batocera_game_stop.sh` trigger GIF audio playback on ZeDMD when a game starts or stops on Batocera. The DMD itself continues to receive live frames from the emulator as usual — these scripts only control the audio layer.
+
+**How it works:**
+- On game start: Batocera sends the ROM name to ZeDMD → ZeDMD plays the matching MP3 from `/GifAudio/` on the SD card
+- On game stop: ZeDMD stops audio playback
+- Naming convention: ROM filename without extension → `medieval_madness.zip` → `medieval_madness.mp3`
+
+**Setup:**
+1. Open both scripts and set `IP_ZEDMD` to your ZeDMD's fixed IP address
+2. Copy to Batocera:
+   ```bash
+   scp scripts/batocera_game_start.sh root@batocera.local:/userdata/system/scripts/gameStart.sh
+   scp scripts/batocera_game_stop.sh root@batocera.local:/userdata/system/scripts/gameStop.sh
+   ```
+3. Place matching MP3 files on the SD card under `/GifAudio/`
+
+> ⚠️ **If a `gameStart.sh` already exists on Batocera** (e.g. from another project), do **not** replace it — append the `curl` call from the script to the existing file instead.
+
+### Batocera WiFi streaming *(experimental)*
+
+By default, Batocera's DMD server only streams to a single USB-connected DMD. To stream to a WiFi ZeDMD at the same time, a second `dmdserver` instance needs to be set up manually.
+
+A full step-by-step guide — including dual-DMD marquee control, attract/playing modes, and troubleshooting — is available here:
+
+📄 **[docs/batocera-dual-dmd.md](docs/batocera-dual-dmd.md)**
+
+> ⚠️ Tested with Batocera **v42**. Batocera v43 introduced changes that may break this setup.
+
+---
+
 ### Batocera audio extraction script *(experimental)*
 
 `scripts/extract_gif_audio.sh` extracts the first N seconds of audio from Batocera scraped game videos and saves them as MP3 files ready for ZeDMD.
@@ -111,31 +143,29 @@ This release includes a comprehensive overhaul of memory management and task saf
 
 ## 🔜 Planned Features
 
-### Stereo Audio *(planned)*
-Stereo output using **two MAX98357A modules** — one for the left channel, one for the right.
+### Stereo Audio *(tested on SDMMC build)*
+Stereo output using **two MAX98357A modules** — one for the left channel, one for the right. Tested with the SDMMC build and two MAX98357A breakout boards.
 
-The SD pin acts as a voltage-level configuration strap at startup. Because the chip has an internal 100kΩ pulldown resistor, you **cannot** just connect it directly to VCC/GND for stereo. You must use specific external pullup resistors to set the correct voltage windows:
+The SD pin is a voltage-level channel-select strap. The values below were measured and confirmed to work with MAX98357A breakout boards that already have a **1 MΩ resistor from SD to Vin** onboard. If your board has a different onboard resistor, these values will not apply — always check your board's schematic and measure before connecting.
 
-* **Module L (Left Channel):** Requires >1.4V. Connect a **100kΩ** resistor from SD to VCC (3.3V or 5V).
-* **Module R (Right Channel):** Requires 0.77V to 1.4V. Connect a **220kΩ** (if using 3.3V) or **330kΩ** (if using 5V) resistor from SD to VCC.
+* **Module L (Left Channel):** Connect a **100 kΩ** resistor from SD to VCC (3.3V or 5V).
+* **Module R (Right Channel):** Connect a **370 kΩ** resistor from SD to VCC (3.3V or 5V).
 
-The ESP32 sends a stereo I2S stream, and each module automatically decodes its designated channel based on these resistor values.
+The ESP32-audioI2S library outputs stereo I2S natively when playing stereo source files. Each module automatically decodes its designated channel based on the SD pin voltage.
 
 | MAX98357A Pin | ESP32-S3 | Notes |
 |---------------|----------|-------|
 | BCLK | **GPIO 9** | shared — both modules |
 | LRC (WSEL) | **GPIO 14** | shared — both modules |
 | DIN | **GPIO 21** | shared — both modules |
-| SD — Module L | **via 100kΩ to VCC**| Sets voltage > 1.4V → **Left channel** |
-| SD — Module R | **via 220kΩ/330kΩ to VCC**| Sets voltage to ~1V → **Right channel** |
-| VIN | **5V** or **3.3V** | each module separately (must match your resistor calculations) |
+| SD — Module L | **100 kΩ to VCC** | → **Left channel** |
+| SD — Module R | **370 kΩ to VCC** | → **Right channel** |
+| VIN | **5V** or **3.3V** | each module separately |
 | GND | **GND** | each module separately |
 
-> ⚠️ Requires firmware change: the current build outputs mono I2S. Stereo I2S output in firmware is still to be implemented.
-
-> ⚠️ **DISCLAIMER / UNTESTED HARDWARE SPECIFICATION:**
-> This stereo configuration is theoretical and based on the MAX98357A datasheet — it has **NOT been tested** in practice yet. Resistor values might need minor adjustments depending on your specific breakout board clone and its onboard pullups. When in doubt, consult the datasheet.
-> **Proceed entirely at your own risk — absolutely no warranty or support provided!**
+> ⚠️ **DISCLAIMER:**
+> These resistor values were determined experimentally with a specific MAX98357A breakout board variant that has a 1 MΩ onboard resistor from SD to Vin. Other board variants may require different values. **Always consult the MAX98357A datasheet, check your board's actual schematic, and measure voltages before connecting.**
+> **Use entirely at your own risk — no warranty or liability of any kind.**
 
 ### Code cleanup *(on my list)*
 The code has grown organically and is honestly a bit messy in places — I know. I'm planning to clean things up at some point, but no promises on when. It works, which counts for something.
@@ -161,6 +191,14 @@ This fork is **WiFi-only** and targets the **ESP32-S3-N16R8** with a **128×32 L
 ---
 
 ## Hardware — ESP32-S3-N16R8 Note
+
+### 💡 Power supply
+
+The ZeDMD can draw a noticeable amount of current — especially when bright GIFs are displayed, webradio is streaming, and WiFi is active all at once. A laptop USB port or a basic phone charger may not deliver enough stable power for this, which can lead to unexpected reboots or an unstable display.
+
+**If things seem unreliable: use a decent 5V / 2A USB power adapter** (the kind that comes with a good phone or tablet). How much power is actually needed varies quite a bit depending on the content — dark GIFs with no audio use much less than a bright screensaver at full volume.
+
+---
 
 ### ⚠️ Missing 5V on VIN pin (IN-OUT solder bridge)
 
