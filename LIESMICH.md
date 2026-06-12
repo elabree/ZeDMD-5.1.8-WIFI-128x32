@@ -63,7 +63,7 @@ Beim Abspielen eines animierten GIF-Screensavers passend dazu eine MP3-Datei von
 
 > **Hinweis:** GIF-Audio spielt einmal pro GIF-Zyklus ab — Endlosschleife ist noch nicht implementiert.
 
-### Batocera Spielstart/Spielende-Trigger
+### Batocera Spielstart/Spielende-Trigger *(experimentell)*
 
 `scripts/batocera_game_start.sh` und `scripts/batocera_game_stop.sh` triggern die GIF-Audio-Wiedergabe auf dem ZeDMD wenn ein Spiel auf Batocera startet oder endet. Das DMD empfängt weiterhin Live-Frames vom Emulator wie gewohnt — diese Scripts steuern nur den Audio-Layer.
 
@@ -87,11 +87,13 @@ Beim Abspielen eines animierten GIF-Screensavers passend dazu eine MP3-Datei von
 
 Batoceras DMD-Server streamt standardmäßig nur an ein einzelnes USB-DMD. Um gleichzeitig an ein WiFi-ZeDMD zu senden, muss manuell eine zweite `dmdserver`-Instanz eingerichtet werden.
 
-Eine vollständige Schritt-für-Schritt-Anleitung — inklusive Dual-DMD-Marquee-Steuerung, Attract-/Playing-Modi und Troubleshooting — gibt es hier:
+Einrichtungsanleitung für eine zweite `dmdserver`-Instanz neben der Standard-Instanz, damit beide DMDs gleichzeitig Frames empfangen (DE):
 
-📄 **[docs/batocera-dual-dmd.md](docs/batocera-dual-dmd.md)**
+📄 **[docs/batocera-dual-dmd-DE.md](docs/batocera-dual-dmd-DE.md)** (DE)
 
-> ⚠️ Getestet mit Batocera **v42**. Batocera v43 brachte Änderungen, die dieses Setup möglicherweise nicht mehr funktionsfähig machen.
+📄 **[docs/batocera-dual-dmd.md](docs/batocera-dual-dmd.md)** (EN)
+
+> ⚠️ Getestet mit Batocera **v42**. Batocera **>v42** hat möglicherweise Änderungen, die dieses Setup nicht mehr funktionsfähig machen. Vor einem Batocera-Update sorgfältig prüfen.
 
 ---
 

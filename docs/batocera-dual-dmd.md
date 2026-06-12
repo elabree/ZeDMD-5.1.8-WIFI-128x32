@@ -1,6 +1,6 @@
 # Batocera Dual-DMD Setup — USB + WiFi ZeDMD
 
-> ⚠️ **Experimental** — tested with Batocera **v42**. Batocera v43 introduced changes that may break this setup. Verify carefully before updating Batocera.
+> ⚠️ **Experimental** — tested with Batocera **v42**. Batocera **>v42** may have introduced changes that break this setup. Verify carefully before updating Batocera.
 >
 > This guide is a personal setup diary. It worked on my cabinet — your hardware and Batocera version may differ. No warranty, no support.
 

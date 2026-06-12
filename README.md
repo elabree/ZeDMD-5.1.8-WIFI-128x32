@@ -63,7 +63,7 @@ Play a matching MP3 file from the SD card in sync with an animated GIF screensav
 
 > **Note:** GIF audio plays once per GIF cycle — looping is not yet implemented.
 
-### Batocera game start/stop trigger
+### Batocera game start/stop trigger *(experimental)*
 
 `scripts/batocera_game_start.sh` and `scripts/batocera_game_stop.sh` trigger GIF audio playback on ZeDMD when a game starts or stops on Batocera. The DMD itself continues to receive live frames from the emulator as usual — these scripts only control the audio layer.
 
@@ -87,11 +87,13 @@ Play a matching MP3 file from the SD card in sync with an animated GIF screensav
 
 By default, Batocera's DMD server only streams to a single USB-connected DMD. To stream to a WiFi ZeDMD at the same time, a second `dmdserver` instance needs to be set up manually.
 
-A full step-by-step guide — including dual-DMD marquee control, attract/playing modes, and troubleshooting — is available here:
+Setup guide for running a second `dmdserver` instance alongside the default one, so both DMDs receive frames simultaneously (EN):
 
 📄 **[docs/batocera-dual-dmd.md](docs/batocera-dual-dmd.md)**
 
-> ⚠️ Tested with Batocera **v42**. Batocera v43 introduced changes that may break this setup.
+📄 **[docs/batocera-dual-dmd-DE.md](docs/batocera-dual-dmd-DE.md)** (DE)
+
+> ⚠️ Tested with Batocera **v42**. Batocera **>v42** may have introduced changes that break this setup. Verify carefully before updating Batocera.
 
 ---
 
