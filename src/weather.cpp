@@ -250,10 +250,16 @@ static void fetchWeather() {
   free(body);
 }
 
+static TaskHandle_t wxTaskHandle = NULL;
+
+// Läuft einmal, suspendiert sich danach — wird per vTaskResume reaktiviert statt neu erzeugt,
+// damit wxTaskBuf (StaticTask_t) nie wiederverwendet wird bevor der Idle-Task ihn aufgeräumt hat.
 static void weatherFetchTask(void* pvParams) {
-  fetchWeather();
-  weatherFetchRunning = false;
-  vTaskDelete(NULL);
+  while (true) {
+    fetchWeather();
+    weatherFetchRunning = false;
+    vTaskSuspend(NULL);
+  }
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -265,17 +271,26 @@ void weatherInit() {
 void weatherTrigger() {
   if (weatherFetchRunning) return;
   weatherFetchRunning = true;
-  // Stack aus PSRAM — interner SRAM ist beim Webradio-Betrieb nahezu erschöpft
-  static StaticTask_t wxTaskBuf;
-  static StackType_t* wxStack = nullptr;
-  if (!wxStack) {
-    wxStack = (StackType_t*)heap_caps_malloc(20480, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-  }
-  if (!wxStack ||
-      !xTaskCreateStatic(weatherFetchTask, "wxFetch", 20480 / sizeof(StackType_t),
-                         NULL, 1, wxStack, &wxTaskBuf)) {
-    weatherFetchRunning = false;
-    logMsg("Wetter: Task-Start fehlgeschlagen");
+  if (!wxTaskHandle) {
+    // Erster Aufruf: Task einmalig erzeugen (Stack bleibt für die gesamte Laufzeit)
+    static StaticTask_t wxTaskBuf;
+    static StackType_t* wxStack = nullptr;
+    if (!wxStack) {
+      wxStack = (StackType_t*)heap_caps_malloc(20480, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    }
+    if (!wxStack) {
+      weatherFetchRunning = false;
+      logMsg("Wetter: Stack-Allokierung fehlgeschlagen");
+      return;
+    }
+    wxTaskHandle = xTaskCreateStatic(weatherFetchTask, "wxFetch", 20480 / sizeof(StackType_t),
+                                     NULL, 1, wxStack, &wxTaskBuf);
+    if (!wxTaskHandle) {
+      weatherFetchRunning = false;
+      logMsg("Wetter: Task-Start fehlgeschlagen");
+    }
+  } else {
+    vTaskResume(wxTaskHandle);
   }
 }
 

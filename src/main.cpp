@@ -31,11 +31,19 @@
   #include <SPI.h>
   // SD Karte SPI Pins
   #ifdef CONFIG_IDF_TARGET_ESP32S3
-    // ESP32-S3 Pins (HUB75 belegt andere Pins)
+    // ESP32-S3 Pins (HUB75 belegt andere Pins) — überschreibbar via build_flags
+    #ifndef SD_MOSI
     #define SD_MOSI 11
+    #endif
+    #ifndef SD_MISO
     #define SD_MISO 13
+    #endif
+    #ifndef SD_SCK
     #define SD_SCK  12
+    #endif
+    #ifndef SD_CS
     #define SD_CS   10
+    #endif
   #elif defined(ZEDMD_WIFI)
     // Standard ESP32 WiFi Build
     #define SD_MOSI 18
@@ -327,8 +335,15 @@ static void diagBoot() {
                        reason == ESP_RST_DEEPSLEEP);
   bool isBrownout   = (reason == ESP_RST_BROWNOUT ||
                        reason == ESP_RST_PWR_GLITCH);
-  bool shouldDump   = preLogValid && preLogCount > 1 &&
-                      !isCleanReset && (!isBrownout || lastUp > 60);
+  bool isPanicOrWdt = !isCleanReset && !isBrownout;
+  // PANIC/WDT: immer dumpen (auch bei nur 1 Log-Zeile — früher Crash)
+  // BROWNOUT/andere: nur dumpen wenn genug Log vorhanden und kein Kurzboot
+  bool shouldDump   = preLogValid && !isCleanReset && (
+                        isPanicOrWdt ||
+                        (preLogCount > 1 && (!isBrownout || lastUp > 60)));
+
+  logMsg("diagBoot: valid=%d count=%d dump=%d reason=%s",
+         (int)preLogValid, (int)preLogCount, (int)shouldDump, reasonName);
 
   if (shouldDump) {
     if (!LittleFS.exists("/crashlogs")) LittleFS.mkdir("/crashlogs");
@@ -349,6 +364,8 @@ static void diagBoot() {
       rtcLogCount = 0;
       rtcLogHead  = 0;
       logMsg("Crash-Dump: %s (uptime war %us)", fname, (unsigned)lastUp);
+    } else {
+      logMsg("diagBoot: FEHLER - %s konnte nicht geoeffnet werden", fname);
     }
   }
 
@@ -393,14 +410,24 @@ uint64_t sdUsedBytes = 0;
 volatile bool screensaverReloadNeeded  = false;
 volatile bool screensaverLoadRunning   = false;  // Background-Task läuft
 volatile bool sdRefreshNeeded = false;
-String cachedSDFolders    = "[]";  // Cache für SD Ordner Liste
-String cachedGifAudioFiles = "[]"; // Cache für /gif_audio_files
-String cachedSdFiles       = "[]"; // Cache für /sd_files (letzter angefragter Ordner)
-String cachedSdFilesFolder = "";   // Ordner für den cachedSdFiles gilt
-volatile bool gifAudioRefreshNeeded = false;
-volatile bool sdFilesRefreshNeeded  = false;
+// Cache-Puffer in PSRAM — dynamisch allokiert, atomarer Swap verhindert Null-Fenster
+#define CACHE_SD_FOLDER_SIZE     256
+static char* cachedSDFolders     = nullptr;
+static char* cachedGifAudioFiles  = nullptr;
+static char* cachedSdFiles        = nullptr;
+static char  cachedSdFilesFolder[CACHE_SD_FOLDER_SIZE] = "";
+volatile bool gifAudioRefreshNeeded       = false;
+volatile bool sdFilesRefreshNeeded        = false;
+volatile bool sdFoldersInvalidateNeeded   = false;
+volatile bool sdFilesInvalidateNeeded     = false;
 bool gifAudioEnabled = true;
 bool screensaverPaused = false;  // Screensaver Pause/Play
+static volatile bool displayTextActive  = false;
+static char   displayTextContent[128]   = "";
+static uint8_t displayTextR = 255, displayTextG = 255, displayTextB = 255;
+static bool   displayTextScroll         = false;
+static uint32_t displayTextEnd          = 0;
+static int16_t  displayTextScrollX      = 128;
 uint8_t screensaverMode = 0;     // 0=Screensaver only, 1=Clock only, 2=Clock+Screensaver
 // ntpSynced, ntpServer, clockR/G/B, dateR/G/B, clockColorChanged → clock.cpp
 // Wetter (Modus 3) — Globals jetzt in weather.cpp
@@ -495,6 +522,7 @@ void addScreensaverFile(const String& path);
 void SaveScreensaverCache();
 bool TryLoadScreensaverCache();
 void InvalidateAllFolderCaches();
+static void psramCacheSet(char** ptr, const String& json);
 void SaveGifAudioCache();
 bool TryLoadGifAudioCache();
 void InvalidateGifAudioCache();
@@ -527,6 +555,7 @@ void LoadMqttConfig();
 void LoadScreensaverMode();
 void SaveClockColors();   // bleibt in main.cpp
 void LoadClockColors();   // bleibt in main.cpp
+void DisplayText(const char* text, bool scroll, uint8_t r, uint8_t g, uint8_t b, uint32_t durationMs);
 void GIFDraw(GIFDRAW *pDraw);
 #ifdef WEBRADIO_ENABLED
 void DisplayRadio();
@@ -1158,15 +1187,19 @@ bool PlayGIF(const String &path, uint32_t endTime = 0, bool clearFirst = true, b
       if      (SD.exists(exact.c_str()))                                 mp3Path = exact;
       else { exact = String(GIF_AUDIO_DIR) + "/" + base + ".MP3";
              if (SD.exists(exact.c_str()))                               mp3Path = exact; }
-      if (mp3Path.isEmpty() && cachedGifAudioFiles.length() > 2) {
+      if (mp3Path.isEmpty() && cachedGifAudioFiles && strlen(cachedGifAudioFiles) > 2) {
         // Fuzzy in RAM: cachedGifAudioFiles JSON nach passendem MP3-Stem durchsuchen
         String baseLow = base; baseLow.toLowerCase();
-        int pos = 0;
-        while ((pos = cachedGifAudioFiles.indexOf("\"name\":\"", pos)) >= 0) {
-          pos += 8;
-          int end = cachedGifAudioFiles.indexOf("\"", pos);
-          if (end < 0) break;
-          String fname = cachedGifAudioFiles.substring(pos, end);
+        const char* p = cachedGifAudioFiles;
+        while ((p = strstr(p, "\"name\":\"")) != nullptr) {
+          p += 8;
+          const char* endQ = strchr(p, '"');
+          if (!endQ) break;
+          int flen = endQ - p;
+          char fnameBuf[256];
+          if (flen >= (int)sizeof(fnameBuf)) { p = endQ; continue; }
+          strncpy(fnameBuf, p, flen); fnameBuf[flen] = '\0';
+          String fname = fnameBuf;
           String fLow  = fname; fLow.toLowerCase();
           if (fLow.endsWith(".mp3")) {
             String stemLow = fLow.substring(0, fLow.lastIndexOf('.'));
@@ -1174,7 +1207,7 @@ bool PlayGIF(const String &path, uint32_t endTime = 0, bool clearFirst = true, b
               mp3Path = String(GIF_AUDIO_DIR) + "/" + fname; break;
             }
           }
-          pos = end;
+          p = endQ;
         }
       }
       if (!mp3Path.isEmpty()) {
@@ -1189,8 +1222,12 @@ bool PlayGIF(const String &path, uint32_t endTime = 0, bool clearFirst = true, b
 #ifdef BOARD_HAS_PSRAM
   gif.setDrawType(GIF_DRAW_COOKED);
 #endif
-  if (!gif.open(path.c_str(), GIFOpenFile, GIFCloseFile, GIFReadFile, GIFSeekFile, GIFDraw))
+  if (!gif.open(path.c_str(), GIFOpenFile, GIFCloseFile, GIFReadFile, GIFSeekFile, GIFDraw)) {
+#ifdef WEBRADIO_ENABLED
+    if (gifAudioActive) { radioStopLocalFile(); gifAudioActive = false; }
+#endif
     return false;
+  }
 
   if (clearFirst) {
     display->ClearScreen();
@@ -1208,13 +1245,13 @@ bool PlayGIF(const String &path, uint32_t endTime = 0, bool clearFirst = true, b
     int frameDelay = 0;
     uint32_t frameStart = millis();
     while (gif.playFrame(false, &frameDelay) && !transportActive && !screensaverReloadNeeded
-           && !forcePlayPending
+           && !forcePlayPending && !displayTextActive
            && (endTime == 0 || millis() < endTime)) {
       if (frameDelay > 0) {
         uint32_t elapsed   = millis() - frameStart;
         uint32_t remaining = (frameDelay > (int)elapsed) ? ((uint32_t)frameDelay - elapsed) : 0;
         uint32_t waitUntil = millis() + remaining;
-        while (millis() < waitUntil && !transportActive && !forcePlayPending && (endTime == 0 || millis() < endTime)) {
+        while (millis() < waitUntil && !transportActive && !forcePlayPending && !displayTextActive && (endTime == 0 || millis() < endTime)) {
           vTaskDelay(pdMS_TO_TICKS(5));
         }
       }
@@ -1223,15 +1260,15 @@ bool PlayGIF(const String &path, uint32_t endTime = 0, bool clearFirst = true, b
       esp_task_wdt_reset();
     }
     // Letzter Frame: volle Anzeigedauer abwarten bevor dem nächsten Loop
-    if (frameDelay > 0 && !transportActive && !screensaverReloadNeeded && !forcePlayPending && (endTime == 0 || millis() < endTime)) {
+    if (frameDelay > 0 && !transportActive && !screensaverReloadNeeded && !forcePlayPending && !displayTextActive && (endTime == 0 || millis() < endTime)) {
       uint32_t elapsed   = millis() - frameStart;
       uint32_t remaining = (frameDelay > (int)elapsed) ? ((uint32_t)frameDelay - elapsed) : 0;
       uint32_t waitUntil = millis() + remaining;
-      while (millis() < waitUntil && !transportActive && !forcePlayPending && (endTime == 0 || millis() < endTime)) {
+      while (millis() < waitUntil && !transportActive && !forcePlayPending && !displayTextActive && (endTime == 0 || millis() < endTime)) {
         vTaskDelay(pdMS_TO_TICKS(5));
       }
     }
-  } while (loopUntilEnd && !transportActive && !screensaverReloadNeeded && !forcePlayPending && (endTime == 0 || millis() < endTime));
+  } while (loopUntilEnd && !transportActive && !screensaverReloadNeeded && !forcePlayPending && !displayTextActive && (endTime == 0 || millis() < endTime));
 
   gif.close();
 
@@ -2288,6 +2325,9 @@ void StartServer() {
     debugInfo += "SSID: " + WiFi.SSID() + "\n";
     debugInfo += "RSSI: " + String(WiFi.RSSI()) + "\n";
     debugInfo += "Heap Free: " + String(ESP.getFreeHeap()) + " bytes\n";
+    debugInfo += "Heap Largest Block: " + String(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)) + " bytes\n";
+    debugInfo += "Heap Min Ever Free: " + String(ESP.getMinFreeHeap()) + " bytes\n";
+    debugInfo += "PSRAM Free: " + String(ESP.getFreePsram()) + " bytes\n";
     debugInfo += "Uptime: " + String(millis() / 1000) + " seconds\n";
     // Add more here if you need it
     request->send(200, "text/plain", debugInfo);
@@ -2773,13 +2813,49 @@ void StartServer() {
     request->send(200, "application/json", json);
   });
 
+  // POST /display_text — Text auf Display anzeigen (statisch oder scrollend, mit Farbe + Dauer)
+  server->on("/display_text", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!request->hasParam("text", true)) { request->send(400, "text/plain", "missing text"); return; }
+    String text = request->getParam("text", true)->value();
+    text.trim();
+    if (text.length() == 0) {
+      displayTextActive = false;
+      request->send(200, "text/plain", "OK");
+      return;
+    }
+    text.substring(0, 127).toCharArray(displayTextContent, sizeof(displayTextContent));
+    bool wantsScroll  = request->hasParam("scroll", true) &&
+                       request->getParam("scroll", true)->value() == "1";
+    displayTextScroll = wantsScroll && (text.length() * 20 > TOTAL_WIDTH);
+    uint32_t dur = request->hasParam("duration", true) ?
+                   (uint32_t)request->getParam("duration", true)->value().toInt() : 10;
+    if (dur < 1) dur = 1; if (dur > 300) dur = 300;
+    String col = request->hasParam("color", true) ?
+                 request->getParam("color", true)->value() : "ffffff";
+    if (col.startsWith("#")) col = col.substring(1);
+    displayTextR = (uint8_t)strtol(col.substring(0, 2).c_str(), nullptr, 16);
+    displayTextG = (uint8_t)strtol(col.substring(2, 4).c_str(), nullptr, 16);
+    displayTextB = (uint8_t)strtol(col.substring(4, 6).c_str(), nullptr, 16);
+    displayTextEnd     = millis() + dur * 1000;
+    displayTextScrollX = TOTAL_WIDTH;
+    displayTextActive  = true;
+    request->send(200, "text/plain", "OK");
+  });
+
+  // POST /display_text_stop — Display-Text sofort beenden
+  server->on("/display_text_stop", HTTP_POST, [](AsyncWebServerRequest *request) {
+    displayTextActive = false;
+    request->send(200, "text/plain", "OK");
+  });
+
   // POST /eject_sd — SD-Karte sicher aushängen
   server->on("/eject_sd", HTTP_POST, [](AsyncWebServerRequest *request) {
     SD.end();
     sdCardAvailable = false;
     sdTotalBytes = 0;
     sdUsedBytes  = 0;
-    cachedSDFolders = "[]";
+    sdFoldersInvalidateNeeded = true;
+    sdFilesInvalidateNeeded   = true;
     if (screensaverPaths.length() > 0) {
       screensaverPaths = "";
       SaveScreensaverPaths();
@@ -2793,7 +2869,8 @@ void StartServer() {
     String json = "{";
     json += "\"available\":" + String(sdCardAvailable ? "true" : "false") + ",";
     json += "\"currentPaths\":\"" + screensaverPaths + "\",";
-    json += "\"folders\":" + cachedSDFolders;
+    json += "\"folders\":";
+    if (cachedSDFolders) json += cachedSDFolders;
     json += "}";
     request->send(200, "application/json", json);
   });
@@ -2828,7 +2905,7 @@ void StartServer() {
   // ── GIF-Audio Verwaltung (/GifAudio/ auf SD) ─────────────────────────────────
 
   server->on("/gif_audio_files", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "application/json", cachedGifAudioFiles);
+    request->send(200, "application/json", cachedGifAudioFiles ? cachedGifAudioFiles : "[]");
   });
 
   server->on("/gif_audio_upload", HTTP_POST,
@@ -2921,13 +2998,14 @@ void StartServer() {
   server->on("/sd_files", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (request->hasParam("folder")) {
       String folder = "/" + request->getParam("folder")->value();
-      if (folder != cachedSdFilesFolder) {
-        cachedSdFilesFolder = folder;
-        cachedSdFiles       = "[]";  // ungültig → loop() baut neu
+      if (strcmp(cachedSdFilesFolder, folder.c_str()) != 0) {
+        strncpy(cachedSdFilesFolder, folder.c_str(), CACHE_SD_FOLDER_SIZE - 1);
+        cachedSdFilesFolder[CACHE_SD_FOLDER_SIZE - 1] = '\0';
+        sdFilesInvalidateNeeded = true;  // ungültig → loop() baut neu
       }
       sdFilesRefreshNeeded = true;
     }
-    request->send(200, "application/json", cachedSdFiles);
+    request->send(200, "application/json", cachedSdFiles ? cachedSdFiles : "[]");
   });
 
   // GET /delete_sd_file — SD Datei löschen
@@ -3725,11 +3803,24 @@ bool TryLoadScreensaverCache() { return false; }
 
 #define GIF_AUDIO_CACHE_FILE "/gif_audio_cache.bin"
 
+// Setzt einen PSRAM-Cache-Pointer auf neuen Inhalt.
+// Allokiert zuerst den neuen Buffer, tauscht den Pointer atomar, gibt dann erst den alten frei —
+// damit ist kein Null-Fenster möglich wenn ein Webserver-Task gleichzeitig liest.
+static void psramCacheSet(char** ptr, const String& json) {
+  size_t len = json.length();
+  char* newBuf = (char*)heap_caps_malloc(len + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (!newBuf) return;
+  memcpy(newBuf, json.c_str(), len + 1);
+  char* old = *ptr;
+  *ptr = newBuf;   // atomarer 32-Bit-Pointer-Swap auf Xtensa
+  if (old) heap_caps_free(old);
+}
+
 void SaveGifAudioCache() {
   File f = LittleFS.open(GIF_AUDIO_CACHE_FILE, "w");
   if (!f) { logMsg("GifAudioCache: Schreiben fehlgeschlagen"); return; }
   // Format: name|size\n
-  String tmp = cachedGifAudioFiles;
+  String tmp = cachedGifAudioFiles ? cachedGifAudioFiles : "[]";
   // Einfaches Parsen des JSON-Arrays ohne ArduinoJson
   tmp.replace("[", ""); tmp.replace("]", "");
   while (tmp.length() > 0) {
@@ -3772,7 +3863,7 @@ bool TryLoadGifAudioCache() {
   f.close();
   json += "]";
   if (json == "[]") return false;
-  cachedGifAudioFiles = json;
+  psramCacheSet(&cachedGifAudioFiles, json);
   logMsg("Cache[%s]: %d Dateien geladen", GIF_AUDIO_DIR, count);
   return true;
 }
@@ -3997,6 +4088,13 @@ void setup() {
                             LOG_LINES, LOG_LINE_LEN, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   uncompressBuffer      = (uint8_t*)heap_caps_malloc(2048, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   screensaverFilesMutex = xSemaphoreCreateMutex();
+  // String-Caches in PSRAM — einmalig allokiert, stoppt Heap-Fragmentierung im Dauerbetrieb
+  cachedSDFolders     = (char*)heap_caps_malloc(3, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  cachedGifAudioFiles = (char*)heap_caps_malloc(3, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  cachedSdFiles       = (char*)heap_caps_malloc(3, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (cachedSDFolders)     strcpy(cachedSDFolders,     "[]");
+  if (cachedGifAudioFiles) strcpy(cachedGifAudioFiles,  "[]");
+  if (cachedSdFiles)       strcpy(cachedSdFiles,        "[]");
   logMsg("=== ZeDMD booting ===");
   esp_log_level_set("*", ESP_LOG_NONE);
 
@@ -4062,7 +4160,7 @@ void setup() {
     LoadIgnore();
     InitSDCard();
     if (!sdCardAvailable) sdCardWarningPending = true;
-    cachedSDFolders = GetSDFolders();  // Cache beim Boot befüllen
+    { String _f = GetSDFolders(); psramCacheSet(&cachedSDFolders, _f); }  // Cache beim Boot befüllen
     LoadScreensaverPaths();
     screensaverReloadNeeded = true;  // Dateien im Hauptloop laden (nach Display+WiFi Init)
     LoadUdpDelay();
@@ -4504,7 +4602,7 @@ void loop() {
 #endif
     vTaskDelay(pdMS_TO_TICKS(100));
     InitSDCard();
-    cachedSDFolders = GetSDFolders();
+    { String _f = GetSDFolders(); psramCacheSet(&cachedSDFolders, _f); }
   }
 
   // GIF-Audio-Dateiliste cachen (statt SD-I/O im Webserver-Callback)
@@ -4553,20 +4651,31 @@ void loop() {
         logMsg("GifAudio: Scan abgebrochen nach %d Dateien", gifAudioCount);
       } else {
         json += "]";
-        cachedGifAudioFiles = json;
+        psramCacheSet(&cachedGifAudioFiles, json);
         logMsg("GifAudio: %d Dateien gefunden, Cache gespeichert", gifAudioCount);
         SaveGifAudioCache();
       }
     }
   }
 
+  // Cache-Invalidierungen aus Webserver-Task (eject, Ordnerwechsel) — nur loop() darf psramCacheSet aufrufen
+  if (sdFoldersInvalidateNeeded) {
+    sdFoldersInvalidateNeeded = false;
+    psramCacheSet(&cachedSDFolders, String("[]"));
+  }
+  if (sdFilesInvalidateNeeded) {
+    sdFilesInvalidateNeeded = false;
+    psramCacheSet(&cachedSdFiles, String("[]"));
+  }
+
   // SD-Dateiliste für gewählten Ordner cachen
-  if (sdFilesRefreshNeeded && sdCardAvailable && cachedSdFilesFolder.length() > 0) {
+  if (sdFilesRefreshNeeded && sdCardAvailable && cachedSdFilesFolder[0] != '\0') {
     sdFilesRefreshNeeded = false;
     String json = "[";
     File dir = SD.open(cachedSdFilesFolder);
     if (dir && dir.isDirectory()) {
       bool first = true;
+      uint16_t fileCount = 0;
       File f = dir.openNextFile();
       while (f) {
         if (!f.isDirectory()) {
@@ -4577,13 +4686,14 @@ void loop() {
             first = false;
           }
         }
+        if ((++fileCount % 50) == 0) esp_task_wdt_reset();
         f.close();
         f = dir.openNextFile();
       }
       dir.close();
     }
     json += "]";
-    cachedSdFiles = json;
+    psramCacheSet(&cachedSdFiles, json);
   }
 
   // WiFi Reconnect wenn Verbindung verloren — max. alle 5s, kein Delay/Return damit
@@ -4696,6 +4806,32 @@ void loop() {
         }
         if (transportActive) return;
         if (screensaverReloadNeeded) return;
+      }
+
+      // Display-Text (timed, optional scrollend) — unterbricht alle Modi
+      if (displayTextActive) {
+        if (millis() >= displayTextEnd) {
+          displayTextActive = false;
+          display->ClearScreen();
+          Render();
+        } else {
+          display->ClearScreen();
+          if (displayTextScroll) {
+            display->DisplayTextScaled(displayTextContent, displayTextScrollX, 1,
+                                       displayTextR, displayTextG, displayTextB, 5);
+            int16_t textW = (int16_t)(strlen(displayTextContent) * 20);
+            if (--displayTextScrollX < -textW) displayTextScrollX = TOTAL_WIDTH;
+          } else {
+            int16_t textW  = (int16_t)(strlen(displayTextContent) * 20);
+            int16_t xPos   = (TOTAL_WIDTH - textW) / 2;
+            if (xPos < 0) xPos = 0;
+            display->DisplayTextScaled(displayTextContent, (uint16_t)xPos, 1,
+                                       displayTextR, displayTextG, displayTextB, 5);
+          }
+          Render();
+          vTaskDelay(pdMS_TO_TICKS(displayTextScroll ? 20 : 200));
+          return;
+        }
       }
 
       // Modus 1: Clock only

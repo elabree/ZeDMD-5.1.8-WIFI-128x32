@@ -47,7 +47,7 @@ Erfordert ein **MAX98357A I2S-Verstärkermodul** — Verkabelung siehe unten.
 - Stabiler Senderwechsel — kein Audio-Aussetzer beim Umschalten mehr
 - Stream-URLs von radio-browser.info werden automatisch normalisiert (`?ti=`-Playlist-Hinweise werden entfernt, die die Audio-Bibliothek zum Hängen brachten)
 
-**⚠️ Wetter-API:** Open-Meteo wird über HTTP statt HTTPS abgefragt. TLS-Handshakes führten im Webradio-Build immer zu Speicher-Abstürzen. Da Open-Meteo öffentliche Daten ohne Login liefert, ist HTTPS hier nicht nötig.
+> **⚠️ Wetter-API:** Open-Meteo wird über HTTP statt HTTPS abgerufen. TLS-Handshakes haben im Webradio-Build zuverlässig speicherbezogene Abstürze verursacht. Da Open-Meteo ausschließlich öffentliche Daten ohne Login liefert, ist HTTPS hier nicht erforderlich.
 
 ### GIF-Vorschau im Browser
 Klick auf einen GIF-Dateinamen in der Screensaver-Dateiliste oder im „Aktuell angezeigt"-Feld öffnet eine animierte Live-Vorschau direkt im Browser — ohne das Display zu berühren. Favorit, Ignorieren und Abspielen sind direkt aus der Vorschau heraus möglich.
@@ -63,9 +63,44 @@ Beim Abspielen eines animierten GIF-Screensavers passend dazu eine MP3-Datei von
 
 > **Hinweis:** GIF-Audio spielt einmal pro GIF-Zyklus ab — Endlosschleife ist noch nicht implementiert.
 
-### Batocera Spielstart/Spielende-Trigger *(experimentell)*
+### SDMMC-Board-Unterstützung
+Unterstützung für Boards mit **onboard SD-Karte via SDMMC-Interface** (1-Bit-Modus) hinzugefügt — kein externes SPI-Modul nötig. Siehe Pin-Tabelle für die erforderlichen HUB75-Kabeländerungen.
+
+### Stabilität & Bugfixes
+Diese Version enthält eine umfassende Überarbeitung der Speicherverwaltung und Task-Sicherheit:
+
+- Race Condition beim Senderwechsel behoben — Audio springt nicht mehr auf den vorherigen Sender zurück
+- Wetterdaten (MQTT + HTTP) jetzt sicher zwischen beiden CPU-Kernen synchronisiert
+- SD-Karten-Verzeichnislisting aus den Netzwerk-Callbacks herausgelöst — kein Audio-Stottern mehr beim Webzugriff
+- Wetter-HTTP-Antwort wird im PSRAM gepuffert — kein großer SRAM-Spike beim Abruf mehr
+- Alle Datei-Uploads jetzt atomar (`.tmp` + Umbenennen) — abgebrochene Uploads hinterlassen keine korrupten Dateien
+- `screensaverFiles`-Array durch Mutex gegen gleichzeitigen Webzugriff gesichert
+
+---
+
+## 🧪 Experimentelle Features
+
+> Diese Features funktionieren, werden aber noch weiterentwickelt. Feedback willkommen.
+
+---
+
+### Batocera WiFi-Streaming
+
+Batoceras DMD-Server streamt standardmäßig nur an ein einzelnes USB-DMD. Um gleichzeitig an ein WiFi-ZeDMD zu senden, muss manuell eine zweite `dmdserver`-Instanz eingerichtet werden.
+
+Eine vollständige Schritt-für-Schritt-Anleitung — inklusive Dual-DMD-Marquee-Steuerung, Attract-/Playing-Modi und Troubleshooting — gibt es hier:
+
+📄 **[docs/batocera-dual-dmd-DE.md](docs/batocera-dual-dmd-DE.md)** (DE) | **[docs/batocera-dual-dmd.md](docs/batocera-dual-dmd.md)** (EN)
+
+> ⚠️ Getestet mit Batocera **v42**. Batocera **>v42** hat möglicherweise Änderungen eingeführt, die dieses Setup nicht mehr funktionsfähig machen. Vor einem Batocera-Update sorgfältig prüfen.
+
+---
+
+### Batocera Spielstart/Spielende-Trigger
 
 `scripts/batocera_game_start.sh` und `scripts/batocera_game_stop.sh` triggern die GIF-Audio-Wiedergabe auf dem ZeDMD wenn ein Spiel auf Batocera startet oder endet. Das DMD empfängt weiterhin Live-Frames vom Emulator wie gewohnt — diese Scripts steuern nur den Audio-Layer.
+
+> ⚠️ Noch nicht vollständig End-to-End getestet — der `/gif_audio_play`-Endpoint funktioniert, aber der Batocera-seitige Trigger wurde noch nicht in einer echten Spielsitzung verifiziert.
 
 **Funktionsweise:**
 - Spielstart: Batocera schickt den ROM-Namen an ZeDMD → ZeDMD spielt die passende MP3 aus `/GifAudio/` auf der SD-Karte
@@ -83,25 +118,13 @@ Beim Abspielen eines animierten GIF-Screensavers passend dazu eine MP3-Datei von
 
 > ⚠️ **Falls auf Batocera bereits ein `gameStart.sh` existiert** (z.B. von einem anderen Projekt), dieses **nicht ersetzen** — den `curl`-Aufruf aus dem Script stattdessen an die bestehende Datei anhängen.
 
-### Batocera WiFi-Streaming *(experimentell)*
-
-Batoceras DMD-Server streamt standardmäßig nur an ein einzelnes USB-DMD. Um gleichzeitig an ein WiFi-ZeDMD zu senden, muss manuell eine zweite `dmdserver`-Instanz eingerichtet werden.
-
-Einrichtungsanleitung für eine zweite `dmdserver`-Instanz neben der Standard-Instanz, damit beide DMDs gleichzeitig Frames empfangen (DE):
-
-📄 **[docs/batocera-dual-dmd-DE.md](docs/batocera-dual-dmd-DE.md)** (DE)
-
-📄 **[docs/batocera-dual-dmd.md](docs/batocera-dual-dmd.md)** (EN)
-
-> ⚠️ Getestet mit Batocera **v42**. Batocera **>v42** hat möglicherweise Änderungen, die dieses Setup nicht mehr funktionsfähig machen. Vor einem Batocera-Update sorgfältig prüfen.
-
 ---
 
-### Batocera Audio-Extraktionsskript *(experimentell)*
+### Batocera Audio-Extraktionsskript
 
 `scripts/extract_gif_audio.sh` extrahiert die ersten N Sekunden Audio aus Batocera-Scraping-Videos und speichert sie als MP3-Dateien, die direkt für ZeDMD verwendet werden können.
 
-> ⚠️ **Experimentell** — nur auf Batocera getestet. Erfordert `ffmpeg` und `python3` auf dem Batocera-System.
+> ⚠️ Nur auf Batocera getestet. Erfordert `ffmpeg` und `python3` auf dem Batocera-System.
 
 **Voraussetzungen:**
 - Batocera mit SSH-Zugang
@@ -128,30 +151,29 @@ ssh root@batocera.local "bash /tmp/extract_gif_audio.sh [Optionen]"
 3. Ausgabeordner im Finder öffnen: **Netzwerk → batocera → share → zedmd → gif_audio**
 4. MP3s über **`http://<ZeDMD-IP>/`** → GIF-Audio hochladen
 
-### SDMMC-Board-Unterstützung
-Unterstützung für Boards mit **onboard SD-Karte via SDMMC-Interface** (1-Bit-Modus) hinzugefügt — kein externes SPI-Modul nötig. Siehe Pin-Tabelle für die erforderlichen HUB75-Kabeländerungen.
+---
 
-### Stabilität & Bugfixes
-Diese Version enthält eine umfassende Überarbeitung der Speicherverwaltung und Task-Sicherheit:
+### Display Text
 
-- Race Condition beim Senderwechsel behoben — Audio springt nicht mehr auf den vorherigen Sender zurück
-- Wetterdaten (MQTT + HTTP) jetzt sicher zwischen beiden CPU-Kernen synchronisiert
-- SD-Karten-Verzeichnislisting aus den Netzwerk-Callbacks herausgelöst — kein Audio-Stottern mehr beim Webzugriff
-- Wetter-HTTP-Antwort wird im PSRAM gepuffert — kein großer SRAM-Spike beim Abruf mehr
-- Alle Datei-Uploads jetzt atomar (`.tmp` + Umbenennen) — abgebrochene Uploads hinterlassen keine korrupten Dateien
-- `screensaverFiles`-Array durch Mutex gegen gleichzeitigen Webzugriff gesichert
+Sendet eine individuelle Textnachricht direkt über die Web-UI an die LED-Matrix.
+
+- Statische oder scrollende Anzeige — kurze Texte werden zentriert angezeigt, längere scrollen automatisch
+- Farbwahl per RGB-Colorpicker
+- Konfigurierbare Anzeigedauer (5–60 Sekunden)
+- Unterbricht sofort jeden laufenden Screensaver oder GIF und stellt ihn anschließend wieder her
+
+> ⚠️ Die Schriftdarstellung wird noch verbessert. Nur ASCII-Zeichen (keine Umlaute oder Sonderzeichen).
 
 ---
 
-## 🔜 Geplante Features
+### Stereo-Audio
 
-### Stereo-Audio *(getestet mit SDMMC-Build)*
-Stereo-Ausgabe mit **zwei MAX98357A-Modulen** — eines für den linken, eines für den rechten Kanal. Getestet mit dem SDMMC-Build und zwei MAX98357A-Breakout-Boards.
+Stereo-Ausgabe mit **zwei MAX98357A-Modulen** — eines für den linken, eines für den rechten Kanal.
 
 Der SD-Pin ist eine Spannungspegel-Kanalwahl-Brücke. Die folgenden Werte wurden gemessen und bestätigt für MAX98357A-Breakout-Boards, die bereits einen **1 MΩ Widerstand von SD nach Vin** onboard haben. Bei abweichender Boardbestückung gelten diese Werte nicht — immer Schaltplan des eigenen Boards prüfen und Spannung messen, bevor etwas angeschlossen wird.
 
-* **Modul L (linker Kanal):** **100 kΩ** Widerstand von SD nach VCC (3,3V oder 5V).
-* **Modul R (rechter Kanal):** **370 kΩ** Widerstand von SD nach VCC (3,3V oder 5V).
+* **Modul L (linker Kanal):** **100 kΩ** Widerstand von SD nach VCC **(5V)**.
+* **Modul R (rechter Kanal):** **370 kΩ** Widerstand von SD nach VCC **(5V)**.
 
 Die ESP32-audioI2S-Bibliothek gibt bei Stereo-Quelldateien nativ Stereo-I2S aus. Jedes Modul dekodiert automatisch seinen zugewiesenen Kanal anhand der SD-Pin-Spannung.
 
@@ -162,12 +184,18 @@ Die ESP32-audioI2S-Bibliothek gibt bei Stereo-Quelldateien nativ Stereo-I2S aus.
 | DIN | **GPIO 21** | gemeinsam — beide Module |
 | SD — Modul L | **100 kΩ nach VCC** | → **linker Kanal** |
 | SD — Modul R | **370 kΩ nach VCC** | → **rechter Kanal** |
-| VIN | **5V** oder **3,3V** | jedes Modul separat |
+| VIN | **5V** *(empfohlen)* | jedes Modul separat |
 | GND | **GND** | jedes Modul separat |
+
+> ⚠️ Die obigen Widerstandswerte wurden ausschließlich bei **5V** verifiziert. Bei 3,3V-Versorgung ändert sich der Wert für den rechten Kanal auf ca. **210 kΩ** (nicht getestet). 3,3V-Versorgung wird **nicht empfohlen** — sie erhöht die Verzerrung und belastet die 3,3V-Schiene.
 
 > ⚠️ **DISCLAIMER:**
 > Diese Widerstandswerte wurden experimentell mit einem spezifischen MAX98357A-Breakout-Board ermittelt, das einen 1 MΩ Widerstand von SD nach Vin onboard hat. Andere Board-Varianten können andere Werte erfordern. **Immer das MAX98357A-Datenblatt lesen, den Schaltplan des eigenen Boards prüfen und Spannungen messen, bevor etwas angeschlossen wird.**
 > **Nutzung auf eigene Gefahr — keinerlei Gewährleistung oder Haftung.**
+
+---
+
+## 🔜 Geplante Features
 
 ### Code-Aufräumen *(steht auf meiner Liste)*
 Der Code ist hier und da ehrlich gesagt etwas gewachsen und durcheinander geraten — ich weiß das. Ich plane irgendwann aufzuräumen, aber wann genau kann ich nicht versprechen. Er funktioniert, und das zählt erstmal.
@@ -189,6 +217,8 @@ Dieser Fork ist **nur WiFi** und zielt auf den **ESP32-S3-N16R8** mit einer **12
 - **Admin-Seite** — WiFi, Display, Transport, MQTT, Wetter-Einstellungen
 - **Webradio** — Internetradio via I2S-Verstärker (MAX98357A); Sendersuche via [radio-browser.info](https://www.radio-browser.info); Preset-Verwaltung mit Logo-Icons; LED-Matrix zeigt Senderinfo 5 s beim Start, „DMD 10s"-Button für On-Demand-Anzeige
 - **Konfig Export/Import** — vollständiges Konfigurations-Backup und -Restore über den Browser (`/config_transfer.html`)
+- **Display Text** *(experimentell)* — individuelle Textnachricht über die Web-UI an die LED-Matrix senden; statisch oder scrollend, mit Farbwahl und konfigurierbarer Dauer (5–60 s)
+- **Stereo-Audio** *(experimentell)* — zwei MAX98357A-Module für echten Stereo-Ausgang; Kanalwahl per SD-Pin-Widerstandsbrücke (nur 5V, Werte verifiziert)
 
 ---
 
@@ -378,9 +408,33 @@ Der Audio-Codec (MP3/AAC) belegt ~50 KB internen SRAM zur Laufzeit. Ein TLS-Hand
 
 ## Installation
 
-1. **Erstmaliges Flashen** (USB, einmalig): PlatformIO → Upload (`S3-N16R8_128x32_wifi_sd_webradio`)
-2. **Zukünftige Firmware-Updates**: Browser → `http://<IP>/admin.html` → „Firmware Update (OTA)"
-3. **Webinterface aktualisieren**: Browser → `http://<IP>/admin.html` → „Web-Dateien aktualisieren"
+### Erstmaliges Flashen (USB, einmalig)
+
+Beim ersten Flash muss das LittleFS-Dateisystem mitgeflasht werden — sonst lädt das Webinterface nach dem Boot nicht. Dafür das Merged-Image verwenden:
+
+```bash
+pio run                              # Firmware bauen
+pio run -t buildfs                   # LittleFS-Image aus data/ bauen
+python3 scripts/merge_firmware.py    # Gesamtes Flash-Image zusammensetzen
+```
+
+Dann die resultierende `*_merged.bin` aus `~/Desktop/Firmwares/` flashen:
+
+```bash
+esptool.py --chip esp32s3 --port /dev/cu.usbmodem* --baud 460800 \
+  write_flash --no-compress 0x0 "ZeDMD_..._merged.bin"
+```
+
+> ⚠️ **`--no-compress` ist Pflicht.** Die LittleFS-Partition belegt 6,5 MB Flash. Ohne `--no-compress` komprimiert esptool die Übertragung — das führt bei der großen Partition zu einem Timeout und der ESP hängt mitten im Flash-Vorgang. Immer `--no-compress` verwenden.
+
+### Nach dem ersten Boot
+
+Das Webinterface ist sofort erreichbar. Falls HTML-Dateien aktualisiert werden müssen:
+**`http://<IP>/admin.html`** → „Web-Dateien aktualisieren"
+
+### Zukünftige Firmware-Updates (OTA, kein USB nötig)
+
+Browser → **`http://<IP>/admin.html`** → „Firmware Update (OTA)"
 
 ---
 

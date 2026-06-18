@@ -287,6 +287,44 @@
                 </div>
             </div>
             <div class="sections-grid">
+                <!-- Display Text Section -->
+                <div class="section" style="grid-column: 1 / -1;">
+                    <h2 class="section-header">&#128196; Display Text</h2>
+                    <label for="display-text-input">Text:</label>
+                    <input type="text" id="display-text-input" maxlength="127" placeholder="Text eingeben...">
+
+                    <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:15px;">
+                        <div style="flex:1; min-width:160px;">
+                            <label for="display-text-duration">Dauer: <span id="display-text-duration-val">10</span>s</label>
+                            <div class="slider-container">
+                                <span>5s</span>
+                                <input type="range" id="display-text-duration" min="5" max="60" step="5" value="10"
+                                    oninput="document.getElementById('display-text-duration-val').innerText=this.value">
+                                <span>60s</span>
+                            </div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <label style="margin:0;">Farbe:</label>
+                            <input type="color" id="display-text-color" value="#ffffff"
+                                style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin:0;">
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span style="font-size:0.95em; color:#aaa;">Statisch</span>
+                            <label class="toggle-switch" style="margin:0;">
+                                <input type="checkbox" id="display-text-scroll">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span style="font-size:0.95em;">Scrollend</span>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px;">
+                        <button onclick="sendDisplayText()" style="flex:1;">&#9654; Senden</button>
+                        <button onclick="stopDisplayText()" style="flex:0 0 auto; width:auto; padding:12px 20px; background:#6c757d;">&#9646;&#9646; Stopp</button>
+                    </div>
+                    <div id="display-text-status" class="status-message"></div>
+                </div>
+
                 <!-- Radio Section -->
                 <div class="section">
                     <h2 class="section-header">&#127925; Webradio</h2>
@@ -594,11 +632,49 @@
 
             </div>
         </div>
+
     </div>
 
 
     <!-- JavaScript Functions -->
     <script>
+        function sendDisplayText() {
+            var text = document.getElementById('display-text-input').value.trim();
+            var statusElem = document.getElementById('display-text-status');
+            if (!text) { statusElem.innerText = "Kein Text eingegeben."; statusElem.style.color = "red"; return; }
+            var duration = document.getElementById('display-text-duration').value;
+            var scroll   = document.getElementById('display-text-scroll').checked ? 1 : 0;
+            var color    = document.getElementById('display-text-color').value;
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/display_text", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    if (xhr.status === 200) {
+                        statusElem.innerText = "Wird angezeigt (" + duration + "s" + (scroll ? ", scrollend" : "") + ")";
+                        statusElem.style.color = "green";
+                    } else {
+                        statusElem.innerText = "Fehler beim Senden.";
+                        statusElem.style.color = "red";
+                    }
+                }
+            };
+            xhr.send("text=" + encodeURIComponent(text) + "&duration=" + duration + "&scroll=" + scroll + "&color=" + encodeURIComponent(color));
+        }
+
+        function stopDisplayText() {
+            var statusElem = document.getElementById('display-text-status');
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/display_text_stop", true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    statusElem.innerText = xhr.status === 200 ? "Gestoppt." : "Fehler.";
+                    statusElem.style.color = xhr.status === 200 ? "#aaa" : "red";
+                }
+            };
+            xhr.send();
+        }
+
         function fetchFsInfo() {
             var xhr = new XMLHttpRequest();
             xhr.open("GET", "/fs_info", true);

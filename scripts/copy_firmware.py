@@ -41,33 +41,10 @@ if _last != _git_hash:
         f.write(_git_hash)
     print(f"copy_firmware: Hash geändert ({_last or 'neu'} → {_git_hash}), main.cpp wird neu kompiliert")
 
-def copy_firmware(source, target, env):
-    firmware_src = os.path.join(env.subst("$BUILD_DIR"), "firmware.bin")
-    if not os.path.exists(firmware_src):
-        print("copy_firmware: firmware.bin nicht gefunden, überspringe.")
-        return
-
-    dest_dir = os.path.expanduser("~/Desktop/Firmwares")
-    os.makedirs(dest_dir, exist_ok=True)
-
-    project_dir = env.subst("$PROJECT_DIR")
-    try:
-        git_hash = subprocess.check_output(
-            ["git", "-C", project_dir, "rev-parse", "--short", "HEAD"],
-            stderr=subprocess.DEVNULL
-        ).decode().strip()
-    except Exception:
-        git_hash = "unknown"
-
-    env_name = env.subst("$PIOENV")
-    named = os.path.join(dest_dir, f"ZeDMD_5.1.8-jb_{env_name}_{git_hash}.bin")
-
-    # Guard: überspringen wenn Zieldatei bereits aktuell
-    if os.path.exists(named) and os.path.getmtime(named) >= os.path.getmtime(firmware_src):
-        print(f"copy_firmware: {os.path.basename(named)} bereits aktuell, überspringe.")
-        return
-
-    shutil.copy2(firmware_src, named)
-    print(f"copy_firmware: {os.path.basename(named)} → ~/Desktop/Firmwares/")
-
-env.AddPostAction("$BUILD_DIR/firmware.bin", copy_firmware)
+# Kein automatischer Copy mehr — verhindert Doppelkopien bei Test-Builds vor dem Commit.
+# Firmware manuell kopieren nach: 1) Commit, 2) pio run (zweiter Build mit richtigem Hash):
+#
+#   HASH=$(git rev-parse --short HEAD)
+#   BRANCH=$(git rev-parse --abbrev-ref HEAD | sed 's|/|-|g')
+#   cp .pio/build/S3-N16R8_128x32_wifi_sd_webradio/firmware.bin \
+#      ~/Desktop/Firmwares/ZeDMD_5.1.8-jb_S3-N16R8_128x32_wifi_sd_webradio_${BRANCH}_${HASH}.bin
