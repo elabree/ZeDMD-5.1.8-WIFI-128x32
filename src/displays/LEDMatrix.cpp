@@ -88,6 +88,23 @@ void LedMatrix::DisplayText(const char *text, uint16_t x, uint16_t y, uint8_t r,
   }
 }
 
+void LedMatrix::DisplayTextScaled(const char *text, uint16_t x, uint16_t y,
+                                   uint8_t r, uint8_t g, uint8_t b, uint8_t scale) {
+  if (scale <= 1) { DisplayText(text, x, y, r, g, b); return; }
+  for (uint8_t ti = 0; ti < strlen(text); ti++) {
+    for (uint8_t tj = 0; tj < 6; tj++) {
+      uint8_t fourPixels = getFontLine(text[ti], tj);
+      for (uint8_t pixel = 0; pixel < 4; pixel++) {
+        if (!((fourPixels >> (3 - pixel)) & 0x1)) continue;
+        for (uint8_t sy = 0; sy < scale; sy++)
+          for (uint8_t sx = 0; sx < scale; sx++)
+            DrawPixel(x + (pixel + ti * 4) * scale + sx,
+                      y + tj * scale + sy, r, g, b);
+      }
+    }
+  }
+}
+
 void IRAM_ATTR LedMatrix::FillZoneRaw(uint8_t idx, uint8_t *pBuffer) {
   const uint8_t zoneYOffset = (idx / ZONES_PER_ROW) * ZONE_HEIGHT;
   const uint8_t zoneXOffset = (idx % ZONES_PER_ROW) * ZONE_WIDTH;

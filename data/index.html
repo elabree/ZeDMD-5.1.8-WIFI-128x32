@@ -262,7 +262,69 @@
             <img src="ppuc.png" alt="PPUC Logo"
                 style="max-width: 100%; margin-bottom: 20px; display: block; margin: 0 auto;">
             <br>
+            <!-- SD-Karte: globale Voraussetzung für Screensaver + GIF-Audio -->
+            <div class="section" style="margin-bottom:20px;">
+                <h2 class="section-header">&#128190; SD-Karte &amp; Speicher</h2>
+                <div style="margin-bottom:10px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+                        <span style="font-size:0.82em; color:#aaa;">LittleFS</span>
+                        <span id="fs-info" style="font-size:0.82em; color:#aaa;"></span>
+                    </div>
+                    <div style="background:#333; border-radius:4px; height:7px; overflow:hidden; margin-bottom:8px;">
+                        <div id="fs-bar" style="height:100%; background:#007bff; width:0%; border-radius:4px; transition:width 0.4s;"></div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+                        <span style="font-size:0.82em; color:#aaa;">SD Card</span>
+                        <span id="sd-info" style="font-size:0.82em; color:#aaa;">–</span>
+                    </div>
+                    <div style="background:#333; border-radius:4px; height:7px; overflow:hidden;">
+                        <div id="sd-bar" style="height:100%; background:#28a745; width:0%; border-radius:4px; transition:width 0.4s;"></div>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div id="sd-card-status" class="status-message" style="margin:0; flex:1;">Checking SD card...</div>
+                    <button id="eject-btn" onclick="ejectSD()" style="display:none; width:auto; padding:8px 14px; margin:0; background:#6c757d;">&#x23CF; Eject</button>
+                </div>
+            </div>
             <div class="sections-grid">
+                <!-- Display Text Section -->
+                <div class="section" style="grid-column: 1 / -1;">
+                    <h2 class="section-header">&#128196; Display Text</h2>
+                    <label for="display-text-input">Text:</label>
+                    <input type="text" id="display-text-input" maxlength="127" placeholder="Text eingeben...">
+
+                    <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:15px;">
+                        <div style="flex:1; min-width:160px;">
+                            <label for="display-text-duration">Dauer: <span id="display-text-duration-val">10</span>s</label>
+                            <div class="slider-container">
+                                <span>5s</span>
+                                <input type="range" id="display-text-duration" min="5" max="60" step="5" value="10"
+                                    oninput="document.getElementById('display-text-duration-val').innerText=this.value">
+                                <span>60s</span>
+                            </div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <label style="margin:0;">Farbe:</label>
+                            <input type="color" id="display-text-color" value="#ffffff"
+                                style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin:0;">
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span style="font-size:0.95em; color:#aaa;">Statisch</span>
+                            <label class="toggle-switch" style="margin:0;">
+                                <input type="checkbox" id="display-text-scroll">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span style="font-size:0.95em;">Scrollend</span>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px;">
+                        <button onclick="sendDisplayText()" style="flex:1;">&#9654; Senden</button>
+                        <button onclick="stopDisplayText()" style="flex:0 0 auto; width:auto; padding:12px 20px; background:#6c757d;">&#9646;&#9646; Stopp</button>
+                    </div>
+                    <div id="display-text-status" class="status-message"></div>
+                </div>
+
                 <!-- Radio Section -->
                 <div class="section">
                     <h2 class="section-header">&#127925; Webradio</h2>
@@ -306,63 +368,12 @@
                     </div>
                 </div>
 
-                <!-- GIF-Audio Section -->
-                <div class="section">
-                    <h2 class="section-header">&#127925; GIF-Audio</h2>
-                    <div style="font-size:0.8em; color:#aaa; margin-bottom:10px;">
-                        MP3-Dateien f&uuml;r GIF-Begleitung &mdash; Dateiname muss dem GIF-Namen entsprechen (z.B. <em>demo.gif</em> &rarr; <em>demo.mp3</em>).<br>
-                        Ordner auf SD: <code>/GifAudio/</code>
-                    </div>
-                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-                        <input type="file" id="gif-audio-upload-file" accept=".mp3,.MP3" multiple
-                            style="flex:1; background:#2c2c2c; color:#e0e0e0; border:none; padding:8px; border-radius:4px;">
-                        <button onclick="gifAudioUploadBtn()" style="width:auto; padding:10px 16px; white-space:nowrap;">
-                            &#x2191; Upload
-                        </button>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-                        <div id="gif-audio-upload-status" class="status-message" style="margin:0; flex:1;"></div>
-                        <button id="cancel-audio-scan-btn" onclick="cancelAudioScan()" style="display:none; width:auto; padding:8px 14px; margin:0; background:#c0392b;">&#x2715; Scan abbrechen</button>
-                    </div>
-                    <label>GIF-Audio Dateien: <span id="gif-audio-count" style="color:#aaa; font-weight:normal;"></span></label>
-                    <ul class="screensaver-file-list" id="gif-audio-list">
-                        <li><span style="color:#666;">Lade...</span></li>
-                    </ul>
-                    <div id="gif-audio-pagination" style="display:none; gap:8px; align-items:center; margin-top:6px;">
-                        <button id="ga-prev-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(-1)">&#9664; Zur&uuml;ck</button>
-                        <span id="gif-audio-page-info" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
-                        <button id="ga-next-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(1)">Weiter &#9654;</button>
-                    </div>
-                </div>
-
-                <!-- SD Card / LittleFS Section -->
+                <!-- Screensaver Source & Upload Section -->
                 <div class="section">
                     <h2 class="section-header">Screensaver Source &amp; Upload</h2>
 
-                    <!-- Speicheranzeige LittleFS + SD -->
-                    <div style="margin-bottom:14px;">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
-                            <span style="font-size:0.82em; color:#aaa;">LittleFS</span>
-                            <span id="fs-info" style="font-size:0.82em; color:#aaa;"></span>
-                        </div>
-                        <div style="background:#333; border-radius:4px; height:7px; overflow:hidden; margin-bottom:8px;">
-                            <div id="fs-bar" style="height:100%; background:#007bff; width:0%; border-radius:4px; transition:width 0.4s;"></div>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
-                            <span style="font-size:0.82em; color:#aaa;">SD Card</span>
-                            <span id="sd-info" style="font-size:0.82em; color:#aaa;">–</span>
-                        </div>
-                        <div style="background:#333; border-radius:4px; height:7px; overflow:hidden;">
-                            <div id="sd-bar" style="height:100%; background:#28a745; width:0%; border-radius:4px; transition:width 0.4s;"></div>
-                        </div>
-                    </div>
 
-                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
-                        <div id="sd-card-status" class="status-message" style="margin:0; flex:1;">Checking SD card...</div>
-                        <button id="eject-btn" onclick="ejectSD()" style="display:none; width:auto; padding:8px 14px; margin:0; background:#6c757d;">&#x23CF; Eject</button>
-                    </div>
-
-                    <label>Select Screensaver Folder:</label>
+                                        <label>Select Screensaver Folder:</label>
                     <div id="sd-folder-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
                         <span style="color:#aaa; font-size:0.85em;">Loading...</span>
                     </div>
@@ -407,7 +418,7 @@
                     </div>
 
                     <!-- Upload to Active Folder -->
-                    <label style="margin-top:15px;">Upload to Active Folder:</label>
+                    <label style="margin-top:15px;">Upload &#x2192; <span id="upload-target-label" style="color:#4a9eff;">LittleFS</span>:</label>
                     <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
                         <input type="file" id="sd-upload-file" accept=".gif,.GIF,.raw" multiple
                             style="flex:1; background:#2c2c2c; color:#e0e0e0; border:none; padding:8px; border-radius:4px;">
@@ -417,9 +428,13 @@
                     </div>
                     <div id="folder-upload-div" style="display:none; gap:8px; align-items:center; margin-bottom:10px;">
                         <input type="file" id="sd-upload-folder" accept=".gif,.GIF,.raw" webkitdirectory
-                            style="flex:1; background:#2c2c2c; color:#e0e0e0; border:none; padding:8px; border-radius:4px;">
+                            style="display:none;" onchange="updateFolderLabel()">
+                        <button onclick="document.getElementById('sd-upload-folder').click()" style="width:auto; padding:10px 16px; white-space:nowrap; background:#555;">
+                            &#x1F4C2; Ordner auswählen
+                        </button>
+                        <span id="folder-label" style="flex:1; font-size:0.85em; color:#aaa; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Kein Ordner gewählt</span>
                         <button onclick="uploadToSD(true)" style="width:auto; padding:10px 16px; white-space:nowrap;">
-                            &#x2191; Upload Folder
+                            &#x2191; Upload
                         </button>
                     </div>
                     <div id="sd-upload-status" class="status-message" style="margin-bottom:10px;"></div>
@@ -455,14 +470,82 @@
                         </div>
                     </div>
 
-                    <label>Active Screensaver Files: <span id="screensaver-file-count" style="color:#aaa; font-weight:normal;"></span></label>
-                    <ul class="screensaver-file-list" id="sd-screensaver-file-list">
-                        <li><span>Loading...</span></li>
-                    </ul>
-                    <div id="ss-pagination" style="display:none; gap:8px; align-items:center; margin-top:6px;">
-                        <button id="ss-prev-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(-1)">&#9664; Zurück</button>
-                        <span id="ss-page-info" style="font-size:0.85em; color:#aaa;"></span>
-                        <button id="ss-next-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(1)">Weiter &#9654;</button>
+                    <div style="margin-top:10px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:8px 10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;"
+                             onclick="toggleSsFileList()">
+                            <span style="font-size:0.85em; color:#aaa;">&#127902; Active Screensaver Files <span id="screensaver-file-count" style="color:#777; font-weight:normal;"></span></span>
+                            <span id="ss-file-list-arrow" style="color:#aaa; font-size:0.85em;">&#9654;</span>
+                        </div>
+                        <div id="ss-file-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px;">
+                            <div id="ss-pagination-top" style="display:none; gap:8px; align-items:center; margin-bottom:6px;">
+                                <button id="ss-prev-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(-1)">&#9664; Zur&uuml;ck</button>
+                                <span id="ss-page-info-top" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
+                                <button id="ss-next-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(1)">Weiter &#9654;</button>
+                            </div>
+                            <ul class="screensaver-file-list" id="sd-screensaver-file-list" style="margin:0;">
+                                <li><span>Loading...</span></li>
+                            </ul>
+                            <div id="ss-pagination" style="display:none; gap:8px; align-items:center; margin-top:6px;">
+                                <button id="ss-prev-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(-1)">&#9664; Zur&uuml;ck</button>
+                                <span id="ss-page-info" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
+                                <button id="ss-next-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(1)">Weiter &#9654;</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GIF-Audio Section -->
+                <div class="section">
+                    <h2 class="section-header">&#127925; GIF-Audio</h2>
+                    <div style="font-size:0.8em; color:#aaa; margin-bottom:10px;">
+                        MP3-Dateien f&uuml;r GIF-Begleitung &mdash; MP3-Name muss im GIF-Namen enthalten sein (z.B. <em>defender.mp3</em> spielt zu <em>defender_level1.gif</em>).<br>
+                        Ordner auf SD: <code>/GifAudio/</code>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                        <span style="font-size:0.95em; color:#aaa;">Aus</span>
+                        <label class="toggle-switch" style="margin:0;">
+                            <input type="checkbox" id="gif-audio-enabled" onchange="saveGifAudioEnabled()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span style="font-size:0.95em;">GIF-Audio aktiv</span>
+                        <span id="gif-audio-enabled-status" class="status-message" style="margin:0; flex:1;"></span>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                        <input type="file" id="gif-audio-upload-file" accept=".mp3,.MP3" multiple
+                            style="flex:1; background:#2c2c2c; color:#e0e0e0; border:none; padding:8px; border-radius:4px;">
+                        <button onclick="gifAudioUploadBtn()" style="width:auto; padding:10px 16px; white-space:nowrap;">
+                            &#x2191; Upload
+                        </button>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                        <div id="gif-audio-upload-status" class="status-message" style="margin:0; flex:1;"></div>
+                        <button id="cancel-audio-scan-btn" onclick="cancelAudioScan()" style="display:none; width:auto; padding:8px 14px; margin:0; background:#c0392b;">&#x2715; Scan abbrechen</button>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                        <button onclick="gifAudioStop()" style="width:auto; padding:8px 14px; margin:0; background:#6c757d; white-space:nowrap;">&#9646;&#9646; Stopp</button>
+                        <span id="gif-audio-play-status" class="status-message" style="margin:0; flex:1; color:#666;">—</span>
+                    </div>
+                    <div style="margin-top:10px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:8px 10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;"
+                             onclick="toggleGifAudioList()">
+                            <span style="font-size:0.85em; color:#aaa;">&#127925; Dateien <span id="gif-audio-count" style="color:#777; font-weight:normal;"></span></span>
+                            <span id="gif-audio-list-arrow" style="color:#aaa; font-size:0.85em;">&#9654;</span>
+                        </div>
+                        <div id="gif-audio-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px;">
+                            <div id="gif-audio-pagination-top" style="display:none; gap:8px; align-items:center; margin-bottom:6px;">
+                                <button id="ga-prev-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(-1)">&#9664; Zur&uuml;ck</button>
+                                <span id="gif-audio-page-info-top" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
+                                <button id="ga-next-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(1)">Weiter &#9654;</button>
+                            </div>
+                            <ul class="screensaver-file-list" id="gif-audio-list" style="margin:0;">
+                                <li><span style="color:#666;">Lade...</span></li>
+                            </ul>
+                            <div id="gif-audio-pagination" style="display:none; gap:8px; align-items:center; margin-top:6px;">
+                                <button id="ga-prev-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(-1)">&#9664; Zur&uuml;ck</button>
+                                <span id="gif-audio-page-info" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
+                                <button id="ga-next-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(1)">Weiter &#9654;</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -549,11 +632,49 @@
 
             </div>
         </div>
+
     </div>
 
 
     <!-- JavaScript Functions -->
     <script>
+        function sendDisplayText() {
+            var text = document.getElementById('display-text-input').value.trim();
+            var statusElem = document.getElementById('display-text-status');
+            if (!text) { statusElem.innerText = "Kein Text eingegeben."; statusElem.style.color = "red"; return; }
+            var duration = document.getElementById('display-text-duration').value;
+            var scroll   = document.getElementById('display-text-scroll').checked ? 1 : 0;
+            var color    = document.getElementById('display-text-color').value;
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/display_text", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    if (xhr.status === 200) {
+                        statusElem.innerText = "Wird angezeigt (" + duration + "s" + (scroll ? ", scrollend" : "") + ")";
+                        statusElem.style.color = "green";
+                    } else {
+                        statusElem.innerText = "Fehler beim Senden.";
+                        statusElem.style.color = "red";
+                    }
+                }
+            };
+            xhr.send("text=" + encodeURIComponent(text) + "&duration=" + duration + "&scroll=" + scroll + "&color=" + encodeURIComponent(color));
+        }
+
+        function stopDisplayText() {
+            var statusElem = document.getElementById('display-text-status');
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/display_text_stop", true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    statusElem.innerText = xhr.status === 200 ? "Gestoppt." : "Fehler.";
+                    statusElem.style.color = xhr.status === 200 ? "#aaa" : "red";
+                }
+            };
+            xhr.send();
+        }
+
         function fetchFsInfo() {
             var xhr = new XMLHttpRequest();
             xhr.open("GET", "/fs_info", true);
@@ -565,7 +686,7 @@
                     var free = (info.free / 1024).toFixed(1);
                     var pct = ((info.used / info.total) * 100).toFixed(1);
                     document.getElementById('fs-info').innerHTML =
-                        used + " KB / " + total + " KB verwendet (" + free + " KB frei) — " + pct + "%";
+                        used + " KB / " + total + " KB (" + free + " KB frei) — " + pct + "%";
                     document.getElementById('fs-bar').style.width = pct + "%";
                     // Farbe je nach Füllstand
                     var bar = document.getElementById('fs-bar');
@@ -645,6 +766,26 @@
             xhr.send(`screensaverStrictTimer=${val}`);
         }
 
+        function saveGifAudioEnabled() {
+            var val = document.getElementById('gif-audio-enabled').checked ? 1 : 0;
+            var statusElem = document.getElementById('gif-audio-enabled-status');
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/save_gif_audio_enabled", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    if (xhr.status === 200) {
+                        statusElem.innerText = val ? "GIF-Audio aktiv" : "GIF-Audio deaktiviert";
+                        statusElem.style.color = val ? "green" : "#aaa";
+                    } else {
+                        statusElem.innerText = "Error saving.";
+                        statusElem.style.color = "red";
+                    }
+                }
+            };
+            xhr.send(`gifAudioEnabled=${val}`);
+        }
+
         var currentFilePath  = '';
         var previewCurrentPath = '';
         var cachedFavLines   = [];
@@ -706,9 +847,25 @@
                         favBtn.textContent = data.favorite ? '⭐' : '☆';
                         favBtn.style.background = data.favorite ? '#f0a500' : '#555';
                     }
-                    refreshFavIgnCache();
-                    var panel = document.getElementById('fav-list-panel');
-                    if (panel && panel.style.display !== 'none') loadFavoritesList();
+                    if (data.favorite && cachedIgnLines.indexOf(currentFilePath) >= 0) {
+                        var x2 = new XMLHttpRequest();
+                        x2.open("POST", "/toggle_ignore", true);
+                        x2.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                        x2.onreadystatechange = function() {
+                            if (x2.readyState === XMLHttpRequest.DONE && x2.status === 200) {
+                                var ignBtn = document.getElementById('ign-btn');
+                                if (ignBtn) ignBtn.style.background = '#555';
+                                refreshFavIgnCache();
+                                var panel = document.getElementById('fav-list-panel');
+                                if (panel && panel.style.display !== 'none') loadFavoritesList();
+                            }
+                        };
+                        x2.send("path=" + encodeURIComponent(currentFilePath));
+                    } else {
+                        refreshFavIgnCache();
+                        var panel = document.getElementById('fav-list-panel');
+                        if (panel && panel.style.display !== 'none') loadFavoritesList();
+                    }
                 }
             };
             xhr.send("path=" + encodeURIComponent(currentFilePath));
@@ -791,12 +948,26 @@
                 if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
                     var data = JSON.parse(xhr.responseText);
                     var ignBtn = document.getElementById('ign-btn');
-                    if (ignBtn) {
-                        ignBtn.style.background = data.ignored ? '#c0392b' : '#555';
+                    if (ignBtn) ignBtn.style.background = data.ignored ? '#c0392b' : '#555';
+                    if (data.ignored && cachedFavLines.indexOf(currentFilePath) >= 0) {
+                        var x2 = new XMLHttpRequest();
+                        x2.open("POST", "/toggle_favorite", true);
+                        x2.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                        x2.onreadystatechange = function() {
+                            if (x2.readyState === XMLHttpRequest.DONE && x2.status === 200) {
+                                var favBtn = document.getElementById('fav-btn');
+                                if (favBtn) { favBtn.textContent = '☆'; favBtn.style.background = '#555'; }
+                                refreshFavIgnCache();
+                                var panel = document.getElementById('ign-list-panel');
+                                if (panel && panel.style.display !== 'none') loadIgnoreList();
+                            }
+                        };
+                        x2.send("path=" + encodeURIComponent(currentFilePath));
+                    } else {
+                        refreshFavIgnCache();
+                        var panel = document.getElementById('ign-list-panel');
+                        if (panel && panel.style.display !== 'none') loadIgnoreList();
                     }
-                    refreshFavIgnCache();
-                    var panel = document.getElementById('ign-list-panel');
-                    if (panel && panel.style.display !== 'none') loadIgnoreList();
                 }
             };
             xhr.send("path=" + encodeURIComponent(currentFilePath));
@@ -809,6 +980,30 @@
                 panel.style.display = 'block';
                 arrow.textContent = '▼';
                 loadIgnoreList();
+            } else {
+                panel.style.display = 'none';
+                arrow.textContent = '▶';
+            }
+        }
+
+        function toggleGifAudioList() {
+            var panel = document.getElementById('gif-audio-list-panel');
+            var arrow = document.getElementById('gif-audio-list-arrow');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                arrow.textContent = '▼';
+            } else {
+                panel.style.display = 'none';
+                arrow.textContent = '▶';
+            }
+        }
+
+        function toggleSsFileList() {
+            var panel = document.getElementById('ss-file-list-panel');
+            var arrow = document.getElementById('ss-file-list-arrow');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                arrow.textContent = '▼';
             } else {
                 panel.style.display = 'none';
                 arrow.textContent = '▶';
@@ -924,22 +1119,36 @@
                         favBtn.textContent = data.favorite ? '⭐' : '☆';
                         favBtn.style.background = data.favorite ? '#f0a500' : '#555';
                     }
-                    // Cache + abhängige UI-Elemente aktualisieren
-                    refreshFavIgnCache(function() {
-                        // Fav-Button in der Dateiliste aktualisieren wenn sichtbar
-                        loadSDScreensaverFiles();
-                        // Fav-Button im Aktuell-angezeigt-Block aktualisieren
-                        if (currentFilePath === previewCurrentPath) {
-                            var fb = document.getElementById('fav-btn');
-                            if (fb) {
-                                fb.textContent = data.favorite ? '⭐' : '☆';
-                                fb.style.background = data.favorite ? '#f0a500' : '#555';
+                    var doRefresh = function() {
+                        refreshFavIgnCache(function() {
+                            loadSDScreensaverFiles();
+                            if (currentFilePath === previewCurrentPath) {
+                                var fb = document.getElementById('fav-btn');
+                                if (fb) { fb.textContent = data.favorite ? '⭐' : '☆'; fb.style.background = data.favorite ? '#f0a500' : '#555'; }
                             }
-                        }
-                        // Favoritenliste refreshen wenn sie offen ist
-                        var panel = document.getElementById('fav-list-panel');
-                        if (panel && panel.style.display !== 'none') loadFavoritesList();
-                    });
+                            var panel = document.getElementById('fav-list-panel');
+                            if (panel && panel.style.display !== 'none') loadFavoritesList();
+                        });
+                    };
+                    if (data.favorite && cachedIgnLines.indexOf(previewCurrentPath) >= 0) {
+                        var x2 = new XMLHttpRequest();
+                        x2.open('POST', '/toggle_ignore', true);
+                        x2.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                        x2.onreadystatechange = function() {
+                            if (x2.readyState === XMLHttpRequest.DONE && x2.status === 200) {
+                                var ignBtn = document.getElementById('gif-preview-ign-btn');
+                                if (ignBtn) ignBtn.style.background = '#555';
+                                if (currentFilePath === previewCurrentPath) {
+                                    var ib = document.getElementById('ign-btn');
+                                    if (ib) ib.style.background = '#555';
+                                }
+                                doRefresh();
+                            }
+                        };
+                        x2.send('path=' + encodeURIComponent(previewCurrentPath));
+                    } else {
+                        doRefresh();
+                    }
                 }
             };
             xhr.send('path=' + encodeURIComponent(previewCurrentPath));
@@ -955,15 +1164,36 @@
                     var data = JSON.parse(xhr.responseText);
                     var ignBtn = document.getElementById('gif-preview-ign-btn');
                     if (ignBtn) ignBtn.style.background = data.ignored ? '#c0392b' : '#555';
-                    refreshFavIgnCache(function() {
-                        loadSDScreensaverFiles();
-                        if (currentFilePath === previewCurrentPath) {
-                            var ib = document.getElementById('ign-btn');
-                            if (ib) ib.style.background = data.ignored ? '#c0392b' : '#555';
-                        }
-                        var panel = document.getElementById('ign-list-panel');
-                        if (panel && panel.style.display !== 'none') loadIgnoreList();
-                    });
+                    var doRefresh = function() {
+                        refreshFavIgnCache(function() {
+                            loadSDScreensaverFiles();
+                            if (currentFilePath === previewCurrentPath) {
+                                var ib = document.getElementById('ign-btn');
+                                if (ib) ib.style.background = data.ignored ? '#c0392b' : '#555';
+                            }
+                            var panel = document.getElementById('ign-list-panel');
+                            if (panel && panel.style.display !== 'none') loadIgnoreList();
+                        });
+                    };
+                    if (data.ignored && cachedFavLines.indexOf(previewCurrentPath) >= 0) {
+                        var x2 = new XMLHttpRequest();
+                        x2.open('POST', '/toggle_favorite', true);
+                        x2.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                        x2.onreadystatechange = function() {
+                            if (x2.readyState === XMLHttpRequest.DONE && x2.status === 200) {
+                                var favBtn = document.getElementById('gif-preview-fav-btn');
+                                if (favBtn) { favBtn.textContent = '☆'; favBtn.style.background = '#555'; }
+                                if (currentFilePath === previewCurrentPath) {
+                                    var fb = document.getElementById('fav-btn');
+                                    if (fb) { fb.textContent = '☆'; fb.style.background = '#555'; }
+                                }
+                                doRefresh();
+                            }
+                        };
+                        x2.send('path=' + encodeURIComponent(previewCurrentPath));
+                    } else {
+                        doRefresh();
+                    }
                 }
             };
             xhr.send('path=' + encodeURIComponent(previewCurrentPath));
@@ -1151,6 +1381,9 @@
                     if (config.screensaverStrictTimer !== undefined) {
                         document.getElementById("screensaver-strict-timer").checked = config.screensaverStrictTimer == 1;
                     }
+                    if (config.gifAudioEnabled !== undefined) {
+                        document.getElementById("gif-audio-enabled").checked = config.gifAudioEnabled == 1;
+                    }
                     if (config.clockR !== undefined) {
                         document.getElementById('clock-color').value = toHex(config.clockR, config.clockG, config.clockB);
                         document.getElementById('date-color').value  = toHex(config.dateR,  config.dateG,  config.dateB);
@@ -1172,12 +1405,25 @@
 
         var activeScreensaverPath = '';  // '' = LittleFS, sonst SD Ordner
 
+        function updateFolderLabel() {
+            var input = document.getElementById('sd-upload-folder');
+            var label = document.getElementById('folder-label');
+            if (input.files && input.files.length > 0) {
+                var folderName = input.files[0].webkitRelativePath.split('/')[0];
+                label.innerText = '📁 ' + folderName + ' (' + input.files.length + ' Dateien)';
+                label.style.color = '#e0e0e0';
+            } else {
+                label.innerText = 'Kein Ordner gewählt';
+                label.style.color = '#aaa';
+            }
+        }
+
         function uploadToSD(isFolder) {
             var inputId = isFolder ? 'sd-upload-folder' : 'sd-upload-file';
             var fileInput = document.getElementById(inputId);
             var statusElem = document.getElementById('sd-upload-status');
             if (!fileInput.files || fileInput.files.length === 0) {
-                statusElem.innerText = 'Please select a file first.';
+                statusElem.innerText = 'Bitte zuerst ' + (isFolder ? 'einen Ordner' : 'eine Datei') + ' auswählen.';
                 statusElem.style.color = 'red';
                 return;
             }
@@ -1185,21 +1431,40 @@
                 return f.name.match(/\.(gif|GIF|raw)$/) && !f.name.startsWith('.');
             });
             if (files.length === 0) {
-                statusElem.innerText = 'No valid files (.gif, .raw)';
+                statusElem.innerText = 'Keine gültigen Dateien (.gif, .raw)';
                 statusElem.style.color = 'red';
                 return;
             }
-            // LittleFS oder SD?
-            var uploadUrl = activeScreensaverPath === '' ? '/upload_screensaver' : '/upload_sd';
+
+            var uploadUrl;
+            if (isFolder) {
+                // Ordnernamen aus webkitRelativePath extrahieren → neuer SD-Ordner
+                var folderName = files[0].webkitRelativePath.split('/')[0];
+                uploadUrl = '/upload_sd?folder=' + encodeURIComponent(folderName);
+            } else {
+                if (activeScreensaverPath === '') {
+                    if (!confirm('Kein SD-Ordner ausgewählt — Dateien werden auf LittleFS hochgeladen. Fortfahren?')) return;
+                    uploadUrl = '/upload_screensaver';
+                } else {
+                    uploadUrl = '/upload_sd';
+                }
+            }
+
             var uploaded = 0, errors = 0;
             function uploadNext(index) {
                 if (index >= files.length) {
                     statusElem.style.color = errors === 0 ? 'green' : 'orange';
                     statusElem.innerText = errors === 0 ?
-                        '✓ ' + uploaded + ' file(s) uploaded!' :
-                        uploaded + ' OK, ' + errors + ' failed.';
+                        '✓ ' + uploaded + ' Datei(en) hochgeladen!' :
+                        uploaded + ' OK, ' + errors + ' fehlgeschlagen.';
                     fileInput.value = '';
-                    loadSDScreensaverFiles();
+                    if (isFolder) {
+                        var lbl = document.getElementById('folder-label');
+                        if (lbl) { lbl.innerText = 'Kein Ordner gewählt'; lbl.style.color = '#aaa'; }
+                        loadSDFolders();
+                    } else {
+                        loadSDScreensaverFiles();
+                    }
                     return;
                 }
                 var file = files[index];
@@ -1277,11 +1542,18 @@
                 sizeSpan.style.cssText = 'color:#666;font-size:0.85em;';
                 sizeSpan.textContent = '(' + Math.round(f.size / 1024) + ' KB)';
                 nameSpan.appendChild(sizeSpan);
+                var playBtn = document.createElement('button');
+                playBtn.className = 'delete-btn';
+                playBtn.textContent = '▶';
+                playBtn.style.background = '#28a745';
+                playBtn.title = 'Abspielen';
+                playBtn.onclick = (function(name) { return function() { gifAudioPlay(name); }; })(f.name);
                 var delBtn = document.createElement('button');
                 delBtn.className = 'delete-btn';
                 delBtn.textContent = '🗑';
                 delBtn.onclick = (function(name) { return function() { gifAudioDelete(name); }; })(f.name);
                 li.appendChild(nameSpan);
+                li.appendChild(playBtn);
                 li.appendChild(delBtn);
                 el.appendChild(li);
             });
@@ -1300,15 +1572,20 @@
         }
 
         function gifAudioUpdatePagination() {
-            var total      = gifAudioAllFiles.length;
-            var pagination = document.getElementById('gif-audio-pagination');
-            var pageInfo   = document.getElementById('gif-audio-page-info');
+            var total         = gifAudioAllFiles.length;
+            var pagination    = document.getElementById('gif-audio-pagination');
+            var paginationTop = document.getElementById('gif-audio-pagination-top');
+            var pageInfo      = document.getElementById('gif-audio-page-info');
+            var pageInfoTop   = document.getElementById('gif-audio-page-info-top');
             if (!pagination) return;
             if (total > gifAudioPageSize) {
+                var info = (gifAudioOffset + 1) + '–' + Math.min(gifAudioOffset + gifAudioPageSize, total) + ' von ' + total;
                 pagination.style.display = 'flex';
-                pageInfo.textContent = (gifAudioOffset + 1) + '–' + Math.min(gifAudioOffset + gifAudioPageSize, total) + ' von ' + total;
+                pageInfo.textContent = info;
+                if (paginationTop) { paginationTop.style.display = 'flex'; pageInfoTop.textContent = info; }
             } else {
                 pagination.style.display = 'none';
+                if (paginationTop) paginationTop.style.display = 'none';
             }
         }
 
@@ -1316,6 +1593,31 @@
             var fd = new FormData(); fd.append('name', name);
             fetch('/gif_audio_delete', { method: 'POST', body: fd })
                 .then(function() { gifAudioLoad(); });
+        }
+
+        function gifAudioPlay(name) {
+            var fd = new FormData();
+            fd.append('path', '/GifAudio/' + name);
+            var status = document.getElementById('gif-audio-play-status');
+            if (status) { status.style.color = '#aaa'; status.textContent = '▶ ' + name + '…'; }
+            fetch('/gif_audio_play', { method: 'POST', body: fd })
+                .then(function(r) {
+                    if (!status) return;
+                    if (r.ok) {
+                        status.style.color = 'green';
+                        status.textContent = '▶ ' + name;
+                    } else {
+                        r.text().then(function(t) { status.style.color = '#c0392b'; status.textContent = t; });
+                    }
+                });
+        }
+
+        function gifAudioStop() {
+            fetch('/gif_audio_stop', { method: 'POST' })
+                .then(function() {
+                    var status = document.getElementById('gif-audio-play-status');
+                    if (status) { status.style.color = '#666'; status.textContent = '—'; }
+                });
         }
 
         function gifAudioUploadBtn() {
@@ -1356,7 +1658,13 @@
                     status.innerText = 'Lade ' + (i + 1) + '/' + files.length + ': ' + files[i].name;
                 }
                 fetch('/gif_audio_upload', { method: 'POST', body: fd })
-                    .then(function(r) { if (r.ok) uploaded++; else errors++; i++; uploadNext(); })
+                    .then(function(r) {
+                        if (r.ok) { uploaded++; i++; uploadNext(); }
+                        else { r.text().then(function(t) {
+                            if (status) { status.style.color = '#c0392b'; status.innerText = t; }
+                            if (onDone) onDone();
+                        }); }
+                    })
                     .catch(function() { errors++; i++; uploadNext(); });
             }
             uploadNext();
@@ -1432,28 +1740,35 @@
             var xhr = new XMLHttpRequest();
             xhr.open("GET", "/sd_info", true);
             xhr.timeout = 5000;
+            var clearSDInfo = function() {
+                document.getElementById('sd-info').innerText = "–";
+                document.getElementById('sd-bar').style.width = "0%";
+                var ejectBtn = document.getElementById('eject-btn');
+                if (ejectBtn) ejectBtn.style.display = 'none';
+            };
+            xhr.ontimeout = clearSDInfo;
+            xhr.onerror = clearSDInfo;
             xhr.onreadystatechange = function() {
-                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-                    var info = JSON.parse(xhr.responseText);
-                    var sdInfoElem = document.getElementById('sd-info');
-                    var sdBar = document.getElementById('sd-bar');
-                    var ejectBtn = document.getElementById('eject-btn');
-                    if (info.available && info.total > 0) {
-                        var usedMB = (info.used / 1024).toFixed(0);
-                        var totalMB = (info.total / 1024).toFixed(0);
-                        var freeMB = (info.free / 1024).toFixed(0);
-                        var pct = ((info.used / info.total) * 100).toFixed(1);
-                        sdInfoElem.innerText = usedMB + " MB / " + totalMB + " MB (" + freeMB + " MB frei)";
-                        sdBar.style.width = pct + "%";
-                        if (pct > 80) sdBar.style.background = "#dc3545";
-                        else if (pct > 60) sdBar.style.background = "#ffc107";
-                        else sdBar.style.background = "#28a745";
-                        if (ejectBtn) ejectBtn.style.display = 'block';
-                    } else {
-                        sdInfoElem.innerText = "–";
-                        sdBar.style.width = "0%";
-                        if (ejectBtn) ejectBtn.style.display = 'none';
-                    }
+                if (xhr.readyState !== XMLHttpRequest.DONE || xhr.status !== 200) return;
+                var info = JSON.parse(xhr.responseText);
+                var sdInfoElem = document.getElementById('sd-info');
+                var sdBar = document.getElementById('sd-bar');
+                var ejectBtn = document.getElementById('eject-btn');
+                if (info.available && info.total > 0) {
+                    var usedMB = (info.used / 1024).toFixed(0);
+                    var totalMB = (info.total / 1024).toFixed(0);
+                    var freeMB = (info.free / 1024).toFixed(0);
+                    var pct = ((info.used / info.total) * 100).toFixed(1);
+                    sdInfoElem.innerText = usedMB + " MB / " + totalMB + " MB (" + freeMB + " MB frei) — " + pct + "%";
+                    sdBar.style.width = pct + "%";
+                    if (pct > 80) sdBar.style.background = "#dc3545";
+                    else if (pct > 60) sdBar.style.background = "#ffc107";
+                    else sdBar.style.background = "#28a745";
+                    if (ejectBtn) ejectBtn.style.display = 'block';
+                } else {
+                    sdInfoElem.innerText = "–";
+                    sdBar.style.width = "0%";
+                    if (ejectBtn) ejectBtn.style.display = 'none';
                 }
             };
             xhr.send();
@@ -1477,24 +1792,22 @@
             xhr.send();
         }
 
-        function loadSDFolders() {
+        function loadSDFolders(retried) {
             var xhr = new XMLHttpRequest();
             xhr.open("GET", "/sd_folders", true);
             xhr.timeout = 5000;
-            xhr.ontimeout = function() {
+            var onFail = function(msg) {
                 var statusElem = document.getElementById('sd-card-status');
-                statusElem.innerText = "✗ SD card check timed out";
+                statusElem.innerText = msg;
                 statusElem.style.color = "red";
                 loadSDScreensaverFiles();
+                if (!retried) setTimeout(function() { fetchSDInfo(); loadSDFolders(true); }, 8000);
             };
+            xhr.ontimeout = function() { onFail(retried ? "✗ SD card check timed out" : "✗ SD card check timed out – retrying..."); };
+            xhr.onerror = function() { onFail(retried ? "✗ SD card check failed" : "✗ SD card check failed – retrying..."); };
             xhr.onreadystatechange = function () {
-                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 0) {
-                    var statusElem = document.getElementById('sd-card-status');
-                    statusElem.innerText = "✗ SD card check failed";
-                    statusElem.style.color = "red";
-                    loadSDScreensaverFiles();
-                }
-                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                if (xhr.readyState !== XMLHttpRequest.DONE || xhr.status === 0) return;
+                if (xhr.status === 200) {
                     var data = JSON.parse(xhr.responseText);
                     var selectedPaths = (data.currentPaths || '').split(',').map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 0; });
                     var statusElem = document.getElementById('sd-card-status');
@@ -1534,6 +1847,7 @@
                         document.querySelectorAll('#sd-folder-list button').forEach(function(b){ b.style.background = '#007bff'; });
                         favBtn.style.background = '#28a745';
                         activeScreensaverPath = '';
+                        var lbl = document.getElementById('upload-target-label'); if (lbl) lbl.innerText = 'LittleFS';
                         var statusElem = document.getElementById('sd-folder-status');
                         if (statusElem) { statusElem.innerText = 'Favoriten werden geladen...'; statusElem.style.color = '#aaa'; }
                         var xhr = new XMLHttpRequest();
@@ -1560,7 +1874,7 @@
 
                     // SD-Ordner als Toggle-Buttons mit versteckter Checkbox
                     if (data.folders && data.folders.length > 0) {
-                        data.folders.forEach(function(folder) {
+                        data.folders.slice().sort().forEach(function(folder) {
                             // GifAudio ist kein Screensaver-Ordner — ausblenden
                             if (folder.toLowerCase() === 'gifaudio') return;
                             var isSelected = selectedPaths.indexOf(folder) >= 0;
@@ -1586,6 +1900,10 @@
                         folderList.innerHTML += '<span style="color:#aaa; font-size:0.85em; margin-left:8px;">Keine Ordner auf SD Karte gefunden</span>';
                     }
 
+                    // Upload-Ziel-Label initialisieren
+                    activeScreensaverPath = selectedPaths.find(function(p) { return p !== 'FS:'; }) || '';
+                    var lbl = document.getElementById('upload-target-label'); if (lbl) lbl.innerText = activeScreensaverPath || 'LittleFS';
+
                     // Load active files + SD Speicherinfo
                     loadSDScreensaverFiles();
                     fetchSDInfo();
@@ -1599,7 +1917,8 @@
             var selected = [];
             checkboxes.forEach(function(cb) { if (cb.checked) selected.push(cb.value); });
             var paths = selected.join(',');
-            activeScreensaverPath = selected.length > 0 ? selected[0] : '';
+            activeScreensaverPath = selected.find(function(p) { return p !== 'FS:'; }) || '';
+            var lbl = document.getElementById('upload-target-label'); if (lbl) lbl.innerText = activeScreensaverPath || 'LittleFS';
             var statusElem = document.getElementById('sd-folder-status');
             statusElem.innerText = 'wird geladen...';
             statusElem.style.color = '#aaa';
@@ -1721,10 +2040,18 @@
 
                                 // Favoriten-Button
                                 var isFav = favLines.indexOf(filepath) >= 0;
+                                var isIgn = ignLines.indexOf(filepath) >= 0;
+                                var isFavActive = isFav;
+                                var isIgnActive = isIgn;
                                 var favBtn = document.createElement('button');
                                 favBtn.className = 'delete-btn';
                                 favBtn.textContent = isFav ? '⭐' : '☆';
                                 favBtn.style.background = isFav ? '#f0a500' : '#555';
+                                var ignBtn = document.createElement('button');
+                                ignBtn.className = 'delete-btn';
+                                ignBtn.textContent = '🚫';
+                                ignBtn.style.background = isIgn ? '#c0392b' : '#555';
+
                                 favBtn.onclick = function() {
                                     var x = new XMLHttpRequest();
                                     x.open("POST", "/toggle_favorite", true);
@@ -1732,23 +2059,34 @@
                                     x.onreadystatechange = function() {
                                         if (x.readyState === XMLHttpRequest.DONE && x.status === 200) {
                                             var d = JSON.parse(x.responseText);
+                                            isFavActive = d.favorite;
                                             favBtn.textContent = d.favorite ? '⭐' : '☆';
                                             favBtn.style.background = d.favorite ? '#f0a500' : '#555';
                                             if (currentFilePath === filepath) {
                                                 var fb = document.getElementById('fav-btn');
                                                 if (fb) { fb.textContent = d.favorite ? '⭐' : '☆'; fb.style.background = d.favorite ? '#f0a500' : '#555'; }
                                             }
+                                            if (d.favorite && isIgnActive) {
+                                                var x2 = new XMLHttpRequest();
+                                                x2.open("POST", "/toggle_ignore", true);
+                                                x2.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                                                x2.onreadystatechange = function() {
+                                                    if (x2.readyState === XMLHttpRequest.DONE && x2.status === 200) {
+                                                        isIgnActive = false;
+                                                        ignBtn.style.background = '#555';
+                                                        if (currentFilePath === filepath) {
+                                                            var ib = document.getElementById('ign-btn');
+                                                            if (ib) ib.style.background = '#555';
+                                                        }
+                                                    }
+                                                };
+                                                x2.send("path=" + encodeURIComponent(filepath));
+                                            }
                                         }
                                     };
                                     x.send("path=" + encodeURIComponent(filepath));
                                 };
 
-                                // Ignore-Button
-                                var isIgn = ignLines.indexOf(filepath) >= 0;
-                                var ignBtn = document.createElement('button');
-                                ignBtn.className = 'delete-btn';
-                                ignBtn.textContent = '🚫';
-                                ignBtn.style.background = isIgn ? '#c0392b' : '#555';
                                 ignBtn.onclick = function() {
                                     var x = new XMLHttpRequest();
                                     x.open("POST", "/toggle_ignore", true);
@@ -1756,10 +2094,28 @@
                                     x.onreadystatechange = function() {
                                         if (x.readyState === XMLHttpRequest.DONE && x.status === 200) {
                                             var d = JSON.parse(x.responseText);
+                                            isIgnActive = d.ignored;
                                             ignBtn.style.background = d.ignored ? '#c0392b' : '#555';
                                             if (currentFilePath === filepath) {
                                                 var ib = document.getElementById('ign-btn');
                                                 if (ib) ib.style.background = d.ignored ? '#c0392b' : '#555';
+                                            }
+                                            if (d.ignored && isFavActive) {
+                                                var x2 = new XMLHttpRequest();
+                                                x2.open("POST", "/toggle_favorite", true);
+                                                x2.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                                                x2.onreadystatechange = function() {
+                                                    if (x2.readyState === XMLHttpRequest.DONE && x2.status === 200) {
+                                                        isFavActive = false;
+                                                        favBtn.textContent = '☆';
+                                                        favBtn.style.background = '#555';
+                                                        if (currentFilePath === filepath) {
+                                                            var fb = document.getElementById('fav-btn');
+                                                            if (fb) { fb.textContent = '☆'; fb.style.background = '#555'; }
+                                                        }
+                                                    }
+                                                };
+                                                x2.send("path=" + encodeURIComponent(filepath));
                                             }
                                         }
                                     };
@@ -1798,7 +2154,8 @@
                             sdFileTotal = info.total;
                             var countEl = document.getElementById('screensaver-file-count');
                             countEl.textContent = '(' + info.total + ')';
-                            var pagination = document.getElementById('ss-pagination');
+                            var pagination    = document.getElementById('ss-pagination');
+                            var paginationTop = document.getElementById('ss-pagination-top');
                             var prevBtn = document.getElementById('ss-prev-btn');
                             var nextBtn = document.getElementById('ss-next-btn');
                             var pageInfo = document.getElementById('ss-page-info');
@@ -1806,11 +2163,17 @@
                                 pagination.style.display = 'flex';
                                 var from = sdFileOffset + 1;
                                 var to = Math.min(sdFileOffset + sdFilePageSize, info.total);
-                                pageInfo.textContent = from + '–' + to + ' von ' + info.total;
+                                var rangeText = from + '–' + to + ' von ' + info.total;
+                                pageInfo.textContent = rangeText;
                                 prevBtn.disabled = false;  // Wrap-Around: immer aktiv
                                 nextBtn.disabled = false;   // Wrap-Around: immer aktiv
+                                if (paginationTop) {
+                                    paginationTop.style.display = 'flex';
+                                    document.getElementById('ss-page-info-top').textContent = rangeText;
+                                }
                             } else {
                                 pagination.style.display = 'none';
+                                if (paginationTop) paginationTop.style.display = 'none';
                             }
                         }
                     };

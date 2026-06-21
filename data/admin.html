@@ -39,6 +39,14 @@ pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overfl
   <div class="status" id="restart-status"></div>
 </div>
 
+<!-- Diagnose -->
+<div class="section">
+  <h2>Diagnose &amp; Crashlogs</h2>
+  <button class="red" onclick="resetDiag()">&#x21BA; Diag-Zähler zurücksetzen</button>
+  <button class="red" onclick="deleteCrashlogs()">&#x1F5D1; Crashlogs löschen</button>
+  <div class="status" id="diag-status"></div>
+</div>
+
 <!-- WiFi -->
 <div class="section">
   <h2>WiFi Configuration</h2>
@@ -158,6 +166,7 @@ pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overfl
   <button onclick="uploadHtmlFile()">&#x2191; Upload File</button>
   <div class="status" id="upload-html-status"></div>
 </div>
+
 
 <!-- Information -->
 <div class="section">
@@ -418,6 +427,29 @@ function uploadOTA() {
   status.innerText = 'Starting upload...';
   status.style.color = '#aaa';
   xhr.send(fd);
+}
+
+
+function resetDiag() {
+  if (!confirm('Diagnose-Zähler zurücksetzen? (boots, lastReset etc.)')) return;
+  var status = document.getElementById('diag-status');
+  fetch('/reset_diag', {method:'POST'})
+    .then(function(r) {
+      status.innerText = r.ok ? '✓ Diag-Zähler zurückgesetzt' : '✗ Fehler';
+      status.style.color = r.ok ? 'green' : 'red';
+    })
+    .catch(function() { status.innerText = '✗ Verbindungsfehler'; status.style.color = 'red'; });
+}
+
+function deleteCrashlogs() {
+  if (!confirm('Alle Crashlogs löschen?')) return;
+  var status = document.getElementById('diag-status');
+  fetch('/delete_crashlogs', {method:'POST'})
+    .then(function(r) {
+      status.innerText = r.ok ? '✓ Crashlogs gelöscht' : '✗ Fehler';
+      status.style.color = r.ok ? 'green' : 'red';
+    })
+    .catch(function() { status.innerText = '✗ Verbindungsfehler'; status.style.color = 'red'; });
 }
 
 function toggleDebug() {

@@ -4,7 +4,7 @@
 #include <Audio.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
-#include <SD.h>
+#include "sd_interface.h"
 
 static Audio audio;
 
@@ -82,6 +82,20 @@ static void loadLastPreset() {
   if (f) { radioLastPreset = f.readStringUntil('\n').toInt(); f.close(); }
 }
 
+static void saveRadioVolume() {
+  File f = LittleFS.open("/radio_volume.val", "w");
+  if (f) { f.println((int)radioVolume); f.close(); }
+}
+
+static void loadRadioVolume() {
+  File f = LittleFS.open("/radio_volume.val", "r");
+  if (f) {
+    int v = f.readStringUntil('\n').toInt();
+    f.close();
+    radioVolume = (uint8_t)constrain(v, 0, 21);
+  }
+}
+
 // ── FreeRTOS Task (Core 0) ────────────────────────────────────────────────────
 
 static void radioTask(void* params) {
@@ -146,7 +160,8 @@ static void radioTask(void* params) {
 void radioInit() {
   radioStringMutex = xSemaphoreCreateMutex();
   audio.setPinout(RADIO_I2S_BCLK, RADIO_I2S_LRC, RADIO_I2S_DOUT);
-  audio.setVolume(RADIO_DEFAULT_VOLUME);
+  loadRadioVolume();
+  audio.setVolume(radioVolume);
   radioLoadPresets();
   loadLastPreset();
   xTaskCreatePinnedToCore(radioTask, "radioTask", 16384, NULL, 2, NULL, 0);
@@ -185,6 +200,7 @@ void radioSetVolume(uint8_t vol) {
   if (vol > 21) vol = 21;
   radioVolume = vol;
   audio.setVolume(vol);
+  saveRadioVolume();
 }
 
 void radioPlayLocalFile(const char* sdPath) {
@@ -235,9 +251,11 @@ void radioSavePresets() {
 
 // ── Webserver-Routen ──────────────────────────────────────────────────────────
 
+extern void sendLittleFSHtml(AsyncWebServerRequest *request, const char* path);
+
 void radioRegisterRoutes(AsyncWebServer* server) {
   server->on("/radio.html", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(LittleFS, "/radio.html", "text/html");
+    sendLittleFSHtml(request, "/radio.html");
   });
 
   server->on("/radio_status", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -296,6 +314,34 @@ void radioRegisterRoutes(AsyncWebServer* server) {
       return;
     }
     radioSetVolume((uint8_t)request->getParam("vol", true)->value().toInt());
+    request->send(200, "text/plain", "OK");
+  });
+
+  server->on("/gif_audio_play", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!request->hasParam("path", true)) {
+      request->send(400, "text/plain", "Missing path");
+      return;
+    }
+    String path = request->getParam("path", true)->value();
+    if (path.startsWith("SD:")) path = path.substring(3);
+    if (!path.startsWith("/") || (!path.endsWith(".mp3") && !path.endsWith(".MP3"))) {
+      request->send(400, "text/plain", "Ungültiger Pfad (erwartet /GifAudio/file.mp3)");
+      return;
+    }
+    if (!SD.exists(path.c_str())) {
+      request->send(404, "text/plain", "Datei nicht gefunden");
+      return;
+    }
+    if (radioIsPlaying) {
+      request->send(409, "text/plain", "Radio läuft — GIF-Audio hat keinen Vorrang");
+      return;
+    }
+    radioPlayLocalFile(path.c_str());
+    request->send(200, "text/plain", "OK");
+  });
+
+  server->on("/gif_audio_stop", HTTP_POST, [](AsyncWebServerRequest *request) {
+    radioStopLocalFile();
     request->send(200, "text/plain", "OK");
   });
 

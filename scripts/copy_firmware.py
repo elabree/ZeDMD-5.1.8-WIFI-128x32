@@ -1,7 +1,6 @@
 Import("env")
 import os, shutil, subprocess
 
-# Git-Hash vor dem Compile als CPPDEFINE setzen
 try:
     _git_hash = subprocess.check_output(
         ["git", "-C", env.subst("$PROJECT_DIR"), "rev-parse", "--short", "HEAD"],
@@ -23,29 +22,29 @@ env.Append(CPPDEFINES=[
     ("GIT_BRANCH", '\\"' + _git_branch + '\\"'),
 ])
 
-def copy_firmware(source, target, env):
-    firmware_src = os.path.join(env.subst("$BUILD_DIR"), "firmware.bin")
-    if not os.path.exists(firmware_src):
-        print("copy_firmware: firmware.bin nicht gefunden, überspringe.")
-        return
+# Wenn sich der Hash seit dem letzten Build geändert hat, main.cpp antouchen
+# damit SCons es neu kompiliert und das neue CPPDEFINE einbettet.
+_stamp = os.path.join(env.subst("$BUILD_DIR"), ".git_hash_stamp")
+_last = ""
+try:
+    with open(_stamp) as f:
+        _last = f.read().strip()
+except Exception:
+    pass
 
-    dest_dir = os.path.expanduser("~/Desktop/Firmwares")
-    os.makedirs(dest_dir, exist_ok=True)
+if _last != _git_hash:
+    _main = os.path.join(env.subst("$PROJECT_DIR"), "src", "main.cpp")
+    if os.path.exists(_main):
+        os.utime(_main, None)
+    os.makedirs(os.path.dirname(_stamp), exist_ok=True)
+    with open(_stamp, "w") as f:
+        f.write(_git_hash)
+    print(f"copy_firmware: Hash geändert ({_last or 'neu'} → {_git_hash}), main.cpp wird neu kompiliert")
 
-    project_dir = env.subst("$PROJECT_DIR")
-    try:
-        git_hash = subprocess.check_output(
-            ["git", "-C", project_dir, "rev-parse", "--short", "HEAD"],
-            stderr=subprocess.DEVNULL
-        ).decode().strip()
-    except Exception:
-        git_hash = "unknown"
-
-    env_name = env.subst("$PIOENV")
-
-    named = os.path.join(dest_dir, f"ZeDMD_5.1.8-jb_{env_name}_{git_hash}.bin")
-
-    shutil.copy2(firmware_src, named)
-    print(f"copy_firmware: {os.path.basename(named)} → ~/Desktop/Firmwares/")
-
-env.AddPostAction("$BUILD_DIR/firmware.bin", copy_firmware)
+# Kein automatischer Copy mehr — verhindert Doppelkopien bei Test-Builds vor dem Commit.
+# Firmware manuell kopieren nach: 1) Commit, 2) pio run (zweiter Build mit richtigem Hash):
+#
+#   HASH=$(git rev-parse --short HEAD)
+#   BRANCH=$(git rev-parse --abbrev-ref HEAD | sed 's|/|-|g')
+#   cp .pio/build/S3-N16R8_128x32_wifi_sd_webradio/firmware.bin \
+#      ~/Desktop/Firmwares/ZeDMD_5.1.8-jb_S3-N16R8_128x32_wifi_sd_webradio_${BRANCH}_${HASH}.bin
