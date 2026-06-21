@@ -4,6 +4,15 @@
 	(generator_version "10.0")
 	(uuid "e0b12abf-2d98-476c-aa08-835728e491f9")
 	(paper "A4")
+	(title_block
+		(title "HUB75")
+		(date "2026-06-21")
+		(rev "1.1")
+		(company "elabree")
+		(comment 1 "https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32")
+		(comment 2 "https://ppuc.github.io/docs/zedmd/")
+		(comment 3 "https://github.com/PPUC/ZeDMD")
+	)
 	(lib_symbols
 		(symbol "Connector_Generic:Conn_02x08_Odd_Even"
 			(pin_names
@@ -1526,7 +1535,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "3a6e9510-e78a-4d3a-8fc9-3ef2c7e751a1")
-		(property "Reference" "SW7"
+		(property "Reference" "SW2"
 			(at 177.8 111.76 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -1546,7 +1555,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Button_Switch_SMD:SW_SPST_SKQG_WithStem"
+		(property "Footprint" "Button_Switch_THT:SW_PUSH_6mm"
 			(at 177.8 111.76 0)
 			(hide yes)
 			(show_name no)
@@ -1568,7 +1577,7 @@
 				)
 			)
 		)
-		(property "Description" "TS-1187A-B-A-B, tacticle switch, 5.1x5.1mm"
+		(property "Description" "Tactile Pushbutton Switch Momentary 4pin 6*6*6mm"
 			(at 177.8 116.84 0)
 			(hide yes)
 			(show_name no)
@@ -1579,7 +1588,95 @@
 				)
 			)
 		)
-		(property "LCSC" "C318884"
+		(property "LCSC" ""
+			(at 177.8 116.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Pmax" ""
+			(at 177.8 116.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Power" ""
+			(at 177.8 116.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Sim.Device" ""
+			(at 177.8 116.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Sim.Pins" ""
+			(at 177.8 116.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Tolerance" ""
+			(at 177.8 116.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Vf" ""
+			(at 177.8 116.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Vmax" ""
+			(at 177.8 116.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Voltage" ""
 			(at 177.8 116.84 0)
 			(hide yes)
 			(show_name no)
@@ -1599,7 +1696,7 @@
 		(instances
 			(project "ZeDMD_WiFi"
 				(path "/f152223e-3e6c-45b9-8918-58617cf6ab29/de14592e-84cd-44fd-b758-98842de6cca7"
-					(reference "SW7")
+					(reference "SW2")
 					(unit 1)
 				)
 			)
@@ -1617,7 +1714,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "6e797645-54f6-4cac-acf7-ec01bb228519")
-		(property "Reference" "SW9"
+		(property "Reference" "SW4"
 			(at 198.12 124.46 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -1637,7 +1734,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Button_Switch_SMD:SW_SPST_SKQG_WithStem"
+		(property "Footprint" "Button_Switch_THT:SW_PUSH_6mm"
 			(at 198.12 124.46 0)
 			(hide yes)
 			(show_name no)
@@ -1659,7 +1756,7 @@
 				)
 			)
 		)
-		(property "Description" "TS-1187A-B-A-B, tacticle switch, 5.1x5.1mm"
+		(property "Description" "Tactile Pushbutton Switch Momentary 4pin 6*6*6mm"
 			(at 198.12 129.54 0)
 			(hide yes)
 			(show_name no)
@@ -1670,7 +1767,95 @@
 				)
 			)
 		)
-		(property "LCSC" "C318884"
+		(property "LCSC" ""
+			(at 198.12 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Pmax" ""
+			(at 198.12 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Power" ""
+			(at 198.12 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Sim.Device" ""
+			(at 198.12 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Sim.Pins" ""
+			(at 198.12 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Tolerance" ""
+			(at 198.12 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Vf" ""
+			(at 198.12 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Vmax" ""
+			(at 198.12 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Voltage" ""
 			(at 198.12 129.54 0)
 			(hide yes)
 			(show_name no)
@@ -1690,7 +1875,7 @@
 		(instances
 			(project "ZeDMD_WiFi"
 				(path "/f152223e-3e6c-45b9-8918-58617cf6ab29/de14592e-84cd-44fd-b758-98842de6cca7"
-					(reference "SW9")
+					(reference "SW4")
 					(unit 1)
 				)
 			)
@@ -1708,7 +1893,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "7f6c63a3-3696-4b92-80d3-fe05f80a2c8d")
-		(property "Reference" "SW8"
+		(property "Reference" "SW3"
 			(at 187.96 137.16 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -1728,7 +1913,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Button_Switch_SMD:SW_SPST_SKQG_WithStem"
+		(property "Footprint" "Button_Switch_THT:SW_PUSH_6mm"
 			(at 187.96 137.16 0)
 			(hide yes)
 			(show_name no)
@@ -1750,7 +1935,7 @@
 				)
 			)
 		)
-		(property "Description" "TS-1187A-B-A-B, tacticle switch, 5.1x5.1mm"
+		(property "Description" "Tactile Pushbutton Switch Momentary 4pin 6*6*6mm"
 			(at 187.96 142.24 0)
 			(hide yes)
 			(show_name no)
@@ -1761,7 +1946,95 @@
 				)
 			)
 		)
-		(property "LCSC" "C318884"
+		(property "LCSC" ""
+			(at 187.96 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Pmax" ""
+			(at 187.96 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Power" ""
+			(at 187.96 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Sim.Device" ""
+			(at 187.96 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Sim.Pins" ""
+			(at 187.96 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Tolerance" ""
+			(at 187.96 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Vf" ""
+			(at 187.96 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Vmax" ""
+			(at 187.96 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Voltage" ""
 			(at 187.96 142.24 0)
 			(hide yes)
 			(show_name no)
@@ -1781,7 +2054,7 @@
 		(instances
 			(project "ZeDMD_WiFi"
 				(path "/f152223e-3e6c-45b9-8918-58617cf6ab29/de14592e-84cd-44fd-b758-98842de6cca7"
-					(reference "SW8")
+					(reference "SW3")
 					(unit 1)
 				)
 			)
@@ -1798,7 +2071,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "87a56644-dc9e-4b15-a9e4-ec77d7dba7c6")
-		(property "Reference" "SW6"
+		(property "Reference" "SW1"
 			(at 167.64 124.46 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -1818,7 +2091,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Button_Switch_SMD:SW_SPST_SKQG_WithStem"
+		(property "Footprint" "Button_Switch_THT:SW_PUSH_6mm"
 			(at 167.64 124.46 0)
 			(hide yes)
 			(show_name no)
@@ -1840,7 +2113,7 @@
 				)
 			)
 		)
-		(property "Description" "TS-1187A-B-A-B, tacticle switch, 5.1x5.1mm"
+		(property "Description" "Tactile Pushbutton Switch Momentary 4pin 6*6*6mm"
 			(at 167.64 129.54 0)
 			(hide yes)
 			(show_name no)
@@ -1851,7 +2124,95 @@
 				)
 			)
 		)
-		(property "LCSC" "C318884"
+		(property "LCSC" ""
+			(at 167.64 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Pmax" ""
+			(at 167.64 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Power" ""
+			(at 167.64 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Sim.Device" ""
+			(at 167.64 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Sim.Pins" ""
+			(at 167.64 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Tolerance" ""
+			(at 167.64 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Vf" ""
+			(at 167.64 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Vmax" ""
+			(at 167.64 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Voltage" ""
 			(at 167.64 129.54 0)
 			(hide yes)
 			(show_name no)
@@ -1871,7 +2232,7 @@
 		(instances
 			(project "ZeDMD_WiFi"
 				(path "/f152223e-3e6c-45b9-8918-58617cf6ab29/de14592e-84cd-44fd-b758-98842de6cca7"
-					(reference "SW6")
+					(reference "SW1")
 					(unit 1)
 				)
 			)
@@ -1889,7 +2250,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "d2f32de2-daef-4faa-8a97-22d7b0f7551c")
-		(property "Reference" "#PWR015"
+		(property "Reference" "#PWR09"
 			(at 172.72 101.6 0)
 			(hide yes)
 			(show_name no)
@@ -1950,7 +2311,7 @@
 		(instances
 			(project "ZeDMD_WiFi"
 				(path "/f152223e-3e6c-45b9-8918-58617cf6ab29/de14592e-84cd-44fd-b758-98842de6cca7"
-					(reference "#PWR015")
+					(reference "#PWR09")
 					(unit 1)
 				)
 			)
@@ -1966,9 +2327,8 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "d3219e72-034e-4b38-a8af-d318b37de467")
-		(property "Reference" "J6"
+		(property "Reference" "J9"
 			(at 163.83 68.58 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -1988,7 +2348,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Connector_IDC:IDC-Header_2x08_P2.54mm_Vertical_SMD"
+		(property "Footprint" "Connector_IDC:IDC-Header_2x08_P2.54mm_Vertical"
 			(at 162.56 82.55 0)
 			(hide yes)
 			(show_name no)
@@ -2010,7 +2370,7 @@
 				)
 			)
 		)
-		(property "Description" "2x8p IDC Header, SMD vertical, P=2.54mm"
+		(property "Description" "2x8p IDC Boxed Header, vertical, P=2.54mm"
 			(at 162.56 82.55 0)
 			(hide yes)
 			(show_name no)
@@ -2021,7 +2381,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C601969"
+		(property "LCSC" ""
 			(at 162.56 82.55 0)
 			(hide yes)
 			(show_name no)
@@ -2035,6 +2395,104 @@
 		(property "JLCPCB Rotation Offset" "270"
 			(at 162.56 82.55 0)
 			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Pmax" ""
+			(at 162.56 82.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Power" ""
+			(at 162.56 82.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Sim.Device" ""
+			(at 162.56 82.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Sim.Pins" ""
+			(at 162.56 82.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Tolerance" ""
+			(at 162.56 82.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Vf" ""
+			(at 162.56 82.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Vmax" ""
+			(at 162.56 82.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Voltage" ""
+			(at 162.56 82.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Function" "HUB-75"
+			(at 163.322 97.79 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -2094,7 +2552,7 @@
 		(instances
 			(project "ZeDMD_WiFi"
 				(path "/f152223e-3e6c-45b9-8918-58617cf6ab29/de14592e-84cd-44fd-b758-98842de6cca7"
-					(reference "J6")
+					(reference "J9")
 					(unit 1)
 				)
 			)
@@ -2112,7 +2570,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "dcce9b80-9d62-40cd-8eb7-135a2fb03a8d")
-		(property "Reference" "#PWR016"
+		(property "Reference" "#PWR010"
 			(at 182.88 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -2173,7 +2631,7 @@
 		(instances
 			(project "ZeDMD_WiFi"
 				(path "/f152223e-3e6c-45b9-8918-58617cf6ab29/de14592e-84cd-44fd-b758-98842de6cca7"
-					(reference "#PWR016")
+					(reference "#PWR010")
 					(unit 1)
 				)
 			)

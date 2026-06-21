@@ -253,7 +253,7 @@
       "internal_id": "",
       "mfg": "",
       "mpn": "",
-      "sch_revision": "1.0"
+      "sch_revision": "1.1"
     },
     "layer_pairs": [],
     "layer_presets": [],
@@ -772,12 +772,6 @@
         },
         {
           "group_by": false,
-          "label": "dielectric",
-          "name": "dielectric",
-          "show": false
-        },
-        {
-          "group_by": false,
           "label": "Dielectric",
           "name": "Dielectric",
           "show": false
@@ -799,6 +793,24 @@
           "label": "LCSC",
           "name": "LCSC",
           "show": true
+        },
+        {
+          "group_by": false,
+          "label": "Clone",
+          "name": "Clone",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "JLCPCB Rotation Offset",
+          "name": "JLCPCB Rotation Offset",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Function",
+          "name": "Function",
+          "show": false
         }
       ],
       "filter_string": "",
@@ -857,17 +869,13 @@
         "uuid": "f152223e-3e6c-45b9-8918-58617cf6ab29"
       }
     ],
-    "used_designators": "#PWR15-18,R7,J6,SW6-9,U4",
+    "used_designators": "",
     "variants": []
   },
   "sheets": [
     [
       "f152223e-3e6c-45b9-8918-58617cf6ab29",
       "ZeDMD_WiFi"
-    ],
-    [
-      "b1f6633d-5b2a-4fbb-91ae-77527bd388a5",
-      "ESP32S3"
     ],
     [
       "de14592e-84cd-44fd-b758-98842de6cca7",
