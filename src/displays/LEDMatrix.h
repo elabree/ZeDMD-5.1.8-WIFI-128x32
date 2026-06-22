@@ -83,6 +83,9 @@ class LedMatrix : public DisplayDriver {
   void DisplayText(const char *text, uint16_t x, uint16_t y, uint8_t r,
                    uint8_t g, uint8_t b, bool transparent = false,
                    bool inverted = false);
+  void DisplayTextScaled(const char *text, uint16_t x, uint16_t y,
+                          uint8_t r, uint8_t g, uint8_t b,
+                          uint8_t scale = 1) override;
   void FillZoneRaw(uint8_t idx, uint8_t *pBuffer);
   void FillZoneRaw565(uint8_t idx, uint8_t *pBuffer);
   void ClearZone(uint8_t idx);

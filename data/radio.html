@@ -74,7 +74,6 @@
     }
     .vol-row label { font-size: 0.85em; color: #aaa; white-space: nowrap; }
     .vol-row input[type=range] { flex: 1; accent-color: #e64; }
-    .vol-val { font-size: 0.85em; width: 28px; text-align: right; }
     .display-row {
       display: flex; align-items: center; gap: 10px;
     }
@@ -228,11 +227,6 @@
 
   <!-- Controls -->
   <div class="controls">
-    <div class="vol-row">
-      <label>Lautst&auml;rke</label>
-      <input type="range" id="volSlider" min="0" max="21" value="15" oninput="onVolChange(this.value)">
-      <span class="vol-val" id="volVal">15</span>
-    </div>
     <div class="display-row">
       <label>Display-Anzeige</label>
       <button class="toggle-btn" id="displayToggle" onclick="toggleDisplay()">10s anzeigen</button>
@@ -244,6 +238,21 @@
   <div class="section-title">Gespeicherte Sender</div>
   <div class="preset-list" id="presetList">
     <div class="preset-empty">Noch keine Sender gespeichert.</div>
+  </div>
+
+  <!-- Manuell -->
+  <div class="section-title">URL direkt eingeben</div>
+  <div class="search-bar" style="margin-bottom:14px">
+    <div class="search-row">
+      <input type="text" id="manualName" placeholder="Sendername" maxlength="60">
+    </div>
+    <div class="search-row" style="margin-top:6px">
+      <input type="text" id="manualUrl" placeholder="Stream-URL (http://...)" maxlength="255">
+    </div>
+    <div class="search-row" style="margin-top:8px; justify-content:flex-end">
+      <button class="btn btn-sec" onclick="playManualUrl()">&#9654; Testen</button>
+      <button class="btn" style="margin-left:8px" onclick="saveManualPreset()">+ Speichern</button>
+    </div>
   </div>
 
   <!-- Suche -->
@@ -264,7 +273,6 @@
 
 <script>
   let currentPlaying = null;
-  let volDebounce = null;
   let displayActive = false;
   let presets = [];
 
@@ -310,11 +318,6 @@
     } else {
       iconEl.style.display = 'none';
       iconPh.style.display = 'flex';
-    }
-
-    if (d.volume !== undefined) {
-      document.getElementById('volSlider').value = d.volume;
-      document.getElementById('volVal').textContent = d.volume;
     }
 
     if (d.displayActive !== undefined) {
@@ -365,17 +368,6 @@
     setTimeout(fetchStatus, 400);
   }
 
-  // Lautstärke
-
-  function onVolChange(val) {
-    document.getElementById('volVal').textContent = val;
-    clearTimeout(volDebounce);
-    volDebounce = setTimeout(() => {
-      const fd = new FormData();
-      fd.append('vol', val);
-      fetch('/radio_volume', { method: 'POST', body: fd });
-    }, 250);
-  }
 
   // Display-Toggle
 
@@ -505,7 +497,8 @@
       const saved = presets.length >= 20 || presets.some(p => p.url === url);
       const icon  = s.favicon || '';
       const name  = s.name || 'Unbekannt';
-      const tags  = [s.state, s.tags].filter(Boolean).join(' · ').substring(0, 60);
+      const bitrate = s.bitrate ? s.bitrate + ' kbps' : '';
+      const tags  = [bitrate, s.state, s.tags].filter(Boolean).join(' · ').substring(0, 60);
       return `
         <div class="result-item">
           ${icon
@@ -543,6 +536,26 @@
   function esc(s) {
     if (!s) return '';
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  // Manuelle URL
+
+  function playManualUrl() {
+    const url  = document.getElementById('manualUrl').value.trim();
+    const name = document.getElementById('manualName').value.trim() || url;
+    if (!url) return;
+    playUrl(url, name, '');
+  }
+
+  async function saveManualPreset() {
+    const url  = document.getElementById('manualUrl').value.trim();
+    const name = document.getElementById('manualName').value.trim() || url;
+    if (!url) return;
+    const ok = await savePreset(name, url, '');
+    if (ok) {
+      document.getElementById('manualName').value = '';
+      document.getElementById('manualUrl').value  = '';
+    }
   }
 
   // Init

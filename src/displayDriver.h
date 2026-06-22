@@ -65,6 +65,12 @@ class DisplayDriver {
                            uint8_t g, uint8_t b, bool transparent = false,
                            bool inverted = false) = 0;
 
+  virtual void DisplayTextScaled(const char *text, uint16_t x, uint16_t y,
+                                  uint8_t r, uint8_t g, uint8_t b,
+                                  uint8_t scale = 1) {
+    DisplayText(text, x, y, r, g, b);
+  }
+
   /// @brief RGB888 24bit Zone fill
   /// @param idx index
   /// @param pBuffer buffer with pixel data [R,G,B]
