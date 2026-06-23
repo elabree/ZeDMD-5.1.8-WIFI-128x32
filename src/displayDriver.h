@@ -71,6 +71,19 @@ class DisplayDriver {
     DisplayText(text, x, y, r, g, b);
   }
 
+  virtual void DisplayTextGFX(const char *text, int16_t x, uint8_t r,
+                               uint8_t g, uint8_t b) {
+    DisplayText(text, (uint16_t)(x < 0 ? 0 : x), 0, r, g, b);
+  }
+
+  virtual uint16_t GetTextGFXWidth(const char *text) {
+    return (uint16_t)(strlen(text) * 12);
+  }
+
+  virtual void EraseVLine(int16_t x) {}
+  virtual void RenderTextGFXToBuffer(uint8_t *buf, const char *text, int16_t x,
+                                     uint8_t r, uint8_t g, uint8_t b) {}
+
   /// @brief RGB888 24bit Zone fill
   /// @param idx index
   /// @param pBuffer buffer with pixel data [R,G,B]

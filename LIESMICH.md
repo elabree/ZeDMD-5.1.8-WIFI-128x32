@@ -40,6 +40,7 @@ Internetradio direkt über ZeDMD streamen — über einen kleinen integrierten L
 Erfordert ein **MAX98357A I2S-Verstärkermodul** — Verkabelung siehe unten.
 
 - Dedizierte Sender-Verwaltungsseite unter `/radio.html` — Sendersuche via [radio-browser.info](https://www.radio-browser.info), Presets mit Logo-Icons speichern
+- **Länder-Schnellauswahl** (🇩🇪 DE / 🇦🇹 AT / 🇨🇭 CH / 🇳🇱 NL / 🇫🇷 FR) lädt die Top-100-Sender des jeweiligen Landes mit einem Tipper; Niedersachsen-Regionalfilter weiterhin verfügbar
 - Sendername, Titelinfo und Sender-Logo in der Web-Oberfläche angezeigt
 - Lautstärkeregler auf der Haupt- und Radio-Seite
 - Sendername und Titelinfo erscheinen beim Start 5 Sekunden auf der LED-Matrix, dann zurück zum Screensaver — „DMD 10s"-Button für erneute Anzeige
@@ -63,18 +64,35 @@ Beim Abspielen eines animierten GIF-Screensavers passend dazu eine MP3-Datei von
 
 > **Hinweis:** GIF-Audio spielt einmal pro GIF-Zyklus ab — Endlosschleife ist noch nicht implementiert.
 
-### SDMMC-Board-Unterstützung
+### SDMMC-Board-Unterstützung *(wird nicht aktiv weiterentwickelt)*
 Unterstützung für Boards mit **onboard SD-Karte via SDMMC-Interface** (1-Bit-Modus) hinzugefügt — kein externes SPI-Modul nötig. Siehe Pin-Tabelle für die erforderlichen HUB75-Kabeländerungen.
+
+> **Hinweis:** Diese Build-Variante wird nicht aktiv gepflegt. Der Entwicklungsfokus liegt auf dem Standard-SPI-SD-Build (`wifi_sd_webradio`). Die SDMMC-Variante funktioniert möglicherweise, wird aber nicht mit jedem Release getestet.
+
+### GIF-Screensaver-Reihenfolge
+- **A-Z-Schalter** — direkt auf der Hauptseite zwischen alphabetischer und zufälliger Wiedergabereihenfolge wechseln
+- **Reshuffle-Button** — GIF-Reihenfolge jederzeit neu würfeln ohne kompletten Reload
+
+### Konfigurierbare Zeitzone
+Die NTP-Zeitzone kann jetzt direkt auf der Admin-Seite eingestellt werden — kein Firmware-Rebuild nötig.
+Ein Dropdown deckt die gängigsten Zeitzonen ab (Mitteleuropa, UK, UTC, US Ost/Mitte/Berg/Pazifik); die Option **Custom** akzeptiert beliebige POSIX-Zeitzone-Strings für volle Flexibilität. Die Einstellung wird in LittleFS gespeichert und übersteht Neustarts.
+
+### SD-Karte mounten / auswerfen
+Die Hauptseite zeigt jetzt neben der SD-Karten-Statusleiste einen **Mount / Eject**-Toggle-Button.
+- **⏏ Eject** (grau) — SD-Karte sicher aushängen, sodass sie bei eingeschaltetem Gerät entnommen werden kann
+- **⏻ Mount** (grün) — Karte nach dem Einlegen wieder einbinden; aktualisiert die Screensaver-Dateiliste und den GIF-Audio-Cache automatisch
 
 ### Stabilität & Bugfixes
 Diese Version enthält eine umfassende Überarbeitung der Speicherverwaltung und Task-Sicherheit:
 
+- **Admin-Seite stürzt nicht mehr ab** — Root-Cause per Coredump-Analyse identifiziert: lwIP-Assertion in AsyncTCP 3.3.5, ausgelöst durch den Basic-Auth-Handshake. Behoben durch Update auf AsyncTCP 3.4.10
 - Race Condition beim Senderwechsel behoben — Audio springt nicht mehr auf den vorherigen Sender zurück
 - Wetterdaten (MQTT + HTTP) jetzt sicher zwischen beiden CPU-Kernen synchronisiert
 - SD-Karten-Verzeichnislisting aus den Netzwerk-Callbacks herausgelöst — kein Audio-Stottern mehr beim Webzugriff
 - Wetter-HTTP-Antwort wird im PSRAM gepuffert — kein großer SRAM-Spike beim Abruf mehr
 - Alle Datei-Uploads jetzt atomar (`.tmp` + Umbenennen) — abgebrochene Uploads hinterlassen keine korrupten Dateien
 - `screensaverFiles`-Array durch Mutex gegen gleichzeitigen Webzugriff gesichert
+- Audio-Task-Priorität über den Webserver-Task angehoben — reduziert Stream-Aussetzer bei gleichzeitigem Web-Traffic
 
 ---
 
@@ -272,6 +290,17 @@ Die Screensaver GIF/RAW-Dateien können auf einer microSD-Karte gespeichert werd
 > Im Zweifelsfall **3,3V** verwenden — die GPIO-Pins des ESP32-S3 sind **nicht** 5V-tolerant.
 
 **Format:** FAT32, Dateien in Unterordnern (z.B. `/MyGIFs/`). GIF- und RAW-Dateien werden unterstützt.
+
+**Scan-Performance beim ersten Start**
+
+> ⚠️ Der erste Scan einer großen GIF-Bibliothek kann sehr lange dauern — ein Ordner mit ~5 400 Dateien benötigt über SPI etwa **35 Minuten**. Das ist eine grundsätzliche SPI/FAT32-Einschränkung: Die Arduino-SD-Library öffnet jede Datei einzeln, und FAT32-Verzeichnisse mit vielen Einträgen können nicht indexiert werden.
+>
+> **Nach dem ersten Scan wird die Dateiliste in LittleFS gecacht** (`sc_*.bin`). Jeder weitere Neustart lädt den Cache in Sekunden — kein SD-Scan nötig.
+>
+> **Tipps für akzeptable Scan-Zeiten:**
+> - **Mehrere kleinere Unterordner** statt einem großen verwenden (z.B. 5 × 1 000 Dateien statt 1 × 5 000) — jeder Ordner wird unabhängig gescannt und separat gecacht.
+> - **Dedizierten Upload-Ordner** nutzen (klein, nur frisch hochgeladene Dateien) — der „Upload folder"-Picker in der Web-UI ermöglicht gezieltes Hochladen ohne den großen Bibliotheksordner anzufassen.
+> - Eine geplante zukünftige Optimierung ist eine **SD-seitige Indexdatei** (`.index` pro Ordner), die Directory-Traversal durch ein einzelnes sequentielles Lesen ersetzt — Scan-Zeit von Minuten auf unter einer Sekunde, unabhängig von der Dateianzahl.
 
 ---
 

@@ -9,4 +9,5 @@ CLAUDE.md
 PROJECT_STATUS.md
 REVIEW_*.md
 scripts/merge_firmware.py
+scripts/copy_firmware.py
 platformio_override.ini
