@@ -4336,6 +4336,16 @@
 		)
 		(uuid "5453a562-4de2-40c7-8664-65bd62f221a6")
 	)
+	(label "RGBout"
+		(at 204.47 116.84 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "5fdb1123-5109-4a8b-af1b-13e2e1a3c4c6")
+	)
 	(label "SD_R"
 		(at 114.3 168.91 0)
 		(effects
@@ -5114,8 +5124,8 @@
 				)
 			)
 		)
-		(property "Value" "TestPoint"
-			(at 40.132 172.974 90)
+		(property "Value" "GND"
+			(at 37.592 172.974 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -5629,8 +5639,8 @@
 				)
 			)
 		)
-		(property "Value" "TestPoint"
-			(at 76.962 181.864 90)
+		(property "Value" "Vin"
+			(at 73.914 181.356 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -7586,8 +7596,8 @@
 				)
 			)
 		)
-		(property "Value" "TestPoint"
-			(at 105.918 188.976 90)
+		(property "Value" "GND"
+			(at 108.966 194.056 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -8255,8 +8265,8 @@
 				)
 			)
 		)
-		(property "Value" "TestPoint"
-			(at 123.698 181.864 90)
+		(property "Value" "Vin"
+			(at 126.238 181.356 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects

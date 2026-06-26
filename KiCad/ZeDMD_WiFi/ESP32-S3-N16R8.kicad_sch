@@ -2065,7 +2065,7 @@
 				)
 			)
 		)
-		(property "Description" "ESP32-S3-DevKitC / YD-ESP32-S3 N16R8 + 2x Pin Socket, single row, 01x22, P=2.54mm"
+		(property "Description" "2x Pin Socket, single row, 01x22, P=2.54mm"
 			(at 134.62 95.25 0)
 			(hide yes)
 			(show_name no)
