@@ -2,6 +2,7 @@
 #include "LEDMatrix.h"
 
 #include "fonts/tiny4x6.h"
+#include <Fonts/FreeSansBold12pt7b.h>
 
 LedMatrix::LedMatrix() {
   int8_t colorPins1[3] = {R1_PIN, G1_PIN, B1_PIN};
@@ -35,6 +36,10 @@ LedMatrix::LedMatrix() {
 
   dma_display = new MatrixPanel_I2S_DMA(mxconfig);
   dma_display->begin();
+
+  // Pre-allocated canvas for flicker-free GFX text rendering.
+  // Renders into SRAM pixel-by-pixel without touching the live DMA buffer.
+  textCanvas = new GFXcanvas16(TOTAL_WIDTH, TOTAL_HEIGHT);
 }
 
 bool LedMatrix::HasScalingModes() {
@@ -155,5 +160,59 @@ void IRAM_ATTR LedMatrix::FillPanelRaw(uint8_t *pBuffer) {
   }
 }
 
-LedMatrix::~LedMatrix() { delete dma_display; }
+// Renders text with FreeSansBold12pt7b (~17px tall). x may be negative (clips correctly).
+// Baseline y=24 leaves headroom for ascenders and descenders within 32px display height.
+void LedMatrix::DisplayTextGFX(const char *text, int16_t x, uint8_t r,
+                                uint8_t g, uint8_t b) {
+  dma_display->setFont(&FreeSansBold12pt7b);
+  // Black background fills each glyph cell — avoids ClearScreen() between frames
+  dma_display->setTextColor(dma_display->color565(r, g, b), 0x0000);
+  dma_display->setTextWrap(false);
+  dma_display->setCursor(x, 24);
+  dma_display->print(text);
+  dma_display->setFont(nullptr);
+}
+
+void LedMatrix::EraseVLine(int16_t x) {
+  if (x >= 0 && x < dma_display->width())
+    dma_display->drawFastVLine(x, 0, dma_display->height(), 0);
+}
+
+// Returns pixel width of text rendered with FreeSansBold12pt7b (pure font math, no rendering).
+uint16_t LedMatrix::GetTextGFXWidth(const char *text) {
+  textCanvas->setFont(&FreeSansBold12pt7b);
+  int16_t x1, y1;
+  uint16_t w, h;
+  textCanvas->getTextBounds(text, 0, 24, &x1, &y1, &w, &h);
+  textCanvas->setFont(nullptr);
+  return w;
+}
+
+// Renders text at position x (may be negative for scroll) into an RGB888 renderBuffer.
+// Uses an off-screen GFXcanvas16 — no DMA writes during rendering, zero flicker.
+void LedMatrix::RenderTextGFXToBuffer(uint8_t *buf, const char *text, int16_t x,
+                                       uint8_t r, uint8_t g, uint8_t b) {
+  textCanvas->fillScreen(0);
+  textCanvas->setFont(&FreeSansBold12pt7b);
+  uint16_t color565 = ((uint16_t)(r & 0xF8) << 8) | ((uint16_t)(g & 0xFC) << 3) | (b >> 3);
+  textCanvas->setTextColor(color565);
+  textCanvas->setTextWrap(false);
+  textCanvas->setCursor(x, 24);
+  textCanvas->print(text);
+  textCanvas->setFont(nullptr);
+
+  const uint16_t *pixels = textCanvas->getBuffer();
+  const uint32_t n = TOTAL_WIDTH * TOTAL_HEIGHT;
+  for (uint32_t i = 0; i < n; i++) {
+    uint16_t c  = pixels[i];
+    buf[i * 3]     = (c >> 8) & 0xF8;
+    buf[i * 3 + 1] = (c >> 3) & 0xFC;
+    buf[i * 3 + 2] = (c << 3) & 0xF8;
+  }
+}
+
+LedMatrix::~LedMatrix() {
+  delete textCanvas;
+  delete dma_display;
+}
 #endif

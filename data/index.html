@@ -126,7 +126,7 @@
         button {
             background-color: #007bff;
             color: white;
-            padding: 12px;
+            padding: 8px 14px;
             border: none;
             border-radius: 4px;
             width: 100%;
@@ -264,7 +264,7 @@
             <br>
             <!-- SD-Karte: globale Voraussetzung für Screensaver + GIF-Audio -->
             <div class="section" style="margin-bottom:20px;">
-                <h2 class="section-header">&#128190; SD-Karte &amp; Speicher</h2>
+                <h2 class="section-header">&#128190; SD Card &amp; Storage</h2>
                 <div style="margin-bottom:10px;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
                         <span style="font-size:0.82em; color:#aaa;">LittleFS</span>
@@ -283,7 +283,7 @@
                 </div>
                 <div style="display:flex; align-items:center; gap:8px;">
                     <div id="sd-card-status" class="status-message" style="margin:0; flex:1;">Checking SD card...</div>
-                    <button id="eject-btn" onclick="ejectSD()" style="display:none; width:auto; padding:8px 14px; margin:0; background:#6c757d;">&#x23CF; Eject</button>
+                    <button id="eject-btn" style="display:none; width:auto; padding:8px 14px; margin:0; background:#6c757d;">&#x23CF; Eject</button>
                 </div>
             </div>
             <div class="sections-grid">
@@ -291,11 +291,11 @@
                 <div class="section" style="grid-column: 1 / -1;">
                     <h2 class="section-header">&#128196; Display Text</h2>
                     <label for="display-text-input">Text:</label>
-                    <input type="text" id="display-text-input" maxlength="127" placeholder="Text eingeben...">
+                    <input type="text" id="display-text-input" maxlength="127" placeholder="Enter text...">
 
                     <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:15px;">
                         <div style="flex:1; min-width:160px;">
-                            <label for="display-text-duration">Dauer: <span id="display-text-duration-val">10</span>s</label>
+                            <label for="display-text-duration">Duration: <span id="display-text-duration-val">10</span>s</label>
                             <div class="slider-container">
                                 <span>5s</span>
                                 <input type="range" id="display-text-duration" min="5" max="60" step="5" value="10"
@@ -304,23 +304,15 @@
                             </div>
                         </div>
                         <div style="display:flex; align-items:center; gap:10px;">
-                            <label style="margin:0;">Farbe:</label>
+                            <label style="margin:0;">Color:</label>
                             <input type="color" id="display-text-color" value="#ffffff"
                                 style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin:0;">
-                        </div>
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <span style="font-size:0.95em; color:#aaa;">Statisch</span>
-                            <label class="toggle-switch" style="margin:0;">
-                                <input type="checkbox" id="display-text-scroll">
-                                <span class="toggle-slider"></span>
-                            </label>
-                            <span style="font-size:0.95em;">Scrollend</span>
                         </div>
                     </div>
 
                     <div style="display:flex; gap:10px;">
-                        <button onclick="sendDisplayText()" style="flex:1;">&#9654; Senden</button>
-                        <button onclick="stopDisplayText()" style="flex:0 0 auto; width:auto; padding:12px 20px; background:#6c757d;">&#9646;&#9646; Stopp</button>
+                        <button onclick="sendDisplayText()" style="flex:1; padding:8px 14px;">&#9654; Send</button>
+                        <button onclick="stopDisplayText()" style="flex:0 0 auto; width:auto; padding:8px 14px; background:#6c757d;">&#9646;&#9646; Stop</button>
                     </div>
                     <div id="display-text-status" class="status-message"></div>
                 </div>
@@ -342,28 +334,28 @@
                     </div>
                     <div style="display:flex; gap:8px; align-items:stretch;">
                         <button id="radio-toggle-btn" onclick="toggleRadio()"
-                            style="width:auto; padding:9px 20px; background:#27ae60; font-size:0.9em; margin:0; white-space:nowrap;">
+                            style="width:auto; padding:8px 14px; background:#27ae60; font-size:0.85em; margin:0; white-space:nowrap;">
                             &#9654; Play
                         </button>
                         <button id="radio-display-btn" onclick="toggleRadioDisplay()"
-                            style="width:auto; padding:9px 12px; background:#555; font-size:0.85em; margin:0; white-space:nowrap;">
+                            style="width:auto; padding:8px 14px; background:#555; font-size:0.85em; margin:0; white-space:nowrap;">
                             &#128250; DMD 10s
                         </button>
                         <a href="/radio.html"
-                            style="display:flex; align-items:center; padding:9px 14px; background:#2c3e50; color:#fff; border-radius:4px; text-decoration:none; font-size:0.85em; white-space:nowrap; box-sizing:border-box;">
-                            &#x2699; Verwalten
+                            style="display:flex; align-items:center; padding:8px 14px; background:#2c3e50; color:#fff; border-radius:4px; text-decoration:none; font-size:0.85em; white-space:nowrap; box-sizing:border-box;">
+                            &#x2699; Manage
                         </a>
                     </div>
 
-                    <!-- Gespeicherte Sender (ausklappbar) -->
+                    <!-- Saved Stations (collapsible) -->
                     <div style="margin-top:10px;">
                         <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:8px 10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;"
                              onclick="togglePresetList()">
-                            <span style="font-size:0.85em; color:#aaa;">&#128251; Gespeicherte Sender</span>
+                            <span style="font-size:0.85em; color:#aaa;">&#128251; Saved Stations</span>
                             <span id="preset-list-arrow" style="color:#aaa; font-size:0.85em;">&#9654;</span>
                         </div>
                         <div id="preset-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px; max-height:220px; overflow-y:auto;">
-                            <div id="preset-list-content" style="font-size:0.85em; color:#aaa;">Lade...</div>
+                            <div id="preset-list-content" style="font-size:0.85em; color:#aaa;">Loading...</div>
                         </div>
                     </div>
                 </div>
@@ -380,60 +372,73 @@
                     <div id="sd-folder-status" class="status-message"></div>
                     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                         <button onclick="setScreensaverPaths()">Apply Folder Selection</button>
-                        <button id="cancel-scan-btn" onclick="cancelScan()" style="display:none; width:auto; padding:8px 14px; margin:0; background:#c0392b;">&#x2715; Scan abbrechen</button>
+                        <button id="cancel-scan-btn" onclick="cancelScan()" style="display:none; width:auto; padding:8px 14px; margin:0; background:#c0392b;">&#x2715; Cancel Scan</button>
                     </div>
 
-                    <!-- Aktuell angezeigte Datei -->
+                    <!-- Currently displayed file -->
                     <div style="margin-top:14px; padding:10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;">
-                        <div style="font-size:0.82em; color:#aaa; margin-bottom:6px;">Aktuell angezeigt:</div>
+                        <div style="font-size:0.82em; color:#aaa; margin-bottom:6px;">Currently displaying:</div>
                         <div style="display:flex; align-items:center; gap:4px;">
                             <span id="current-file-name" style="flex:1; font-size:0.9em; word-break:break-all; color:#e0e0e0;">–</span>
                             <button id="fav-btn" onclick="toggleFavorite()" class="delete-btn" style="margin:0; background:#555;">☆</button>
-                            <button id="ign-btn" onclick="toggleIgnore()" class="delete-btn" style="margin:0; background:#555;" title="Ignorieren">🚫</button>
+                            <button id="ign-btn" onclick="toggleIgnore()" class="delete-btn" style="margin:0; background:#555;" title="Ignore">🚫</button>
                         </div>
                     </div>
 
-                    <!-- Favoritenliste -->
+                    <!-- Favorites list -->
                     <div style="margin-top:10px;">
                         <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:8px 10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;"
                              onclick="toggleFavoritesList()">
-                            <span style="font-size:0.85em; color:#aaa;">⭐ Favoriten</span>
+                            <span style="font-size:0.85em; color:#aaa;">⭐ Favorites</span>
                             <span id="fav-list-arrow" style="color:#aaa; font-size:0.85em;">▶</span>
                         </div>
                         <div id="fav-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px; max-height:200px; overflow-y:auto;">
-                            <div id="fav-list-content" style="font-size:0.82em; color:#aaa;">Lade...</div>
+                            <div id="fav-list-content" style="font-size:0.82em; color:#aaa;">Loading...</div>
                         </div>
                     </div>
 
-                    <!-- Ignore-Liste -->
+                    <!-- Ignore list -->
                     <div style="margin-top:10px;">
                         <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:8px 10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;"
                              onclick="toggleIgnoreList()">
-                            <span style="font-size:0.85em; color:#aaa;">🚫 Ignorierte Dateien</span>
+                            <span style="font-size:0.85em; color:#aaa;">🚫 Ignored Files</span>
                             <span id="ign-list-arrow" style="color:#aaa; font-size:0.85em;">▶</span>
                         </div>
                         <div id="ign-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px; max-height:200px; overflow-y:auto;">
-                            <div id="ign-list-content" style="font-size:0.82em; color:#aaa;">Lade...</div>
+                            <div id="ign-list-content" style="font-size:0.82em; color:#aaa;">Loading...</div>
                         </div>
                     </div>
 
+                    <!-- Upload Folder Selection (entkoppelt von Screensaver-Quelle) -->
+                    <label style="margin-top:15px;">Upload folder:</label>
+                    <div id="upload-folder-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+                        <span style="color:#aaa; font-size:0.85em;">Loading...</span>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                        <input type="text" id="new-upload-folder" placeholder="New folder name..."
+                            style="flex:1; background:#2c2c2c; color:#e0e0e0; border:1px solid #444; padding:8px; border-radius:4px; font-size:0.9em;"
+                            onkeydown="if(event.key==='Enter') setNewUploadFolder()">
+                        <button onclick="setNewUploadFolder()" style="width:auto; padding:8px 14px; margin:0; background:#555; white-space:nowrap;">+ Set</button>
+                    </div>
+                    <div id="upload-folder-status" class="status-message" style="margin-bottom:6px; text-align:left;"></div>
+
                     <!-- Upload to Active Folder -->
-                    <label style="margin-top:15px;">Upload &#x2192; <span id="upload-target-label" style="color:#4a9eff;">LittleFS</span>:</label>
+                    <label>Upload &#x2192; <span id="upload-target-label" style="color:#4a9eff;">LittleFS</span>:</label>
                     <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
                         <input type="file" id="sd-upload-file" accept=".gif,.GIF,.raw" multiple
                             style="flex:1; background:#2c2c2c; color:#e0e0e0; border:none; padding:8px; border-radius:4px;">
-                        <button onclick="uploadToSD(false)" style="width:auto; padding:10px 16px; white-space:nowrap;">
+                        <button onclick="uploadToSD(false)" style="width:auto; padding:8px 14px; white-space:nowrap;">
                             &#x2191; Upload Files
                         </button>
                     </div>
                     <div id="folder-upload-div" style="display:none; gap:8px; align-items:center; margin-bottom:10px;">
                         <input type="file" id="sd-upload-folder" accept=".gif,.GIF,.raw" webkitdirectory
                             style="display:none;" onchange="updateFolderLabel()">
-                        <button onclick="document.getElementById('sd-upload-folder').click()" style="width:auto; padding:10px 16px; white-space:nowrap; background:#555;">
-                            &#x1F4C2; Ordner auswählen
+                        <button onclick="document.getElementById('sd-upload-folder').click()" style="width:auto; padding:8px 14px; white-space:nowrap; background:#555;">
+                            &#x1F4C2; Select Folder
                         </button>
-                        <span id="folder-label" style="flex:1; font-size:0.85em; color:#aaa; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Kein Ordner gewählt</span>
-                        <button onclick="uploadToSD(true)" style="width:auto; padding:10px 16px; white-space:nowrap;">
+                        <span id="folder-label" style="flex:1; font-size:0.85em; color:#aaa; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">No folder selected</span>
+                        <button onclick="uploadToSD(true)" style="width:auto; padding:8px 14px; white-space:nowrap;">
                             &#x2191; Upload
                         </button>
                     </div>
@@ -442,7 +447,7 @@
                     <!-- Pause Button -->
                     <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
                         <button id="pause-btn" onclick="toggleScreensaverPause()"
-                            style="width:auto; padding:10px 20px; background:#e67e22;">
+                            style="width:auto; padding:8px 14px; background:#e67e22;">
                             ⏸ Pause
                         </button>
                         <span id="pause-status" style="font-size:0.85em; color:#aaa;">Running</span>
@@ -454,11 +459,11 @@
                             <span id="gif-preview-name" style="font-size:0.8em; color:#aaa; word-break:break-all; flex:1;"></span>
                             <div style="display:flex; gap:4px; flex-shrink:0;">
                                 <button onclick="playPreviewFile()"
-                                    class="delete-btn" style="margin:0; background:#28a745;" title="Abspielen">▶</button>
+                                    class="delete-btn" style="margin:0; background:#28a745;" title="Play">▶</button>
                                 <button id="gif-preview-fav-btn" onclick="togglePreviewFavorite()"
-                                    class="delete-btn" style="margin:0; background:#555;" title="Favorit">☆</button>
+                                    class="delete-btn" style="margin:0; background:#555;" title="Favorite">☆</button>
                                 <button id="gif-preview-ign-btn" onclick="togglePreviewIgnore()"
-                                    class="delete-btn" style="margin:0; background:#555;" title="Ignorieren">🚫</button>
+                                    class="delete-btn" style="margin:0; background:#555;" title="Ignore">🚫</button>
                                 <button onclick="closeGifPreview()"
                                     class="delete-btn" style="margin:0; background:#555;">✕</button>
                             </div>
@@ -478,17 +483,17 @@
                         </div>
                         <div id="ss-file-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px;">
                             <div id="ss-pagination-top" style="display:none; gap:8px; align-items:center; margin-bottom:6px;">
-                                <button id="ss-prev-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(-1)">&#9664; Zur&uuml;ck</button>
+                                <button id="ss-prev-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(-1)">&#9664; Back</button>
                                 <span id="ss-page-info-top" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
-                                <button id="ss-next-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(1)">Weiter &#9654;</button>
+                                <button id="ss-next-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(1)">Next &#9654;</button>
                             </div>
                             <ul class="screensaver-file-list" id="sd-screensaver-file-list" style="margin:0;">
                                 <li><span>Loading...</span></li>
                             </ul>
                             <div id="ss-pagination" style="display:none; gap:8px; align-items:center; margin-top:6px;">
-                                <button id="ss-prev-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(-1)">&#9664; Zur&uuml;ck</button>
+                                <button id="ss-prev-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(-1)">&#9664; Back</button>
                                 <span id="ss-page-info" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
-                                <button id="ss-next-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(1)">Weiter &#9654;</button>
+                                <button id="ss-next-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(1)">Next &#9654;</button>
                             </div>
                         </div>
                     </div>
@@ -498,52 +503,52 @@
                 <div class="section">
                     <h2 class="section-header">&#127925; GIF-Audio</h2>
                     <div style="font-size:0.8em; color:#aaa; margin-bottom:10px;">
-                        MP3-Dateien f&uuml;r GIF-Begleitung &mdash; MP3-Name muss im GIF-Namen enthalten sein (z.B. <em>defender.mp3</em> spielt zu <em>defender_level1.gif</em>).<br>
-                        Ordner auf SD: <code>/GifAudio/</code>
+                        MP3 files for GIF audio — MP3 name must be contained in the GIF name (e.g. <em>defender.mp3</em> plays with <em>defender_level1.gif</em>).<br>
+                        Folder on SD: <code>/GifAudio/</code>
                     </div>
                     <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
-                        <span style="font-size:0.95em; color:#aaa;">Aus</span>
+                        <span style="font-size:0.95em; color:#aaa;">Off</span>
                         <label class="toggle-switch" style="margin:0;">
                             <input type="checkbox" id="gif-audio-enabled" onchange="saveGifAudioEnabled()">
                             <span class="toggle-slider"></span>
                         </label>
-                        <span style="font-size:0.95em;">GIF-Audio aktiv</span>
+                        <span style="font-size:0.95em;">GIF Audio active</span>
                         <span id="gif-audio-enabled-status" class="status-message" style="margin:0; flex:1;"></span>
                     </div>
                     <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
                         <input type="file" id="gif-audio-upload-file" accept=".mp3,.MP3" multiple
                             style="flex:1; background:#2c2c2c; color:#e0e0e0; border:none; padding:8px; border-radius:4px;">
-                        <button onclick="gifAudioUploadBtn()" style="width:auto; padding:10px 16px; white-space:nowrap;">
+                        <button onclick="gifAudioUploadBtn()" style="width:auto; padding:8px 14px; white-space:nowrap;">
                             &#x2191; Upload
                         </button>
                     </div>
                     <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
                         <div id="gif-audio-upload-status" class="status-message" style="margin:0; flex:1;"></div>
-                        <button id="cancel-audio-scan-btn" onclick="cancelAudioScan()" style="display:none; width:auto; padding:8px 14px; margin:0; background:#c0392b;">&#x2715; Scan abbrechen</button>
+                        <button id="cancel-audio-scan-btn" onclick="cancelAudioScan()" style="display:none; width:auto; padding:8px 14px; margin:0; background:#c0392b;">&#x2715; Cancel Scan</button>
                     </div>
                     <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-                        <button onclick="gifAudioStop()" style="width:auto; padding:8px 14px; margin:0; background:#6c757d; white-space:nowrap;">&#9646;&#9646; Stopp</button>
+                        <button onclick="gifAudioStop()" style="width:auto; padding:8px 14px; margin:0; background:#6c757d; white-space:nowrap;">&#9646;&#9646; Stop</button>
                         <span id="gif-audio-play-status" class="status-message" style="margin:0; flex:1; color:#666;">—</span>
                     </div>
                     <div style="margin-top:10px;">
                         <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:8px 10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;"
                              onclick="toggleGifAudioList()">
-                            <span style="font-size:0.85em; color:#aaa;">&#127925; Dateien <span id="gif-audio-count" style="color:#777; font-weight:normal;"></span></span>
+                            <span style="font-size:0.85em; color:#aaa;">&#127925; Files <span id="gif-audio-count" style="color:#777; font-weight:normal;"></span></span>
                             <span id="gif-audio-list-arrow" style="color:#aaa; font-size:0.85em;">&#9654;</span>
                         </div>
                         <div id="gif-audio-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px;">
                             <div id="gif-audio-pagination-top" style="display:none; gap:8px; align-items:center; margin-bottom:6px;">
-                                <button id="ga-prev-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(-1)">&#9664; Zur&uuml;ck</button>
+                                <button id="ga-prev-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(-1)">&#9664; Back</button>
                                 <span id="gif-audio-page-info-top" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
-                                <button id="ga-next-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(1)">Weiter &#9654;</button>
+                                <button id="ga-next-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(1)">Next &#9654;</button>
                             </div>
                             <ul class="screensaver-file-list" id="gif-audio-list" style="margin:0;">
-                                <li><span style="color:#666;">Lade...</span></li>
+                                <li><span style="color:#666;">Loading...</span></li>
                             </ul>
                             <div id="gif-audio-pagination" style="display:none; gap:8px; align-items:center; margin-top:6px;">
-                                <button id="ga-prev-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(-1)">&#9664; Zur&uuml;ck</button>
+                                <button id="ga-prev-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(-1)">&#9664; Back</button>
                                 <span id="gif-audio-page-info" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
-                                <button id="ga-next-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(1)">Weiter &#9654;</button>
+                                <button id="ga-next-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(1)">Next &#9654;</button>
                             </div>
                         </div>
                     </div>
@@ -556,11 +561,11 @@
                     <!-- Screensaver Mode -->
                     <label for="screensaver-mode">Display Mode:</label>
                     <select id="screensaver-mode" onchange="saveScreensaverMode()">
-                        <option value="0">Nur Screensaver</option>
-                        <option value="1">Nur Uhr</option>
-                        <option value="2">Uhr + Screensaver</option>
-                        <option value="3">Uhr + Wetter</option>
-                        <option value="4">Uhr+Wetter + Screensaver</option>
+                        <option value="0">Screensaver only</option>
+                        <option value="1">Clock only</option>
+                        <option value="2">Clock + Screensaver</option>
+                        <option value="3">Clock + Weather</option>
+                        <option value="4">Clock + Weather + Screensaver</option>
                     </select>
                     <div id="mode-status" class="status-message"></div>
 
@@ -602,15 +607,15 @@
                     <div id="screensaver-duration-status" class="status-message"></div>
                     <button onclick="applyScreensaverDuration()">Apply Duration</button>
 
-                    <!-- Order + Strict Timer Toggle -->
+                    <!-- Order + Strict Timer -->
                     <div style="display:flex; align-items:center; gap:24px; margin-top:14px; flex-wrap:wrap;">
                         <div style="display:flex; align-items:center; gap:10px;">
-                            <span style="font-size:0.95em; color:#aaa;">A-Z Order</span>
                             <label class="toggle-switch" style="margin:0;">
-                                <input type="checkbox" id="screensaver-shuffle" onchange="saveScreensaverShuffle()">
+                                <input type="checkbox" id="screensaver-az" onchange="saveScreensaverShuffle()">
                                 <span class="toggle-slider"></span>
                             </label>
-                            <span style="font-size:0.95em;">Random Order</span>
+                            <span style="font-size:0.95em; color:#aaa;">A-Z</span>
+                            <button id="reshuffle-btn" onclick="reshuffleScreensaver()" style="width:auto; padding:8px 14px; margin:0 0 0 8px; background:#6c757d;">&#8652; Reshuffle</button>
                         </div>
                         <div style="display:flex; align-items:center; gap:12px;">
                             <label class="toggle-switch" style="margin:0;">
@@ -641,9 +646,8 @@
         function sendDisplayText() {
             var text = document.getElementById('display-text-input').value.trim();
             var statusElem = document.getElementById('display-text-status');
-            if (!text) { statusElem.innerText = "Kein Text eingegeben."; statusElem.style.color = "red"; return; }
+            if (!text) { statusElem.innerText = "No text entered."; statusElem.style.color = "red"; return; }
             var duration = document.getElementById('display-text-duration').value;
-            var scroll   = document.getElementById('display-text-scroll').checked ? 1 : 0;
             var color    = document.getElementById('display-text-color').value;
             var xhr = new XMLHttpRequest();
             xhr.open("POST", "/display_text", true);
@@ -651,15 +655,15 @@
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === XMLHttpRequest.DONE) {
                     if (xhr.status === 200) {
-                        statusElem.innerText = "Wird angezeigt (" + duration + "s" + (scroll ? ", scrollend" : "") + ")";
+                        statusElem.innerText = "Displaying (" + duration + "s)";
                         statusElem.style.color = "green";
                     } else {
-                        statusElem.innerText = "Fehler beim Senden.";
+                        statusElem.innerText = "Error sending.";
                         statusElem.style.color = "red";
                     }
                 }
             };
-            xhr.send("text=" + encodeURIComponent(text) + "&duration=" + duration + "&scroll=" + scroll + "&color=" + encodeURIComponent(color));
+            xhr.send("text=" + encodeURIComponent(text) + "&duration=" + duration + "&color=" + encodeURIComponent(color));
         }
 
         function stopDisplayText() {
@@ -668,7 +672,7 @@
             xhr.open("POST", "/display_text_stop", true);
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === XMLHttpRequest.DONE) {
-                    statusElem.innerText = xhr.status === 200 ? "Gestoppt." : "Fehler.";
+                    statusElem.innerText = xhr.status === 200 ? "Stopped." : "Error.";
                     statusElem.style.color = xhr.status === 200 ? "#aaa" : "red";
                 }
             };
@@ -686,7 +690,7 @@
                     var free = (info.free / 1024).toFixed(1);
                     var pct = ((info.used / info.total) * 100).toFixed(1);
                     document.getElementById('fs-info').innerHTML =
-                        used + " KB / " + total + " KB (" + free + " KB frei) — " + pct + "%";
+                        used + " KB / " + total + " KB (" + free + " KB free) — " + pct + "%";
                     document.getElementById('fs-bar').style.width = pct + "%";
                     // Farbe je nach Füllstand
                     var bar = document.getElementById('fs-bar');
@@ -727,23 +731,30 @@
         }
 
         function saveScreensaverShuffle() {
-            var val = document.getElementById('screensaver-shuffle').checked ? 1 : 0;
+            var az = document.getElementById('screensaver-az').checked;
+            var val = az ? 0 : 1;
+            var btn = document.getElementById('reshuffle-btn');
+            btn.disabled = az;
+            btn.style.opacity = az ? '0.4' : '1';
             var statusElem = document.getElementById('screensaver-shuffle-status');
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", "/save_screensaver_shuffle", true);
-            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === XMLHttpRequest.DONE) {
-                    if (xhr.status === 200) {
-                        statusElem.innerText = val ? "Random order on" : "Sequential order on";
-                        statusElem.style.color = "green";
-                    } else {
-                        statusElem.innerText = "Error saving.";
-                        statusElem.style.color = "red";
-                    }
-                }
-            };
-            xhr.send(`screensaverShuffle=${val}`);
+            fetch('/save_screensaver_shuffle', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'screensaverShuffle=' + val
+            }).then(function(r) {
+                statusElem.innerText = az ? 'A-Z order' : 'Random order';
+                statusElem.style.color = 'green';
+            }).catch(function() {
+                statusElem.innerText = 'Error saving.';
+                statusElem.style.color = 'red';
+            });
+        }
+
+        function reshuffleScreensaver() {
+            fetch('/screensaver_reshuffle', { method: 'POST' }).catch(function(){});
+            var statusElem = document.getElementById('screensaver-shuffle-status');
+            statusElem.innerText = 'Reshuffled';
+            statusElem.style.color = 'green';
         }
 
         function saveScreensaverStrictTimer() {
@@ -775,7 +786,7 @@
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === XMLHttpRequest.DONE) {
                     if (xhr.status === 200) {
-                        statusElem.innerText = val ? "GIF-Audio aktiv" : "GIF-Audio deaktiviert";
+                        statusElem.innerText = val ? "GIF Audio enabled" : "GIF Audio disabled";
                         statusElem.style.color = val ? "green" : "#aaa";
                     } else {
                         statusElem.innerText = "Error saving.";
@@ -817,7 +828,7 @@
                         var isGif = currentFilePath.toLowerCase().endsWith('.gif');
                         nameEl.style.cursor          = isGif ? 'pointer' : 'default';
                         nameEl.style.textDecoration  = isGif ? 'underline dotted' : 'none';
-                        nameEl.title                 = isGif ? 'Klicken für Vorschau' : '';
+                        nameEl.title                 = isGif ? 'Click for preview' : '';
                         nameEl.onclick = isGif
                             ? function() { showGifPreview(currentFilePath, data.name); }
                             : null;
@@ -889,7 +900,7 @@
             fetch('/get_favorites').then(function(r) { return r.text(); }).then(function(t) {
                 var lines = t.split('\n').map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 0; });
                 if (lines.length === 0) {
-                    content.innerHTML = '<span style="color:#666;">Keine Favoriten gespeichert</span>';
+                    content.innerHTML = '<span style="color:#666;">No favorites saved</span>';
                     return;
                 }
                 content.innerHTML = '';
@@ -935,7 +946,7 @@
                     content.appendChild(row);
                 });
             }).catch(function() {
-                content.innerHTML = '<span style="color:#c0392b;">Fehler beim Laden</span>';
+                content.innerHTML = '<span style="color:#c0392b;">Error loading</span>';
             });
         }
 
@@ -1015,7 +1026,7 @@
             fetch('/get_ignores').then(function(r) { return r.text(); }).then(function(t) {
                 var lines = t.split('\n').map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 0; });
                 if (lines.length === 0) {
-                    content.innerHTML = '<span style="color:#666;">Keine ignorierten Dateien</span>';
+                    content.innerHTML = '<span style="color:#666;">No ignored files</span>';
                     return;
                 }
                 content.innerHTML = '';
@@ -1050,7 +1061,7 @@
                     content.appendChild(row);
                 });
             }).catch(function() {
-                content.innerHTML = '<span style="color:#c0392b;">Fehler beim Laden</span>';
+                content.innerHTML = '<span style="color:#c0392b;">Error loading</span>';
             });
         }
 
@@ -1084,12 +1095,12 @@
                     img.src = '/gif_preview?path=' + encodeURIComponent(path);
                     img.onerror = function() {
                         img.style.display = 'none';
-                        msg.textContent   = 'Vorschau nicht verfügbar (Datei zu groß oder Fehler)';
+                        msg.textContent   = 'Preview not available (file too large or error)';
                     };
                 } else {
                     img.style.display = 'none';
                     img.src           = '';
-                    msg.textContent   = 'RAW-Datei — keine Vorschau möglich';
+                    msg.textContent   = 'RAW file — no preview available';
                 }
                 box.style.display = 'block';
                 box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1203,7 +1214,8 @@
             if (!previewCurrentPath) return;
             var fd = new FormData();
             fd.append('path', previewCurrentPath);
-            fetch('/play_file', { method: 'POST', body: fd });
+            fetch('/play_file', { method: 'POST', body: fd })
+                .catch(function(e) { console.warn('ZeDMD play_file:', e); });
         }
 
         function togglePresetList() {
@@ -1224,7 +1236,7 @@
             if (!content) return;
             fetch('/radio_presets').then(function(r) { return r.json(); }).then(function(presets) {
                 if (presets.length === 0) {
-                    content.innerHTML = '<span style="color:#666;">Keine Sender gespeichert &mdash; <a href="/radio.html" style="color:#007bff;">Sender verwalten</a></span>';
+                    content.innerHTML = '<span style="color:#666;">No stations saved &mdash; <a href="/radio.html" style="color:#007bff;">Manage stations</a></span>';
                     return;
                 }
                 content.innerHTML = '';
@@ -1244,11 +1256,11 @@
                     }
 
                     var nameSpan = document.createElement('span');
-                    nameSpan.textContent = preset.name || ('Sender ' + (idx + 1));
+                    nameSpan.textContent = preset.name || ('Station ' + (idx + 1));
                     nameSpan.style.cssText = 'flex:1; font-size:0.9em; color:' + (isActive ? '#4caf50' : '#e0e0e0') + ';';
 
                     var playBtn = document.createElement('button');
-                    playBtn.textContent = isActive ? '▶ Aktiv' : '▶';
+                    playBtn.textContent = isActive ? '▶ Active' : '▶';
                     playBtn.style.cssText = 'width:auto; padding:4px 10px; margin:0; font-size:0.85em; background:'
                         + (isActive ? '#27ae60' : '#2c3e50') + ';';
                     playBtn.onclick = function() {
@@ -1263,7 +1275,7 @@
                     content.appendChild(row);
                 });
             }).catch(function() {
-                if (content) content.innerHTML = '<span style="color:#c0392b;">Fehler beim Laden</span>';
+                if (content) content.innerHTML = '<span style="color:#c0392b;">Error loading</span>';
             });
         }
 
@@ -1376,7 +1388,11 @@
                         document.getElementById("screensaver-mode").value = config.screensaverMode;
                     }
                     if (config.screensaverShuffle !== undefined) {
-                        document.getElementById("screensaver-shuffle").checked = config.screensaverShuffle == 1;
+                        var az = config.screensaverShuffle == 0;
+                        document.getElementById("screensaver-az").checked = az;
+                        var btn = document.getElementById('reshuffle-btn');
+                        btn.disabled = az;
+                        btn.style.opacity = az ? '0.4' : '1';
                     }
                     if (config.screensaverStrictTimer !== undefined) {
                         document.getElementById("screensaver-strict-timer").checked = config.screensaverStrictTimer == 1;
@@ -1403,17 +1419,19 @@
             }
         })();
 
-        var activeScreensaverPath = '';  // '' = LittleFS, sonst SD Ordner
+        var activeScreensaverPath = '';  // '' = LittleFS, sonst SD Ordner (Screensaver-Quelle)
+        var uploadTargetPath = '';       // '' = LittleFS, sonst SD Ordner (Upload-Ziel, unabhängig von Screensaver)
+                                         // TODO: nach Seiten-Reload immer LittleFS — letzte Auswahl per localStorage persistieren
 
         function updateFolderLabel() {
             var input = document.getElementById('sd-upload-folder');
             var label = document.getElementById('folder-label');
             if (input.files && input.files.length > 0) {
                 var folderName = input.files[0].webkitRelativePath.split('/')[0];
-                label.innerText = '📁 ' + folderName + ' (' + input.files.length + ' Dateien)';
+                label.innerText = '📁 ' + folderName + ' (' + input.files.length + ' files)';
                 label.style.color = '#e0e0e0';
             } else {
-                label.innerText = 'Kein Ordner gewählt';
+                label.innerText = 'No folder selected';
                 label.style.color = '#aaa';
             }
         }
@@ -1423,7 +1441,7 @@
             var fileInput = document.getElementById(inputId);
             var statusElem = document.getElementById('sd-upload-status');
             if (!fileInput.files || fileInput.files.length === 0) {
-                statusElem.innerText = 'Bitte zuerst ' + (isFolder ? 'einen Ordner' : 'eine Datei') + ' auswählen.';
+                statusElem.innerText = 'Please select ' + (isFolder ? 'a folder' : 'a file') + ' first.';
                 statusElem.style.color = 'red';
                 return;
             }
@@ -1431,7 +1449,7 @@
                 return f.name.match(/\.(gif|GIF|raw)$/) && !f.name.startsWith('.');
             });
             if (files.length === 0) {
-                statusElem.innerText = 'Keine gültigen Dateien (.gif, .raw)';
+                statusElem.innerText = 'No valid files (.gif, .raw)';
                 statusElem.style.color = 'red';
                 return;
             }
@@ -1442,11 +1460,10 @@
                 var folderName = files[0].webkitRelativePath.split('/')[0];
                 uploadUrl = '/upload_sd?folder=' + encodeURIComponent(folderName);
             } else {
-                if (activeScreensaverPath === '') {
-                    if (!confirm('Kein SD-Ordner ausgewählt — Dateien werden auf LittleFS hochgeladen. Fortfahren?')) return;
+                if (uploadTargetPath === '') {
                     uploadUrl = '/upload_screensaver';
                 } else {
-                    uploadUrl = '/upload_sd';
+                    uploadUrl = '/upload_sd?folder=' + encodeURIComponent(uploadTargetPath);
                 }
             }
 
@@ -1455,15 +1472,33 @@
                 if (index >= files.length) {
                     statusElem.style.color = errors === 0 ? 'green' : 'orange';
                     statusElem.innerText = errors === 0 ?
-                        '✓ ' + uploaded + ' Datei(en) hochgeladen!' :
-                        uploaded + ' OK, ' + errors + ' fehlgeschlagen.';
+                        '✓ ' + uploaded + ' file(s) uploaded!' :
+                        uploaded + ' OK, ' + errors + ' failed.';
                     fileInput.value = '';
                     if (isFolder) {
                         var lbl = document.getElementById('folder-label');
-                        if (lbl) { lbl.innerText = 'Kein Ordner gewählt'; lbl.style.color = '#aaa'; }
+                        if (lbl) { lbl.innerText = 'No folder selected'; lbl.style.color = '#aaa'; }
                         loadSDFolders();
                     } else {
-                        loadSDScreensaverFiles();
+                        // SD-Upload: loadSDFolders() damit neuer Ordner sofort in der Liste erscheint
+                        // loadSDFolders() ruft intern loadSDScreensaverFiles() auf
+                        if (uploadTargetPath !== '') {
+                            loadSDFolders();
+                        } else {
+                            loadSDScreensaverFiles();
+                        }
+                        if (uploaded > 0) {
+                            var lastGif = null;
+                            for (var i = files.length - 1; i >= 0; i--) {
+                                if (files[i].name.toLowerCase().endsWith('.gif')) { lastGif = files[i]; break; }
+                            }
+                            if (lastGif) {
+                                var pp = (uploadTargetPath === '')
+                                    ? 'FS:/screensaver/' + lastGif.name
+                                    : 'SD:/' + uploadTargetPath + '/' + lastGif.name;
+                                showGifPreview(pp, lastGif.name);
+                            }
+                        }
                     }
                     return;
                 }
@@ -1506,19 +1541,22 @@
                 if (cancelBtn) cancelBtn.style.display = 'none';
             }).catch(function() {
                 var el = document.getElementById('gif-audio-list');
-                if (el) el.innerHTML = '<li><span style="color:#c0392b;">Fehler beim Laden</span></li>';
+                if (el) el.innerHTML = '<li><span style="color:#c0392b;">Error loading</span></li>';
             });
         }
 
         function cancelAudioScan() {
             var statusEl = document.getElementById('gif-audio-upload-status');
             var cancelBtn = document.getElementById('cancel-audio-scan-btn');
-            if (statusEl) { statusEl.innerText = 'Scan wird abgebrochen...'; statusEl.style.color = '#e67e22'; }
+            if (statusEl) { statusEl.innerText = 'Cancelling scan...'; statusEl.style.color = '#e67e22'; }
             fetch('/cancel_gif_audio_scan', { method: 'POST' })
                 .then(function() {
-                    if (statusEl) { statusEl.innerText = 'Scan abgebrochen'; statusEl.style.color = 'green'; }
+                    if (statusEl) { statusEl.innerText = 'Scan cancelled'; statusEl.style.color = 'green'; }
                     if (cancelBtn) cancelBtn.style.display = 'none';
                     setTimeout(function() { gifAudioLoad(); }, 1500);
+                })
+                .catch(function() {
+                    if (statusEl) { statusEl.innerText = 'Error cancelling scan'; statusEl.style.color = 'red'; }
                 });
         }
 
@@ -1529,7 +1567,7 @@
             var countEl = document.getElementById('gif-audio-count');
             if (countEl) countEl.textContent = '(' + gifAudioAllFiles.length + ')';
             if (gifAudioAllFiles.length === 0) {
-                el.innerHTML = '<li><span style="color:#666;">Keine MP3s in /GifAudio/</span></li>';
+                el.innerHTML = '<li><span style="color:#666;">No MP3s in /GifAudio/</span></li>';
                 gifAudioUpdatePagination();
                 return;
             }
@@ -1546,7 +1584,7 @@
                 playBtn.className = 'delete-btn';
                 playBtn.textContent = '▶';
                 playBtn.style.background = '#28a745';
-                playBtn.title = 'Abspielen';
+                playBtn.title = 'Play';
                 playBtn.onclick = (function(name) { return function() { gifAudioPlay(name); }; })(f.name);
                 var delBtn = document.createElement('button');
                 delBtn.className = 'delete-btn';
@@ -1579,7 +1617,7 @@
             var pageInfoTop   = document.getElementById('gif-audio-page-info-top');
             if (!pagination) return;
             if (total > gifAudioPageSize) {
-                var info = (gifAudioOffset + 1) + '–' + Math.min(gifAudioOffset + gifAudioPageSize, total) + ' von ' + total;
+                var info = (gifAudioOffset + 1) + '–' + Math.min(gifAudioOffset + gifAudioPageSize, total) + ' of ' + total;
                 pagination.style.display = 'flex';
                 pageInfo.textContent = info;
                 if (paginationTop) { paginationTop.style.display = 'flex'; pageInfoTop.textContent = info; }
@@ -1592,7 +1630,8 @@
         function gifAudioDelete(name) {
             var fd = new FormData(); fd.append('name', name);
             fetch('/gif_audio_delete', { method: 'POST', body: fd })
-                .then(function() { gifAudioLoad(); });
+                .then(function() { gifAudioLoad(); })
+                .catch(function(e) { console.warn('ZeDMD gif_audio_delete:', e); });
         }
 
         function gifAudioPlay(name) {
@@ -1609,6 +1648,9 @@
                     } else {
                         r.text().then(function(t) { status.style.color = '#c0392b'; status.textContent = t; });
                     }
+                })
+                .catch(function() {
+                    if (status) { status.style.color = '#c0392b'; status.textContent = 'Connection error'; }
                 });
         }
 
@@ -1617,14 +1659,15 @@
                 .then(function() {
                     var status = document.getElementById('gif-audio-play-status');
                     if (status) { status.style.color = '#666'; status.textContent = '—'; }
-                });
+                })
+                .catch(function(e) { console.warn('ZeDMD gif_audio_stop:', e); });
         }
 
         function gifAudioUploadBtn() {
             var input = document.getElementById('gif-audio-upload-file');
             if (!input || !input.files || input.files.length === 0) {
                 var s = document.getElementById('gif-audio-upload-status');
-                if (s) { s.innerText = 'Bitte zuerst eine Datei auswählen.'; s.style.color = 'red'; }
+                if (s) { s.innerText = 'Please select a file first.'; s.style.color = 'red'; }
                 return;
             }
             gifAudioUpload(input.files, function() {
@@ -1643,8 +1686,8 @@
                     if (status) {
                         status.style.color = errors === 0 ? 'green' : 'orange';
                         status.innerText = errors === 0
-                            ? '✓ ' + uploaded + ' Datei(en) hochgeladen — wird gescannt...'
-                            : uploaded + ' OK, ' + errors + ' Fehler';
+                            ? '✓ ' + uploaded + ' file(s) uploaded — scanning...'
+                            : uploaded + ' OK, ' + errors + ' error(s)';
                     }
                     if (cancelBtn) cancelBtn.style.display = 'inline-block';
                     gifAudioLoad();
@@ -1655,7 +1698,7 @@
                 fd.append('file', files[i], files[i].name);
                 if (status) {
                     status.style.color = '#aaa';
-                    status.innerText = 'Lade ' + (i + 1) + '/' + files.length + ': ' + files[i].name;
+                    status.innerText = 'Uploading ' + (i + 1) + '/' + files.length + ': ' + files[i].name;
                 }
                 fetch('/gif_audio_upload', { method: 'POST', body: fd })
                     .then(function(r) {
@@ -1679,34 +1722,40 @@
             if (slider) slider.value = v;
             if (!skipSend) {
                 var fd = new FormData(); fd.append('vol', v);
-                fetch('/radio_volume', { method: 'POST', body: fd });
+                fetch('/radio_volume', { method: 'POST', body: fd })
+                    .catch(function(e) { console.warn('ZeDMD radio_volume:', e); });
             }
         }
 
         function updateDisplayBtn(active) {
             var btn = document.getElementById('radio-display-btn');
             if (!btn) return;
-            btn.innerHTML = active ? '&#128250; DMD: aktiv' : '&#128250; DMD 10s';
+            btn.innerHTML = active ? '&#128250; DMD: active' : '&#128250; DMD 10s';
             btn.style.background = active ? '#27ae60' : '#555';
         }
 
         function toggleRadioDisplay() {
-            fetch('/radio_display', { method: 'POST' });
+            fetch('/radio_display', { method: 'POST' })
+                .catch(function(e) { console.warn('ZeDMD radio_display:', e); });
             updateDisplayBtn(true);
         }
 
         function toggleRadio() {
             if (_radioPlaying) {
-                fetch('/radio_stop', { method: 'POST' }).then(function() { updateRadioBtns(); });
+                fetch('/radio_stop', { method: 'POST' })
+                    .then(function() { updateRadioBtns(); })
+                    .catch(function(e) { console.warn('ZeDMD radio_stop:', e); });
             } else if (_radioLastPreset >= 0) {
                 fetch('/radio_presets').then(function(r) { return r.json(); }).then(function(presets) {
                     if (presets[_radioLastPreset]) {
                         var fd = new FormData();
                         fd.append('url', presets[_radioLastPreset].url);
                         fd.append('preset', _radioLastPreset);
-                        fetch('/radio_play', { method: 'POST', body: fd }).then(function() { updateRadioBtns(); });
+                        fetch('/radio_play', { method: 'POST', body: fd })
+                            .then(function() { updateRadioBtns(); })
+                            .catch(function(e) { console.warn('ZeDMD radio_play:', e); });
                     }
-                });
+                }).catch(function(e) { console.warn('ZeDMD radio_presets:', e); });
             } else {
                 window.location.href = '/radio.html';
             }
@@ -1744,7 +1793,7 @@
                 document.getElementById('sd-info').innerText = "–";
                 document.getElementById('sd-bar').style.width = "0%";
                 var ejectBtn = document.getElementById('eject-btn');
-                if (ejectBtn) ejectBtn.style.display = 'none';
+                if (ejectBtn) { ejectBtn.style.display = 'block'; setEjectBtn(false); }
             };
             xhr.ontimeout = clearSDInfo;
             xhr.onerror = clearSDInfo;
@@ -1759,23 +1808,37 @@
                     var totalMB = (info.total / 1024).toFixed(0);
                     var freeMB = (info.free / 1024).toFixed(0);
                     var pct = ((info.used / info.total) * 100).toFixed(1);
-                    sdInfoElem.innerText = usedMB + " MB / " + totalMB + " MB (" + freeMB + " MB frei) — " + pct + "%";
+                    sdInfoElem.innerText = usedMB + " MB / " + totalMB + " MB (" + freeMB + " MB free) — " + pct + "%";
                     sdBar.style.width = pct + "%";
                     if (pct > 80) sdBar.style.background = "#dc3545";
                     else if (pct > 60) sdBar.style.background = "#ffc107";
                     else sdBar.style.background = "#28a745";
-                    if (ejectBtn) ejectBtn.style.display = 'block';
+                    if (ejectBtn) { ejectBtn.style.display = 'block'; setEjectBtn(true); }
                 } else {
                     sdInfoElem.innerText = "–";
                     sdBar.style.width = "0%";
-                    if (ejectBtn) ejectBtn.style.display = 'none';
+                    if (ejectBtn) { ejectBtn.style.display = 'block'; setEjectBtn(false); }
                 }
             };
             xhr.send();
         }
 
+        function setEjectBtn(mounted) {
+            var btn = document.getElementById('eject-btn');
+            if (!btn) return;
+            if (mounted) {
+                btn.innerHTML = '&#x23CF; Eject';
+                btn.style.background = '#6c757d';
+                btn.onclick = ejectSD;
+            } else {
+                btn.innerHTML = '&#x23FB; Mount';
+                btn.style.background = '#28a745';
+                btn.onclick = mountSD;
+            }
+        }
+
         function ejectSD() {
-            if (!confirm("SD-Karte sicher auswerfen?")) return;
+            if (!confirm("Safely eject SD card?")) return;
             var xhr = new XMLHttpRequest();
             xhr.open("POST", "/eject_sd", true);
             xhr.onreadystatechange = function() {
@@ -1783,11 +1846,45 @@
                     var statusElem = document.getElementById('sd-card-status');
                     statusElem.innerText = "⏏ SD card ejected — safe to remove";
                     statusElem.style.color = "#aaa";
-                    document.getElementById('eject-btn').style.display = 'none';
                     document.getElementById('sd-info').innerText = "–";
                     document.getElementById('sd-bar').style.width = "0%";
+                    setEjectBtn(false);
                     loadSDFolders();
                 }
+            };
+            xhr.send();
+        }
+
+        function mountSD() {
+            var btn = document.getElementById('eject-btn');
+            var statusElem = document.getElementById('sd-card-status');
+            btn.disabled = true;
+            btn.innerHTML = 'Mounting...';
+            statusElem.innerText = "Mounting SD card...";
+            statusElem.style.color = "#aaa";
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/mount_sd", true);
+            xhr.timeout = 8000;
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState !== XMLHttpRequest.DONE) return;
+                btn.disabled = false;
+                if (xhr.status === 200) {
+                    statusElem.innerText = "✓ SD card mounted";
+                    statusElem.style.color = "#28a745";
+                    setEjectBtn(true);
+                    fetchSDInfo();
+                    loadSDFolders();
+                } else {
+                    statusElem.innerText = "✗ Mount failed — check SD card";
+                    statusElem.style.color = "#dc3545";
+                    setEjectBtn(false);
+                }
+            };
+            xhr.ontimeout = function() {
+                btn.disabled = false;
+                statusElem.innerText = "✗ Mount timed out";
+                statusElem.style.color = "#dc3545";
+                setEjectBtn(false);
             };
             xhr.send();
         }
@@ -1839,7 +1936,7 @@
 
                     // Favoriten Button
                     var favBtn = document.createElement('button');
-                    favBtn.innerText = '⭐ Favoriten';
+                    favBtn.innerText = '⭐ Favorites';
                     favBtn.style.cssText = 'width:auto; padding:8px 14px; margin-bottom:0; background:' +
                         (data.currentPaths === 'FAV' ? '#28a745' : '#007bff') + ';';
                     favBtn.onclick = function() {
@@ -1847,9 +1944,8 @@
                         document.querySelectorAll('#sd-folder-list button').forEach(function(b){ b.style.background = '#007bff'; });
                         favBtn.style.background = '#28a745';
                         activeScreensaverPath = '';
-                        var lbl = document.getElementById('upload-target-label'); if (lbl) lbl.innerText = 'LittleFS';
                         var statusElem = document.getElementById('sd-folder-status');
-                        if (statusElem) { statusElem.innerText = 'Favoriten werden geladen...'; statusElem.style.color = '#aaa'; }
+                        if (statusElem) { statusElem.innerText = 'Loading favorites...'; statusElem.style.color = '#aaa'; }
                         var xhr = new XMLHttpRequest();
                         xhr.open("POST", "/set_screensaver_paths", true);
                         xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
@@ -1858,7 +1954,7 @@
                                 setTimeout(function() {
                                     sdFileOffset = 0;
                                     loadSDScreensaverFiles();
-                                    if (statusElem) { statusElem.innerText = 'Favoriten aktiv'; statusElem.style.color = 'green'; }
+                                    if (statusElem) { statusElem.innerText = 'Favorites active'; statusElem.style.color = 'green'; }
                                 }, 2000);
                             }
                         };
@@ -1868,6 +1964,7 @@
                     folderList.appendChild(defBtn);
 
                     if (!data.available) {
+                        buildUploadFolderList([], false);
                         loadSDScreensaverFiles();
                         return;
                     }
@@ -1897,12 +1994,11 @@
                             folderList.appendChild(btn);
                         });
                     } else {
-                        folderList.innerHTML += '<span style="color:#aaa; font-size:0.85em; margin-left:8px;">Keine Ordner auf SD Karte gefunden</span>';
+                        folderList.innerHTML += '<span style="color:#aaa; font-size:0.85em; margin-left:8px;">No folders found on SD card</span>';
                     }
 
-                    // Upload-Ziel-Label initialisieren
                     activeScreensaverPath = selectedPaths.find(function(p) { return p !== 'FS:'; }) || '';
-                    var lbl = document.getElementById('upload-target-label'); if (lbl) lbl.innerText = activeScreensaverPath || 'LittleFS';
+                    buildUploadFolderList(data.folders || [], data.available);
 
                     // Load active files + SD Speicherinfo
                     loadSDScreensaverFiles();
@@ -1918,9 +2014,8 @@
             checkboxes.forEach(function(cb) { if (cb.checked) selected.push(cb.value); });
             var paths = selected.join(',');
             activeScreensaverPath = selected.find(function(p) { return p !== 'FS:'; }) || '';
-            var lbl = document.getElementById('upload-target-label'); if (lbl) lbl.innerText = activeScreensaverPath || 'LittleFS';
             var statusElem = document.getElementById('sd-folder-status');
-            statusElem.innerText = 'wird geladen...';
+            statusElem.innerText = 'Loading...';
             statusElem.style.color = '#aaa';
             var cancelBtn = document.getElementById('cancel-scan-btn');
             if (cancelBtn) cancelBtn.style.display = 'inline-block';
@@ -1930,32 +2025,93 @@
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
                     var countEl = document.getElementById('screensaver-file-count');
-                    if (countEl) countEl.textContent = 'wird geladen...';
+                    if (countEl) countEl.textContent = 'Loading...';
                     setTimeout(function() {
                         sdFileOffset = 0;
                         loadSDFolders();
                         loadSDScreensaverFiles();
-                        statusElem.innerText = selected.length > 0 ? selected.length + ' Ordner aktiv' : 'LittleFS aktiv';
+                        statusElem.innerText = selected.length > 0 ? selected.length + ' folder(s) active' : 'LittleFS active';
                         statusElem.style.color = 'green';
                         if (cancelBtn) cancelBtn.style.display = 'none';
                     }, 8000);
                 } else if (xhr.readyState === XMLHttpRequest.DONE) {
-                    statusElem.innerText = 'Fehler beim Speichern';
+                    statusElem.innerText = 'Error saving';
                     statusElem.style.color = 'red';
                 }
             };
             xhr.send("paths=" + encodeURIComponent(paths));
         }
 
+        function buildUploadFolderList(folders, sdAvailable) {
+            var list = document.getElementById('upload-folder-list');
+            if (!list) return;
+            list.innerHTML = '';
+
+            var lfsBtn = document.createElement('button');
+            lfsBtn.innerText = '📁 LittleFS';
+            lfsBtn.dataset.folder = '';
+            lfsBtn.style.cssText = 'width:auto; padding:8px 14px; margin-bottom:0; background:' +
+                (uploadTargetPath === '' ? '#28a745' : '#007bff') + ';';
+            lfsBtn.onclick = function() {
+                uploadTargetPath = '';
+                document.getElementById('new-upload-folder').value = '';
+                updateUploadFolderButtons();
+                updateUploadTargetLabel();
+                var s = document.getElementById('upload-folder-status'); if (s) s.innerText = '';
+            };
+            list.appendChild(lfsBtn);
+
+            if (sdAvailable && folders && folders.length > 0) {
+                folders.slice().sort().forEach(function(folder) {
+                    if (folder.toLowerCase() === 'gifaudio') return;
+                    var btn = document.createElement('button');
+                    btn.innerText = '📂 ' + folder;
+                    btn.dataset.folder = folder;
+                    btn.style.cssText = 'width:auto; padding:8px 14px; margin-bottom:0; background:' +
+                        (uploadTargetPath === folder ? '#28a745' : '#007bff') + ';';
+                    btn.onclick = function() {
+                        uploadTargetPath = folder;
+                        document.getElementById('new-upload-folder').value = '';
+                        updateUploadFolderButtons();
+                        updateUploadTargetLabel();
+                        var s = document.getElementById('upload-folder-status'); if (s) s.innerText = '';
+                    };
+                    list.appendChild(btn);
+                });
+            }
+        }
+
+        function updateUploadFolderButtons() {
+            document.querySelectorAll('#upload-folder-list button').forEach(function(btn) {
+                btn.style.background = (uploadTargetPath === (btn.dataset.folder || '')) ? '#28a745' : '#007bff';
+            });
+        }
+
+        function updateUploadTargetLabel() {
+            var lbl = document.getElementById('upload-target-label');
+            if (lbl) lbl.innerText = uploadTargetPath || 'LittleFS';
+        }
+
+        function setNewUploadFolder() {
+            var input = document.getElementById('new-upload-folder');
+            var name = input.value.trim().replace(/[\/\\]/g, '').trim();
+            if (!name) return;
+            uploadTargetPath = name;
+            updateUploadFolderButtons();
+            updateUploadTargetLabel();
+            var s = document.getElementById('upload-folder-status');
+            if (s) { s.innerText = 'Upload folder: /' + name + ' (created on first upload)'; s.style.color = '#4a9eff'; }
+        }
+
         function cancelScan() {
             var statusElem = document.getElementById('sd-folder-status');
             var cancelBtn = document.getElementById('cancel-scan-btn');
-            if (statusElem) { statusElem.innerText = 'Scan wird abgebrochen...'; statusElem.style.color = '#e67e22'; }
+            if (statusElem) { statusElem.innerText = 'Cancelling scan...'; statusElem.style.color = '#e67e22'; }
             var xhr = new XMLHttpRequest();
             xhr.open("POST", "/cancel_scan", true);
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-                    if (statusElem) { statusElem.innerText = 'Scan abgebrochen — LittleFS aktiv'; statusElem.style.color = 'green'; }
+                    if (statusElem) { statusElem.innerText = 'Scan cancelled — LittleFS active'; statusElem.style.color = 'green'; }
                     if (cancelBtn) cancelBtn.style.display = 'none';
                     setTimeout(function() { sdFileOffset = 0; loadSDFolders(); loadSDScreensaverFiles(); }, 2000);
                 }
@@ -2032,7 +2188,7 @@
                                 if (isGif) {
                                     span.style.cursor = 'pointer';
                                     span.style.textDecoration = 'underline dotted';
-                                    span.title = 'Klicken für Vorschau';
+                                    span.title = 'Click for preview';
                                     span.onclick = (function(p, n) {
                                         return function() { showGifPreview(p, n); };
                                     })(filepath, name);
@@ -2163,7 +2319,7 @@
                                 pagination.style.display = 'flex';
                                 var from = sdFileOffset + 1;
                                 var to = Math.min(sdFileOffset + sdFilePageSize, info.total);
-                                var rangeText = from + '–' + to + ' von ' + info.total;
+                                var rangeText = from + '–' + to + ' of ' + info.total;
                                 pageInfo.textContent = rangeText;
                                 prevBtn.disabled = false;  // Wrap-Around: immer aktiv
                                 nextBtn.disabled = false;   // Wrap-Around: immer aktiv
@@ -2238,13 +2394,13 @@
                     } else if (_radioLastPreset >= 0) {
                         btn.innerHTML = '&#9654; Play';
                         btn.style.background = '#27ae60';
-                        if (stEl)    stEl.innerText   = 'Gestoppt';
+                        if (stEl)    stEl.innerText   = 'Stopped';
                         if (trackEl) trackEl.innerText = '';
                         if (iconEl) { iconEl.style.display = 'none'; iconEl.src = ''; }
                     } else {
                         btn.innerHTML = '&#9654; Play';
                         btn.style.background = '#555';
-                        if (stEl)    stEl.innerText   = 'Kein Sender gewählt';
+                        if (stEl)    stEl.innerText   = 'No station selected';
                         if (trackEl) trackEl.innerText = '';
                         if (iconEl) { iconEl.style.display = 'none'; iconEl.src = ''; }
                     }

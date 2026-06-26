@@ -1,0 +1,10 @@
+# ESP32 Coredump to Flash — aktiviert für Post-Crash-Diagnose
+# Partition ist bereits in partitions_16MB.csv reserviert (coredump, 128KB)
+# Download: http://<ip>/coredump → coredump.bin
+# Dekodieren: espcoredump.py info_corefile --core coredump.bin firmware.elf
+CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
+CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
+CONFIG_ESP_COREDUMP_CHECKSUM_CRC32=y
+CONFIG_ESP_COREDUMP_MAX_TASKS_NUM=64
+CONFIG_ESP_COREDUMP_STACK_SIZE=1024
+CONFIG_ESP_COREDUMP_LOG_LEVEL=0

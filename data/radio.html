@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
@@ -62,39 +62,6 @@
     .np-status.live { color: #f44; }
     .np-status.stopped { color: #666; }
 
-    /* Controls */
-    .controls {
-      background: #1e1e1e;
-      border-radius: 10px;
-      padding: 12px 16px;
-      margin-bottom: 14px;
-    }
-    .vol-row {
-      display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
-    }
-    .vol-row label { font-size: 0.85em; color: #aaa; white-space: nowrap; }
-    .vol-row input[type=range] { flex: 1; accent-color: #e64; }
-    .display-row {
-      display: flex; align-items: center; gap: 10px;
-    }
-    .display-row label { font-size: 0.85em; color: #aaa; }
-    .toggle-btn {
-      padding: 5px 14px;
-      border: none; border-radius: 16px;
-      font-size: 0.8em; cursor: pointer;
-      background: #333; color: #ccc;
-      transition: background 0.2s;
-    }
-    .toggle-btn.active { background: #e64; color: #fff; }
-    .stop-btn {
-      padding: 7px 18px;
-      background: #c33; color: #fff;
-      border: none; border-radius: 20px;
-      font-size: 0.85em; cursor: pointer;
-      margin-left: auto;
-    }
-    .stop-btn:disabled { background: #444; color: #888; cursor: default; }
-
     /* Section headings */
     .section-title {
       font-size: 0.78em;
@@ -140,7 +107,7 @@
     .preset-del:hover { color: #e44; }
     .preset-empty { color: #555; font-size: 0.85em; padding: 8px 0; }
 
-    /* Suche */
+    /* Suche / URL-Eingabe */
     .search-bar {
       background: #1e1e1e;
       border-radius: 10px;
@@ -157,7 +124,7 @@
     }
     .search-row input:focus { outline: none; border-color: #e64; }
     .btn {
-      padding: 7px 14px;
+      padding: 8px 14px;
       background: #e64; color: #fff;
       border: none; border-radius: 6px;
       font-size: 0.85em; cursor: pointer;
@@ -214,69 +181,64 @@
 <div class="container">
 
   <!-- Now Playing -->
-  <div class="section-title">Jetzt l&auml;uft</div>
+  <div class="section-title">Now Playing</div>
   <div class="now-playing" id="nowPlaying">
     <div class="np-icon-placeholder" id="npIconPh">&#127925;</div>
     <img id="npIcon" class="np-icon" src="" alt="" style="display:none" onerror="this.style.display='none';document.getElementById('npIconPh').style.display='flex'">
     <div class="np-info">
-      <div class="np-station" id="npStation">Kein Sender</div>
+      <div class="np-station" id="npStation">No station</div>
       <div class="np-track" id="npTrack"></div>
-      <div class="np-status stopped" id="npStatus">&#9724; Gestoppt</div>
+      <div class="np-status stopped" id="npStatus">&#9724; Stopped</div>
     </div>
   </div>
 
-  <!-- Controls -->
-  <div class="controls">
-    <div class="display-row">
-      <label>Display-Anzeige</label>
-      <button class="toggle-btn" id="displayToggle" onclick="toggleDisplay()">10s anzeigen</button>
-      <button class="stop-btn" id="stopBtn" onclick="stopRadio()" disabled>&#9632; Stop</button>
+  <!-- Search -->
+  <div class="section-title">Search stations</div>
+  <div class="search-bar">
+    <div class="search-row" style="flex-wrap:wrap;gap:6px;margin-bottom:6px">
+      <button class="btn btn-sec" onclick="loadCountry('DE')">&#127465;&#127466; DE</button>
+      <button class="btn btn-sec" onclick="loadCountry('AT')">&#127462;&#127481; AT</button>
+      <button class="btn btn-sec" onclick="loadCountry('CH')">&#127464;&#127469; CH</button>
+      <button class="btn btn-sec" onclick="loadCountry('NL')">&#127475;&#127473; NL</button>
+      <button class="btn btn-sec" onclick="loadCountry('FR')">&#127467;&#127479; FR</button>
+      <button class="btn btn-sec" onclick="loadNiedersachsen()">Niedersachsen</button>
     </div>
+    <div class="search-row">
+      <input type="text" id="searchInput" placeholder="Search term (e.g. NDR, Radio FFN ...)" maxlength="60">
+      <button class="btn" onclick="searchStations()">Search</button>
+    </div>
+    <div class="search-hint">Source: <a href="https://www.radio-browser.info" target="_blank" style="color:#666">radio-browser.info</a></div>
+    <div id="searchStatus" class="loading" style="display:none">Loading...</div>
+    <div id="searchError" class="error-msg" style="display:none"></div>
+    <div class="result-list" id="resultList"></div>
   </div>
 
-  <!-- Presets -->
-  <div class="section-title">Gespeicherte Sender</div>
-  <div class="preset-list" id="presetList">
-    <div class="preset-empty">Noch keine Sender gespeichert.</div>
-  </div>
-
-  <!-- Manuell -->
-  <div class="section-title">URL direkt eingeben</div>
+  <!-- Manual URL -->
+  <div class="section-title">Enter URL directly</div>
   <div class="search-bar" style="margin-bottom:14px">
     <div class="search-row">
-      <input type="text" id="manualName" placeholder="Sendername" maxlength="60">
+      <input type="text" id="manualName" placeholder="Station name" maxlength="60">
     </div>
     <div class="search-row" style="margin-top:6px">
       <input type="text" id="manualUrl" placeholder="Stream-URL (http://...)" maxlength="255">
     </div>
     <div class="search-row" style="margin-top:8px; justify-content:flex-end">
-      <button class="btn btn-sec" onclick="playManualUrl()">&#9654; Testen</button>
-      <button class="btn" style="margin-left:8px" onclick="saveManualPreset()">+ Speichern</button>
+      <button class="btn btn-sec" onclick="playManualUrl()">&#9654; Test</button>
+      <button class="btn" style="margin-left:8px" onclick="saveManualPreset()">+ Save</button>
     </div>
   </div>
 
-  <!-- Suche -->
-  <div class="section-title">Sender suchen</div>
-  <div class="search-bar">
-    <div class="search-row">
-      <input type="text" id="searchInput" placeholder="Suchbegriff (z.B. NDR, Radio FFN ...)" maxlength="60">
-      <button class="btn" onclick="searchStations()">Suchen</button>
-      <button class="btn btn-sec" onclick="loadNiedersachsen()">Niedersachsen</button>
-    </div>
-    <div class="search-hint">Quelle: <a href="https://www.radio-browser.info" target="_blank" style="color:#666">radio-browser.info</a></div>
-    <div id="searchStatus" class="loading" style="display:none">Lade...</div>
-    <div id="searchError" class="error-msg" style="display:none"></div>
-    <div class="result-list" id="resultList"></div>
+  <!-- Saved Stations -->
+  <div class="section-title">Saved Stations</div>
+  <div class="preset-list" id="presetList">
+    <div class="preset-empty">No stations saved yet.</div>
   </div>
 
 </div>
 
 <script>
   let currentPlaying = null;
-  let displayActive = false;
   let presets = [];
-
-  // Status pollen
 
   async function fetchStatus() {
     try {
@@ -289,22 +251,20 @@
 
   function updateUI(d) {
     const playing = d.playing;
-    document.getElementById('stopBtn').disabled = !playing;
 
     const st = document.getElementById('npStatus');
     if (playing) {
       st.textContent = '● LIVE';
       st.className = 'np-status live';
     } else {
-      st.textContent = '■ Gestoppt';
+      st.textContent = '■ Stopped';
       st.className = 'np-status stopped';
     }
 
-    const station = d.station || (playing ? 'Unbekannt' : 'Kein Sender');
+    const station = d.station || (playing ? 'Unknown' : 'No station');
     document.getElementById('npStation').textContent = station;
     document.getElementById('npTrack').textContent = d.title || '';
 
-    // Icon: zuerst aus radio_status (server-seitig), Fallback auf Preset-Array
     const iconEl = document.getElementById('npIcon');
     const iconPh = document.getElementById('npIconPh');
     let icon = d.icon || '';
@@ -320,27 +280,8 @@
       iconPh.style.display = 'flex';
     }
 
-    if (d.displayActive !== undefined) {
-      displayActive = d.displayActive;
-      const btn = document.getElementById('displayToggle');
-      btn.textContent = displayActive ? 'aktiv...' : '10s anzeigen';
-      btn.className = displayActive ? 'toggle-btn active' : 'toggle-btn';
-    }
-
     currentPlaying = (playing && d.preset >= 0) ? d.preset : null;
     refreshPresetHighlight();
-  }
-
-  // Playback
-
-  async function playPreset(idx) {
-    const p = presets[idx];
-    if (!p) return;
-    const fd = new FormData();
-    fd.append('url', p.url);
-    fd.append('preset', idx);
-    await fetch('/radio_play', { method: 'POST', body: fd });
-    setTimeout(fetchStatus, 600);
   }
 
   async function playUrl(url, name, icon) {
@@ -349,7 +290,7 @@
     fd.append('preset', -1);
     document.getElementById('npStation').textContent = name || url;
     document.getElementById('npTrack').textContent = '';
-    document.getElementById('npStatus').textContent = '▶ Verbinde...';
+    document.getElementById('npStatus').textContent = '▶ Connecting...';
     document.getElementById('npStatus').className = 'np-status live';
     if (icon) {
       const iconEl = document.getElementById('npIcon');
@@ -357,28 +298,9 @@
       iconEl.style.display = 'block';
       document.getElementById('npIconPh').style.display = 'none';
     }
-    await fetch('/radio_play', { method: 'POST', body: fd });
-    document.getElementById('stopBtn').disabled = false;
+    try { await fetch('/radio_play', { method: 'POST', body: fd }); } catch(e) { console.warn('ZeDMD radio_play:', e); document.getElementById('npStatus').textContent = 'Connection error'; document.getElementById('npStatus').className = 'np-status'; return; }
     setTimeout(fetchStatus, 1500);
   }
-
-  async function stopRadio() {
-    await fetch('/radio_stop', { method: 'POST' });
-    currentPlaying = null;
-    setTimeout(fetchStatus, 400);
-  }
-
-
-  // Display-Toggle
-
-  async function toggleDisplay() {
-    const btn = document.getElementById('displayToggle');
-    btn.textContent = 'aktiv...';
-    btn.className = 'toggle-btn active';
-    await fetch('/radio_display', { method: 'POST' });
-  }
-
-  // Presets
 
   async function loadPresets() {
     try {
@@ -391,7 +313,7 @@
   function renderPresets() {
     const el = document.getElementById('presetList');
     if (!presets.length) {
-      el.innerHTML = '<div class="preset-empty">Noch keine Sender gespeichert.</div>';
+      el.innerHTML = '<div class="preset-empty">No stations saved yet.</div>';
       return;
     }
     el.innerHTML = presets.map((p, i) => `
@@ -401,7 +323,7 @@
           : ''}
         <div class="preset-logo-ph" style="${p.icon ? 'display:none' : ''}">&#127925;</div>
         <div class="preset-name">${esc(p.name)}</div>
-        <button class="preset-del" onclick="event.stopPropagation();deletePreset(${i})" title="L&ouml;schen">&#10005;</button>
+        <button class="preset-del" onclick="event.stopPropagation();deletePreset(${i})" title="Delete">&#10005;</button>
       </div>`).join('');
   }
 
@@ -411,35 +333,48 @@
     });
   }
 
+  async function playPreset(idx) {
+    const p = presets[idx];
+    if (!p) return;
+    const fd = new FormData();
+    fd.append('url', p.url);
+    fd.append('preset', idx);
+    try { await fetch('/radio_play', { method: 'POST', body: fd }); } catch(e) { console.warn('ZeDMD radio_play:', e); return; }
+    setTimeout(fetchStatus, 600);
+  }
+
   async function savePreset(name, url, icon) {
     if (presets.length >= 20) {
-      alert('Maximal 20 Sender gespeichert. Bitte erst einen löschen.');
+      alert('Maximum 20 presets saved. Please delete one first.');
       return false;
     }
     const fd = new FormData();
     fd.append('name', name);
     fd.append('url', url);
     fd.append('icon', icon || '');
-    const r = await fetch('/radio_save_preset', { method: 'POST', body: fd });
+    let r;
+    try { r = await fetch('/radio_save_preset', { method: 'POST', body: fd }); } catch(e) { console.warn('ZeDMD radio_save_preset:', e); return false; }
     if (r.ok) await loadPresets();
     return r.ok;
   }
 
   async function deletePreset(idx) {
-    if (!confirm('Sender löschen?')) return;
+    if (!confirm('Delete station?')) return;
     const fd = new FormData();
     fd.append('index', idx);
-    await fetch('/radio_delete_preset', { method: 'POST', body: fd });
+    try { await fetch('/radio_delete_preset', { method: 'POST', body: fd }); } catch(e) { console.warn('ZeDMD radio_delete_preset:', e); return; }
     if (currentPlaying === idx) currentPlaying = null;
     await loadPresets();
   }
-
-  // Suche via radio-browser.info
 
   async function searchStations() {
     const q = document.getElementById('searchInput').value.trim();
     if (!q) return;
     await doSearch({ name: q, limit: 80, order: 'votes', hidebroken: 'true', countrycode: 'DE' });
+  }
+
+  async function loadCountry(cc) {
+    await doSearch({ countrycode: cc, limit: 100, order: 'votes', hidebroken: 'true' });
   }
 
   async function loadNiedersachsen() {
@@ -473,12 +408,11 @@
 
     statusEl.style.display = 'none';
     if (!data) {
-      errorEl.textContent = 'Keine Verbindung zur radio-browser.info API.';
+      errorEl.textContent = 'No connection to radio-browser.info API.';
       errorEl.style.display = 'block';
       return;
     }
 
-    // Deduplizierung: pro Stream-URL nur den ersten (höchste Votes) behalten
     const seenUrls = new Set();
     data = data.filter(s => {
       const url = normalizeStreamUrl(s.url_resolved || s.url);
@@ -488,7 +422,7 @@
     });
 
     if (!data.length) {
-      listEl.innerHTML = '<div class="loading">Keine Ergebnisse.</div>';
+      listEl.innerHTML = '<div class="loading">No results.</div>';
       return;
     }
 
@@ -496,7 +430,7 @@
       const url   = normalizeStreamUrl(s.url_resolved || s.url);
       const saved = presets.length >= 20 || presets.some(p => p.url === url);
       const icon  = s.favicon || '';
-      const name  = s.name || 'Unbekannt';
+      const name  = s.name || 'Unknown';
       const bitrate = s.bitrate ? s.bitrate + ' kbps' : '';
       const tags  = [bitrate, s.state, s.tags].filter(Boolean).join(' · ').substring(0, 60);
       return `
@@ -511,16 +445,12 @@
           </div>
           <div class="result-actions">
             <button class="btn-play-result" onclick="playUrl('${esc(url)}','${esc(name)}','${esc(icon)}')">&#9654;</button>
-            <button class="btn-save-result" ${saved ? 'disabled title="Bereits gespeichert"' : `onclick="savePreset('${esc(name)}','${esc(url)}','${esc(icon)}')"`}>+</button>
+            <button class="btn-save-result" ${saved ? 'disabled title="Already saved"' : `onclick="savePreset('${esc(name)}','${esc(url)}','${esc(icon)}')"`}>+</button>
           </div>
         </div>`;
     }).join('');
   }
 
-  // Helpers
-
-  // Bereinigt radio-browser.info URLs: ?ti=m3u / ?ti=pls sind Server-Hints
-  // die eine Playlist-Datei statt des direkten Streams liefern → Library hängt.
   function normalizeStreamUrl(url) {
     if (!url) return url;
     try {
@@ -537,8 +467,6 @@
     if (!s) return '';
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
-
-  // Manuelle URL
 
   function playManualUrl() {
     const url  = document.getElementById('manualUrl').value.trim();
@@ -557,8 +485,6 @@
       document.getElementById('manualUrl').value  = '';
     }
   }
-
-  // Init
 
   loadPresets();
   fetchStatus();

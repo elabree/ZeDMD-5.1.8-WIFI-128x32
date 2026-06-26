@@ -1,8 +1,9 @@
 # Batocera Dual-DMD Einrichtung — USB + WiFi ZeDMD
 
-> ⚠️ **Experimentell** — getestet mit Batocera **v42**. Batocera **>v42** hat möglicherweise Änderungen, die dieses Setup nicht mehr funktionsfähig machen. Vor einem Batocera-Update sorgfältig prüfen.
+> ⚠️ **Experimentell** — getestet mit Batocera **v42**. Vor einem Batocera-Update sorgfältig prüfen.
 >
 > Diese Anleitung ist ein persönliches Setup-Protokoll. Es funktioniert auf meinem Cabinet — Hardware und Batocera-Version können bei dir abweichen. Keine Garantie, kein Support.
+
 
 ---
 
@@ -58,7 +59,7 @@ Beide DMDs zeigen beim Durchblättern das Marquee des gewählten Spiels. Beim Sp
 ├── scripts/
 │   └── zedmd_marquee.sh
 ├── services/
-│   └── dmd_real2                         ← zweiter DMD-Service (WiFi)
+│   └── (dmd_real2 existiert nicht — WiFi-dmdserver wird von postshare.sh gestartet)
 └── dmd/
     ├── screensaver.gif
     ├── insert_coin/
@@ -87,6 +88,12 @@ Beide DMDs zeigen beim Durchblättern das Marquee des gewählten Spiels. Beim Sp
 ---
 
 ## Schritt 1 — Zweiten DMD-Service einrichten (WiFi-DMD)
+
+> ℹ️ **Aktuelle Implementierung:** Das Service-Script `/userdata/system/services/dmd_real2` wird **nicht verwendet**. Der WiFi-dmdserver wird ausschließlich von `postshare.sh` gestartet (Schritt 2). In `batocera.conf` steht `dmd_real2` als aktivierter Service — das ist harmloser Ballast, da kein Script vorhanden ist.
+>
+> **Warum kein Service-Script?** User-Services starten über `S99userservices` — viel zu spät. `postshare.sh` läuft als `S12` und zeigt damit Inhalte schon während des Bootens. Ein reines Service-Script würde das WiFi-DMD beim Boot stumm lassen.
+>
+> Der folgende Abschnitt dokumentiert den Service-Script-Ansatz als **Referenz** für ein späteres Neuaufsetzen oder eine Migration auf Batocera >v42.
 
 **Original-Service kopieren:**
 ```bash
@@ -233,6 +240,17 @@ Pfad: `/userdata/system/scripts/zedmd_marquee.sh`
 chmod +x /userdata/system/scripts/zedmd_marquee.sh
 ```
 
+> ℹ️ **Wie wird das Script aufgerufen?** Nicht über ES-Hooks (`game-start` / `game-end`), sondern durch Batoceras **`emulatorlauncher`** — dieser ruft beim Spielstart und -ende automatisch alle ausführbaren Scripts in `/userdata/system/scripts/` auf:
+>
+> ```
+> Spielstart:  zedmd_marquee.sh gameStart <system> <systemname> <emulator> <rompath>
+> Spielende:   zedmd_marquee.sh gameStop
+> ```
+>
+> Beispiel MAME: `zedmd_marquee.sh gameStart mame mame mame /userdata/roms/mame/1942.zip`
+>
+> Im Script relevant: `$1` = Aktion, `$2` = System, `$5` = ROM-Pfad. Das Script läuft als Hintergrundprozess und überwacht per `evtest` die Joystick-Eingaben bis zum Spielende.
+
 **Marquee-Suchreihenfolge — USB-DMD:**
 1. `/userdata/system/dmd/games/<system>/<rom>.gif/png`
 2. `/userdata/roms/<system>/images/<rom>-marquee.png`
@@ -362,9 +380,16 @@ Alle Dateien werden beim Spielende automatisch gelöscht.
 cat /userdata/system/dmd.log
 
 # Laufende Prozesse
-ps aux | grep dmdserver
-ps aux | grep dmd-play
-ps aux | grep zedmd
+ps aux | grep dmdserver | grep -v grep
+ps aux | grep dmd-play  | grep -v grep
+ps aux | grep zedmd     | grep -v grep
+
+# Beide dmdserver-Instanzen unterscheiden sich nur am Argument:
+#   /usr/bin/dmdserver                            ← USB-DMD  (Port 6789, dmd_real Service)
+#   /usr/bin/dmdserver -c .../config_real2.ini    ← WiFi-DMD (Port 9001, postshare.sh)
+#
+# Nur die WiFi-Instanz prüfen:
+pgrep -a -f config_real2.ini
 
 # Aktueller Zustand
 cat /tmp/zedmd_mode
