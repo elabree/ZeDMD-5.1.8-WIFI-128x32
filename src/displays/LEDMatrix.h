@@ -63,6 +63,7 @@ extern const uint8_t rgbOrder[3 * 6];
 class LedMatrix : public DisplayDriver {
  private:
   MatrixPanel_I2S_DMA *dma_display;
+  GFXcanvas16 *textCanvas = nullptr;
   const uint8_t lumval[16] = {0,  2,  4,  7,   11,  18,  30,  40,
                               50, 65, 80, 100, 125, 160, 200, 255};
 
@@ -86,6 +87,12 @@ class LedMatrix : public DisplayDriver {
   void DisplayTextScaled(const char *text, uint16_t x, uint16_t y,
                           uint8_t r, uint8_t g, uint8_t b,
                           uint8_t scale = 1) override;
+  void DisplayTextGFX(const char *text, int16_t x, uint8_t r,
+                      uint8_t g, uint8_t b);
+  uint16_t GetTextGFXWidth(const char *text);
+  void RenderTextGFXToBuffer(uint8_t *buf, const char *text, int16_t x,
+                              uint8_t r, uint8_t g, uint8_t b);
+  void EraseVLine(int16_t x) override;
   void FillZoneRaw(uint8_t idx, uint8_t *pBuffer);
   void FillZoneRaw565(uint8_t idx, uint8_t *pBuffer);
   void ClearZone(uint8_t idx);

@@ -40,6 +40,7 @@ Stream internet radio stations directly through the ZeDMD's built-in speaker.
 Requires a **MAX98357A I2S amplifier module** — see wiring below.
 
 - Dedicated station manager at `/radio.html` — search stations via [radio-browser.info](https://www.radio-browser.info), save presets with logo icons
+- **Country quick-select buttons** (🇩🇪 DE / 🇦🇹 AT / 🇨🇭 CH / 🇳🇱 NL / 🇫🇷 FR) load the top-100 stations for that country in one tap; Niedersachsen regional filter still available
 - Station name, track title and station logo displayed in the web UI
 - Volume control via slider on the main page and the radio page
 - Station name and track title scroll on the LED matrix for 5 seconds when a station starts, then returns to the screensaver — tap "DMD 10s" to show it again
@@ -63,18 +64,35 @@ Play a matching MP3 file from the SD card in sync with an animated GIF screensav
 
 > **Note:** GIF audio plays once per GIF cycle — looping is not yet implemented.
 
-### SDMMC Board Support
+### SDMMC Board Support *(not actively maintained)*
 Added support for boards with an **onboard SD card via SDMMC interface** (1-bit mode) — no external SPI module required. See pin table below for the required HUB75 cable changes.
+
+> **Note:** This build variant is not actively maintained. Development focus is on the standard SPI SD build (`wifi_sd_webradio`). The SDMMC variant may work but is not tested with each release.
+
+### GIF Screensaver Order
+- **A-Z toggle** — switch between alphabetical and random playback order directly on the main page
+- **Reshuffle button** — re-randomise the GIF order at any time without a full reload
+
+### Configurable Timezone
+The NTP clock timezone can now be set directly on the admin page — no firmware rebuild required.
+A dropdown covers the most common zones (Central Europe, UK, UTC, US East/Central/Mountain/Pacific); a **Custom** option accepts any POSIX timezone string for full flexibility. The setting is stored in LittleFS and survives reboots.
+
+### SD Card Mount / Eject
+The main page now shows a **Mount / Eject** toggle button next to the SD card status bar.
+- **⏏ Eject** (grey) — safely unmounts the SD card so it can be removed while the device stays powered
+- **⏻ Mount** (green) — remounts the card after reinsertion; updates the screensaver file list and GIF audio cache automatically
 
 ### Stability & Bug Fixes
 This release includes a comprehensive overhaul of memory management and task safety:
 
+- **Admin page no longer crashes** — root cause identified via coredump analysis: lwIP assertion in AsyncTCP 3.3.5 triggered by the Basic Auth handshake. Fixed by updating AsyncTCP to 3.4.10
 - Fixed race condition on station switching — audio no longer reverts to the previous station
 - Weather data (MQTT + HTTP) now safely synchronized between CPU cores
 - SD card directory listing moved out of network callbacks — no more audio stuttering during web access
 - Weather HTTP response buffered in PSRAM — eliminates large internal SRAM spike during fetch
 - All file uploads are now atomic (`.tmp` + rename) — interrupted uploads no longer leave corrupt files
 - `screensaverFiles` array protected by mutex against concurrent web access
+- Audio task priority raised above the web server task — reduces stream dropouts under concurrent web traffic
 
 ---
 
@@ -272,6 +290,17 @@ The screensaver GIF/RAW files can be stored on a microSD card connected via SPI.
 > Check your module's datasheet. If in doubt, use **3.3V** — the ESP32-S3 GPIO pins are **not** 5V-tolerant.
 
 **Format:** FAT32, files in subfolders (e.g. `/MyGIFs/`). GIF and RAW files supported.
+
+**First-boot scan performance**
+
+> ⚠️ The first scan of a large GIF library can take a very long time — a folder with ~5 400 files takes approximately **35 minutes** over SPI. This is a fundamental SPI/FAT32 limitation: the Arduino SD library opens every file individually to read its name, and FAT32 directories with many entries cannot be indexed.
+>
+> **After the first scan the file list is cached in LittleFS** (`sc_*.bin`). Every subsequent reboot loads the cache in seconds — no SD scan needed.
+>
+> **Tips to keep scan times acceptable:**
+> - Use **multiple smaller subfolders** instead of one large one (e.g. 5 × 1 000 files instead of 1 × 5 000) — each folder is scanned independently and cached separately.
+> - Use a **dedicated upload folder** (small, freshly uploaded files only) — the web UI's "Upload folder" picker lets you target it specifically without touching the large library folder.
+> - A planned future optimisation is an **SD-side index file** (`.index` per folder) that replaces directory traversal with a single sequential read — reducing scan time from minutes to under a second regardless of file count.
 
 ---
 

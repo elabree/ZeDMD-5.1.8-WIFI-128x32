@@ -23,11 +23,12 @@ uint8_t       dateR  = 180, dateG  = 180, dateB  = 180;
 volatile bool clockColorChanged = true;
 bool          ntpSynced = false;
 String        ntpServer = "pool.ntp.org";
+String        clockTimezone = "CET-1CEST,M3.5.0,M10.5.0/3";
 
 // ── NTP ───────────────────────────────────────────────────────────────────────
 
 void clockInit() {
-  configTzTime("CET-1CEST,M3.5.0,M10.5.0/3", ntpServer.c_str());
+  configTzTime(clockTimezone.c_str(), ntpServer.c_str());
   struct tm timeinfo;
   if (getLocalTime(&timeinfo, 5000)) {
     ntpSynced = true;

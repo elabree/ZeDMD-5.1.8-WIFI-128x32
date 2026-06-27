@@ -1,6 +1,7 @@
 
 #include <Arduino.h>
 #include <algorithm>
+#include <memory>
 #include <AsyncUDP.h>
 #include <Bounce2.h>
 #include <ESPAsyncWebServer.h>
@@ -65,6 +66,7 @@
 #endif
 #include "displayDriver.h"  // Base class for all display drivers
 #include "esp_log.h"
+#include "esp_partition.h"
 #include "esp_task_wdt.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/portmacro.h"
@@ -216,10 +218,11 @@ int8_t transport = TRANSPORT_WIFI_UDP;
 int8_t transport = TRANSPORT_USB;
 #endif
 // ── Log Ring-Buffer ───────────────────────────────────────────────────────────
-#define LOG_LINES     80
-#define LOG_LINE_LEN  120
-#define RTC_LOG_LINES 40
-#define RTC_LINE_LEN  100
+#define LOG_LINES        80
+#define LOG_LINE_LEN     120
+#define RTC_LOG_LINES    40
+#define RTC_LINE_LEN     100
+#define CRASH_LOG_SLOTS  10
 
 static char (*logBuffer)[LOG_LINE_LEN] = nullptr;  // alloziert in PSRAM (setup)
 static uint8_t logHead = 0;
@@ -248,9 +251,11 @@ void logMsg(const char* fmt, ...) {
   char line[LOG_LINE_LEN];
   snprintf(line, sizeof(line), "[%lu.%03lu] %s", ms / 1000, ms % 1000, tmp);
   portENTER_CRITICAL(&logMux);
-  strncpy(logBuffer[logHead], line, LOG_LINE_LEN - 1);
-  logHead = (logHead + 1) % LOG_LINES;
-  if (logCount < LOG_LINES) logCount++;
+  if (logBuffer) {
+    strncpy(logBuffer[logHead], line, LOG_LINE_LEN - 1);
+    logHead = (logHead + 1) % LOG_LINES;
+    if (logCount < LOG_LINES) logCount++;
+  }
   // Auch in RTC-Speicher schreiben
   strncpy(rtcLog[rtcLogHead], line, RTC_LINE_LEN - 1);
   rtcLog[rtcLogHead][RTC_LINE_LEN - 1] = '\0';
@@ -260,6 +265,20 @@ void logMsg(const char* fmt, ...) {
   portEXIT_CRITICAL(&logMux);
 }
 // ── Crash-Diagnose (LittleFS, konsistent mit Settings-Pattern) ───────────────
+
+// File-scope: kein C++-Guard nötig, sicher nach PANIC-Reset
+static constexpr int kRsnN = 9;
+static const struct { esp_reset_reason_t r; const char* name; } kRsn[kRsnN] = {
+  { ESP_RST_POWERON,    "POWERON"    },
+  { ESP_RST_SW,         "SW"         },
+  { ESP_RST_PANIC,      "PANIC"      },
+  { ESP_RST_INT_WDT,    "INT_WDT"    },
+  { ESP_RST_TASK_WDT,   "TASK_WDT"   },
+  { ESP_RST_WDT,        "WDT"        },
+  { ESP_RST_BROWNOUT,   "BROWNOUT"   },
+  { ESP_RST_PWR_GLITCH, "PWR_GLITCH" },
+  { ESP_RST_CPU_LOCKUP, "CPU_LOCKUP" },
+};
 
 static uint32_t diagBootCount = 0;
 
@@ -277,7 +296,9 @@ static uint32_t diagReadUInt(const char* json, const char* key, uint32_t def) {
 // esp_reset_reason()-Switch in setup(). Beim Dump enthält der RTC-Buffer
 // genau 1 neues "=== ZeDMD booting ==="-Entry; der Rest ist Pre-Crash-Log.
 static void diagBoot() {
-  char jsonBuf[600] = "{}";
+  // static: kein Stack-Druck nach PANIC (Stack könnte teilbeschädigt sein)
+  static char jsonBuf[600];
+  strcpy(jsonBuf, "{}");
   {
     File rf = LittleFS.open("/diag.json", "r");
     if (rf) {
@@ -287,19 +308,6 @@ static void diagBoot() {
     }
   }
 
-  static constexpr int kRsnN = 9;
-  static const struct { esp_reset_reason_t r; const char* name; } kRsn[kRsnN] = {
-    { ESP_RST_POWERON,    "POWERON"    },
-    { ESP_RST_SW,         "SW"         },
-    { ESP_RST_PANIC,      "PANIC"      },
-    { ESP_RST_INT_WDT,    "INT_WDT"    },
-    { ESP_RST_TASK_WDT,   "TASK_WDT"   },
-    { ESP_RST_WDT,        "WDT"        },
-    { ESP_RST_BROWNOUT,   "BROWNOUT"   },
-    { ESP_RST_PWR_GLITCH, "PWR_GLITCH" },
-    { ESP_RST_CPU_LOCKUP, "CPU_LOCKUP" },
-  };
-
   // ── Pre-Crash-State sichern VOR logMsg() — Dump-Bedingung basiert darauf ──
   bool    preLogValid = rtcLogValid;
   uint8_t preLogCount = rtcLogCount;
@@ -307,9 +315,11 @@ static void diagBoot() {
   // rtcLastUptime sofort nullen — Bootloop-Schutz: nächster Reboot sieht 0
   uint32_t lastUp     = rtcLastUptime;
   rtcLastUptime       = 0;
+  logMsg("diagBoot: preLog snapped valid=%d count=%d lastUp=%us",
+         (int)preLogValid, (int)preLogCount, (unsigned)lastUp);
 
   diagBootCount        = diagReadUInt(jsonBuf, "boots",      0) + 1;
-  uint8_t  crashNext   = (uint8_t)(diagReadUInt(jsonBuf, "crashNext", 0) % 5);
+  uint8_t  crashNext   = (uint8_t)(diagReadUInt(jsonBuf, "crashNext", 0) % CRASH_LOG_SLOTS);
   uint32_t otherCount  = diagReadUInt(jsonBuf, "boots_OTHER", 0);
   uint32_t counts[kRsnN];
 
@@ -322,6 +332,7 @@ static void diagBoot() {
     if (kRsn[i].r == reason) { counts[i]++; reasonName = kRsn[i].name; }
   }
   if (strcmp(reasonName, "OTHER") == 0) otherCount++;
+  logMsg("diagBoot: reason=%s boots=%u", reasonName, (unsigned)diagBootCount);
 
   logMsg("Boot #%u | Reset: %s | Heap: %u | lastUp: %us",
          (unsigned)diagBootCount, reasonName,
@@ -359,7 +370,7 @@ static void diagBoot() {
       for (uint8_t i = 0; i < preLogCount; i++)
         f.println(rtcLog[(start + i) % RTC_LOG_LINES]);
       f.close();
-      crashNext   = (uint8_t)((crashNext + 1) % 5);
+      crashNext   = (uint8_t)((crashNext + 1) % CRASH_LOG_SLOTS);
       rtcLogValid = false;
       rtcLogCount = 0;
       rtcLogHead  = 0;
@@ -403,7 +414,7 @@ uint8_t screensaverBrightness = 3;
 uint8_t screensaverDuration = 10;  // Anzeigedauer in Sekunden, Default 10
 bool screensaverShuffle = false;
 bool screensaverStrictTimer = true;
-bool sdCardAvailable = false;
+volatile bool sdCardAvailable = false;
 bool sdCardWarningPending = false;
 uint64_t sdTotalBytes = 0;
 uint64_t sdUsedBytes = 0;
@@ -419,15 +430,17 @@ static char  cachedSdFilesFolder[CACHE_SD_FOLDER_SIZE] = "";
 volatile bool gifAudioRefreshNeeded       = false;
 volatile bool sdFilesRefreshNeeded        = false;
 volatile bool sdFoldersInvalidateNeeded   = false;
+volatile bool sdFoldersRefreshNeeded      = false;
 volatile bool sdFilesInvalidateNeeded     = false;
 bool gifAudioEnabled = true;
 bool screensaverPaused = false;  // Screensaver Pause/Play
-static volatile bool displayTextActive  = false;
-static char   displayTextContent[128]   = "";
+static volatile bool displayTextActive     = false;
+static char   displayTextContent[128]      = "";
 static uint8_t displayTextR = 255, displayTextG = 255, displayTextB = 255;
-static bool   displayTextScroll         = false;
-static uint32_t displayTextEnd          = 0;
-static int16_t  displayTextScrollX      = 128;
+static bool   displayTextScroll            = false;
+static uint32_t displayTextEnd             = 0;
+static int16_t  displayTextScrollX         = 128;
+static bool     displayTextNeedsClear      = true;  // ClearScreen only on first frame and wrap
 uint8_t screensaverMode = 0;     // 0=Screensaver only, 1=Clock only, 2=Clock+Screensaver
 // ntpSynced, ntpServer, clockR/G/B, dateR/G/B, clockColorChanged → clock.cpp
 // Wetter (Modus 3) — Globals jetzt in weather.cpp
@@ -508,6 +521,7 @@ String forcePlayFile = "";
 String currentlyPlayingFile = "";  // aktuell gespieltes GIF (auch Force-Play)
 String screensaverIgnore = "";     // Newline-getrennte Ignore-Pfade
 volatile bool cancelSdScan = false;
+String lastUploadFolder = "";      // Zielordner des letzten SD-Uploads (für gezielten Cache-Invalidierung)
 
 // AnimatedGIF
 AnimatedGIF gif;
@@ -522,6 +536,7 @@ void addScreensaverFile(const String& path);
 void SaveScreensaverCache();
 bool TryLoadScreensaverCache();
 void InvalidateAllFolderCaches();
+void InvalidateFolderCache(const String& path);
 static void psramCacheSet(char** ptr, const String& json);
 void SaveGifAudioCache();
 bool TryLoadGifAudioCache();
@@ -548,6 +563,8 @@ void LoadGifAudioEnabled();
 void sendLittleFSHtml(AsyncWebServerRequest *request, const char* path);
 void SaveWeatherConfig();
 void LoadWeatherConfig();
+void SaveTimezoneConfig();
+void LoadTimezoneConfig();
 #ifdef ZEDMD_WIFI
 void SaveMqttConfig();
 void LoadMqttConfig();
@@ -639,6 +656,7 @@ DisplayDriver *GetDisplayObject() { return display; }
 
 void SaveSettingsMenu() {
   File f = LittleFS.open("/settings_menu.val", "w");
+  if (!f) return;
   f.write(settingsMenu);
   f.close();
 }
@@ -659,6 +677,7 @@ void LoadSettingsMenu() {
 
 void SaveTransport() {
   File f = LittleFS.open("/transport.val", "w");
+  if (!f) return;
   f.write(transport);
   f.close();
 }
@@ -676,6 +695,7 @@ void LoadTransport() {
 #ifdef DISPLAY_LED_MATRIX
 void SaveRgbOrder() {
   File f = LittleFS.open("/rgb_order.val", "w");
+  if (!f) return;
   f.write(rgbMode);
   f.close();
 }
@@ -692,20 +712,15 @@ void LoadRgbOrder() {
 
 void SavePanelSettings() {
   File f = LittleFS.open("/panel_clkphase.val", "w");
-  f.write(panelClkphase);
-  f.close();
+  if (f) { f.write(panelClkphase); f.close(); }
   f = LittleFS.open("/panel_driver.val", "w");
-  f.write(panelDriver);
-  f.close();
+  if (f) { f.write(panelDriver); f.close(); }
   f = LittleFS.open("/panel_i2sspeed.val", "w");
-  f.write(panelI2sspeed);
-  f.close();
+  if (f) { f.write(panelI2sspeed); f.close(); }
   f = LittleFS.open("/panel_latch_blanking.val", "w");
-  f.write(panelLatchBlanking);
-  f.close();
+  if (f) { f.write(panelLatchBlanking); f.close(); }
   f = LittleFS.open("/panel_min_refresh_rate.val", "w");
-  f.write(panelMinRefreshRate);
-  f.close();
+  if (f) { f.write(panelMinRefreshRate); f.close(); }
 }
 
 void LoadPanelSettings() {
@@ -738,6 +753,7 @@ void LoadPanelSettings() {
 
 void SaveLum() {
   File f = LittleFS.open("/lum.val", "w");
+  if (!f) return;
   f.write(brightness);
   f.close();
 }
@@ -754,6 +770,7 @@ void LoadLum() {
 
 void SaveDebug() {
   File f = LittleFS.open("/debug.val", "w");
+  if (!f) return;
   f.write(debug);
   f.close();
 }
@@ -770,6 +787,7 @@ void LoadDebug() {
 
 void SaveUsbPackageSizeMultiplier() {
   File f = LittleFS.open("/usb_size.val", "w");
+  if (!f) return;
   f.write(usbPackageSizeMultiplier);
   f.close();
 }
@@ -786,6 +804,7 @@ void LoadUsbPackageSizeMultiplier() {
 
 void SaveUdpDelay() {
   File f = LittleFS.open("/udp_delay.val", "w");
+  if (!f) return;
   f.write(udpDelay);
   f.close();
 }
@@ -803,6 +822,7 @@ void LoadUdpDelay() {
 #ifdef ZEDMD_HD_HALF
 void SaveYOffset() {
   File f = LittleFS.open("/y_offset.val", "w");
+  if (!f) return;
   f.write(yOffset);
   f.close();
 }
@@ -820,6 +840,7 @@ void LoadYOffset() {
 
 void SaveScale() {
   File f = LittleFS.open("/scale.val", "w");
+  if (!f) return;
   f.write(display->GetCurrentScalingMode());
   f.close();
 }
@@ -2002,13 +2023,20 @@ void Task_ReadSerial(void *pvParameters) {
 
 static void HandleUdpPacket(AsyncUDPPacket packet) {
   static bool isProcessing = false;
+  static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 
-  if (!isProcessing) {
-    isProcessing = true;
+  portENTER_CRITICAL(&mux);
+  bool alreadyProcessing = isProcessing;
+  if (!alreadyProcessing) isProcessing = true;
+  portEXIT_CRITICAL(&mux);
+
+  if (!alreadyProcessing) {
     transportActive = true;
     HandleData(packet.data(), packet.length());
     yield();
+    portENTER_CRITICAL(&mux);
     isProcessing = false;
+    portEXIT_CRITICAL(&mux);
   }
 }
 
@@ -2050,6 +2078,10 @@ static void NewTcpClient(void *arg, AsyncClient *client) {
 }
 
 void sendLittleFSHtml(AsyncWebServerRequest *request, const char* path) {
+  if (ESP.getMaxAllocHeap() < 10240) {
+    request->send(503, "text/plain", "Low memory");
+    return;
+  }
   File f = LittleFS.open(path, "r");
   if (!f) { request->send(404); return; }
   String etag = "\"" + String(f.size()) + "\"";
@@ -2060,6 +2092,7 @@ void sendLittleFSHtml(AsyncWebServerRequest *request, const char* path) {
     return;
   }
   AsyncWebServerResponse *resp = request->beginResponse(LittleFS, path, "text/html");
+  if (!resp) { request->send(503, "text/plain", "Low memory"); return; }
   resp->addHeader("ETag", etag);
   resp->addHeader("Cache-Control", "no-cache");
   request->send(resp);
@@ -2305,7 +2338,7 @@ void StartServer() {
 
   // POST /delete_crashlogs — alle Crash-Dumps löschen
   server->on("/delete_crashlogs", HTTP_POST, [](AsyncWebServerRequest *request) {
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < CRASH_LOG_SLOTS; i++) {
       char fname[32];
       snprintf(fname, sizeof(fname), "/crashlogs/crash-%d.txt", i);
       LittleFS.remove(fname);
@@ -2360,7 +2393,7 @@ void StartServer() {
     }
     out += ",\n  \"crashFiles\": [";
     bool first = true;
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < CRASH_LOG_SLOTS; i++) {
       char fname[32];
       snprintf(fname, sizeof(fname), "/crashlogs/crash-%d.txt", i);
       if (LittleFS.exists(fname)) {
@@ -2379,7 +2412,7 @@ void StartServer() {
   server->on("/crashlog", HTTP_GET, [](AsyncWebServerRequest *request) {
     int n = 0;
     if (request->hasParam("n")) n = request->getParam("n")->value().toInt();
-    if (n < 0 || n > 4) { request->send(400, "text/plain", "n muss 0-4 sein"); return; }
+    if (n < 0 || n >= CRASH_LOG_SLOTS) { request->send(400, "text/plain", "n muss 0-9 sein"); return; }
     char fname[32];
     snprintf(fname, sizeof(fname), "/crashlogs/crash-%d.txt", n);
     if (!LittleFS.exists(fname)) {
@@ -2387,6 +2420,35 @@ void StartServer() {
       return;
     }
     request->send(LittleFS, fname, "text/plain");
+  });
+
+  // GET /coredump — lädt rohen ELF-Coredump aus Flash-Partition zum Dekodieren mit espcoredump.py
+  server->on("/coredump", HTTP_GET, [](AsyncWebServerRequest *request) {
+    const esp_partition_t *part = esp_partition_find_first(
+        ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_COREDUMP, NULL);
+    if (!part) {
+      request->send(404, "text/plain", "No coredump partition");
+      return;
+    }
+    // Erased flash = 0xFFFFFFFF → kein Coredump vorhanden.
+    // ESP-IDF schreibt keinen ELF-Header direkt; erster uint32 ist die Datenlänge.
+    uint32_t firstWord = 0xFFFFFFFF;
+    esp_partition_read(part, 0, &firstWord, 4);
+    if (firstWord == 0xFFFFFFFF) {
+      request->send(404, "text/plain", "No valid coredump (no crash recorded yet)");
+      return;
+    }
+    const size_t cdSize = part->size;
+    AsyncWebServerResponse *resp = request->beginChunkedResponse("application/octet-stream",
+      [part, cdSize](uint8_t *buf, size_t maxLen, size_t index) -> size_t {
+        if (index >= cdSize) return 0;
+        size_t toRead = min(maxLen, cdSize - index);
+        if (esp_partition_read(part, index, buf, toRead) != ESP_OK) return 0;
+        return toRead;
+      });
+    resp->addHeader("Content-Disposition", "attachment; filename=\"coredump.bin\"");
+    resp->addHeader("Cache-Control", "no-store");
+    request->send(resp);
   });
 
   // POST /save_mqtt_config
@@ -2417,49 +2479,72 @@ void StartServer() {
     request->send(200, "text/plain", "OK");
   });
 
+  // POST /save_timezone
+  server->on("/save_timezone", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (request->hasParam("tz", true)) {
+      String tz = request->getParam("tz", true)->value();
+      tz.trim();
+      if (tz.length() > 0) {
+        clockTimezone = tz;
+        SaveTimezoneConfig();
+        configTzTime(clockTimezone.c_str(), ntpServer.c_str());
+        logMsg("Timezone geaendert: %s", clockTimezone.c_str());
+      }
+    }
+    request->send(200, "text/plain", "OK");
+  });
+
   // Route to return the current settings as JSON
+  // snprintf in statischen Puffer — kein Heap-Aufbau durch String-Konkatenation
   server->on("/get_config", HTTP_GET, [](AsyncWebServerRequest *request) {
+    static char json[896];
     String trimmedSsid = ssid;
     trimmedSsid.trim();
 
-    String json = "{";
-    json += "\"ssid\":\"" + trimmedSsid + "\",";
-    json += "\"port\":" + String(port) + ",";
+    int n = snprintf(json, sizeof(json),
+      "{\"ssid\":\"%s\",\"port\":%u"
 #ifndef DISPLAY_RM67162_AMOLED
-    json += "\"rgbOrder\":" + String(rgbMode) + ",";
+      ",\"rgbOrder\":%u"
 #endif
-    json += "\"brightness\":" + String(brightness) + ",";
-    json += "\"screensaverBrightness\":" + String(screensaverBrightness) + ",";
-    json += "\"screensaverDuration\":" + String(screensaverDuration) + ",";
-    json += "\"screensaverShuffle\":" + String(screensaverShuffle ? 1 : 0) + ",";
-    json += "\"screensaverStrictTimer\":" + String(screensaverStrictTimer ? 1 : 0) + ",";
-    json += "\"gifAudioEnabled\":" + String(gifAudioEnabled ? 1 : 0) + ",";
-    json += "\"localIP\":\"" + WiFi.localIP().toString() + "\",";
-    json += "\"screensaverMode\":" + String(screensaverMode) + ",";
-    json += "\"clockR\":" + String(clockR) + ",";
-    json += "\"clockG\":" + String(clockG) + ",";
-    json += "\"clockB\":" + String(clockB) + ",";
-    json += "\"dateR\":"  + String(dateR)  + ",";
-    json += "\"dateG\":"  + String(dateG)  + ",";
-    json += "\"dateB\":"  + String(dateB)  + ",";
-    json += "\"scaleMode\":" + String(display->GetCurrentScalingMode()) + ",";
-    json += "\"transport\":" + String(transport) + ",";
-    json += "\"udpDelay\":" + String(udpDelay) + ",";
-    json += "\"usbSize\":" + String(usbPackageSizeMultiplier);
+      ",\"brightness\":%u,\"screensaverBrightness\":%u,\"screensaverDuration\":%u"
+      ",\"screensaverShuffle\":%u,\"screensaverStrictTimer\":%u,\"gifAudioEnabled\":%u"
+      ",\"localIP\":\"%s\",\"screensaverMode\":%u"
+      ",\"clockR\":%u,\"clockG\":%u,\"clockB\":%u"
+      ",\"dateR\":%u,\"dateG\":%u,\"dateB\":%u"
+      ",\"scaleMode\":%u,\"transport\":%u,\"udpDelay\":%u,\"usbSize\":%u",
+      trimmedSsid.c_str(), (unsigned)port,
+#ifndef DISPLAY_RM67162_AMOLED
+      (unsigned)rgbMode,
+#endif
+      (unsigned)brightness, (unsigned)screensaverBrightness, (unsigned)screensaverDuration,
+      (unsigned)screensaverShuffle, (unsigned)screensaverStrictTimer, (unsigned)gifAudioEnabled,
+      WiFi.localIP().toString().c_str(), (unsigned)screensaverMode,
+      (unsigned)clockR, (unsigned)clockG, (unsigned)clockB,
+      (unsigned)dateR,  (unsigned)dateG,  (unsigned)dateB,
+      (unsigned)display->GetCurrentScalingMode(), (unsigned)transport,
+      (unsigned)udpDelay, (unsigned)usbPackageSizeMultiplier);
+
 #ifdef ZEDMD_WIFI
-    json += ",\"mqttServer\":\"" + mqttServer + "\"";
-    json += ",\"mqttPort\":" + String(mqttPort);
+    n += snprintf(json + n, sizeof(json) - n,
+      ",\"mqttServer\":\"%s\",\"mqttPort\":%u",
+      mqttServer.c_str(), (unsigned)mqttPort);
 #endif
-    json += ",\"weatherLat\":" + String(weatherLat, 4);
-    json += ",\"weatherLon\":" + String(weatherLon, 4);
+
+    n += snprintf(json + n, sizeof(json) - n,
+      ",\"weatherLat\":%.4f,\"weatherLon\":%.4f,\"timezone\":\"%s\"",
+      weatherLat, weatherLon, clockTimezone.c_str());
+
 #ifdef DISPLAY_LED_MATRIX
-    json += ",\"panelClkphase\":" + String(panelClkphase);
-    json += ",\"panelI2sspeed\":" + String(panelI2sspeed);
-    json += ",\"panelLatchBlanking\":" + String(panelLatchBlanking);
-    json += ",\"panelMinRefreshRate\":" + String(panelMinRefreshRate);
-    json += ",\"panelDriver\":" + String(panelDriver);
+    n += snprintf(json + n, sizeof(json) - n,
+      ",\"panelClkphase\":%u,\"panelI2sspeed\":%u"
+      ",\"panelLatchBlanking\":%u,\"panelMinRefreshRate\":%u,\"panelDriver\":%u",
+      (unsigned)panelClkphase, (unsigned)panelI2sspeed,
+      (unsigned)panelLatchBlanking, (unsigned)panelMinRefreshRate, (unsigned)panelDriver);
 #endif
-    json += "}";
+
+    if (n < (int)sizeof(json) - 1) json[n++] = '}';
+    json[n] = '\0';
+
     request->send(200, "application/json", json);
   });
 
@@ -2555,22 +2640,36 @@ void StartServer() {
       return;
     }
 
-    // SD: chunked streamen ohne vollständiges RAM-Buffering
+    // SD: erst komplett in PSRAM laden, dann SD sofort schliessen, dann aus RAM streamen.
+    // Verhindert SPI-Konflikt zwischen WebServer (Core 0) und GIF-Screensaver (Core 1).
     if (path.startsWith("SD:")) {
       if (!sdCardAvailable) { request->send(503, "text/plain", "SD not available"); return; }
       String sdPath = path.substring(3);
       File f = SD.open(sdPath, "r");
       if (!f) { request->send(404, "text/plain", "Not found"); return; }
-      if (f.size() > 1024UL * 1024UL) {  // max 1 MB — schützt vor RAM-Überlastung
+      size_t fileSize = f.size();
+      if (fileSize > 1024UL * 1024UL) {
         f.close();
         request->send(413, "text/plain", "File too large for preview");
         return;
       }
-      File *pf = new File(f);
+      uint8_t *rawBuf = (uint8_t *)heap_caps_malloc(fileSize, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+      if (!rawBuf) {
+        f.close();
+        request->send(503, "text/plain", "No memory");
+        return;
+      }
+      f.read(rawBuf, fileSize);
+      f.close();  // SD sofort freigeben — kein concurrent access mehr
+
+      // shared_ptr: free genau einmal — bei EOF und bei Verbindungsabbruch
+      std::shared_ptr<uint8_t> gifBuf(rawBuf, [](uint8_t *p) { heap_caps_free(p); });
       AsyncWebServerResponse *response = request->beginChunkedResponse("image/gif",
-        [pf](uint8_t *buf, size_t maxLen, size_t) -> size_t {
-          if (!pf->available()) { pf->close(); delete pf; return 0; }
-          return pf->read(buf, maxLen);
+        [gifBuf, fileSize](uint8_t *buf, size_t maxLen, size_t index) -> size_t {
+          if (index >= fileSize) return 0;
+          size_t toSend = min(fileSize - index, maxLen);
+          memcpy(buf, gifBuf.get() + index, toSend);
+          return toSend;
         }
       );
       response->addHeader("Cache-Control", "max-age=30");
@@ -2615,6 +2714,7 @@ void StartServer() {
       static File uploadFile;
       static String targetPath;
       if (index == 0) {
+        if (uploadFile) { uploadFile.close(); LittleFS.remove((targetPath + ".tmp").c_str()); }
         targetPath = "/screensaver/" + filename;
         uploadFile = LittleFS.open(targetPath + ".tmp", "w");
       }
@@ -2704,6 +2804,15 @@ void StartServer() {
     } else {
       request->send(400, "text/plain", "Missing parameter");
     }
+  });
+
+  // POST /screensaver_reshuffle — Reihenfolge neu würfeln ohne Einstellung zu ändern
+  server->on("/screensaver_reshuffle", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (screensaverShuffle && screensaverCount > 1) {
+      screensaverIndex = 0;
+      shuffleScreensaverFiles();
+    }
+    request->send(200, "text/plain", "OK");
   });
 
   // POST /save_screensaver_strict_timer
@@ -2824,9 +2933,7 @@ void StartServer() {
       return;
     }
     text.substring(0, 127).toCharArray(displayTextContent, sizeof(displayTextContent));
-    bool wantsScroll  = request->hasParam("scroll", true) &&
-                       request->getParam("scroll", true)->value() == "1";
-    displayTextScroll = wantsScroll && (text.length() * 20 > TOTAL_WIDTH);
+    displayTextScroll = display->GetTextGFXWidth(displayTextContent) > TOTAL_WIDTH;
     uint32_t dur = request->hasParam("duration", true) ?
                    (uint32_t)request->getParam("duration", true)->value().toInt() : 10;
     if (dur < 1) dur = 1; if (dur > 300) dur = 300;
@@ -2836,9 +2943,10 @@ void StartServer() {
     displayTextR = (uint8_t)strtol(col.substring(0, 2).c_str(), nullptr, 16);
     displayTextG = (uint8_t)strtol(col.substring(2, 4).c_str(), nullptr, 16);
     displayTextB = (uint8_t)strtol(col.substring(4, 6).c_str(), nullptr, 16);
-    displayTextEnd     = millis() + dur * 1000;
-    displayTextScrollX = TOTAL_WIDTH;
-    displayTextActive  = true;
+    displayTextEnd        = millis() + dur * 1000;
+    displayTextScrollX    = TOTAL_WIDTH;
+    displayTextNeedsClear = true;
+    displayTextActive     = true;
     request->send(200, "text/plain", "OK");
   });
 
@@ -2862,6 +2970,35 @@ void StartServer() {
       screensaverReloadNeeded = true;
     }
     request->send(200, "text/plain", "OK");
+  });
+
+  // POST /mount_sd — SD-Karte wieder einhängen
+  server->on("/mount_sd", HTTP_POST, [](AsyncWebServerRequest *request) {
+#ifdef CONFIG_IDF_TARGET_ESP32S3
+    const uint32_t spiSpeed = 8000000;
+#else
+    const uint32_t spiSpeed = 4000000;
+#endif
+    SD.end();
+    bool ok = false;
+    for (uint8_t i = 0; i < 3; i++) {
+      if (SD.begin(SD_CS, spiSD, spiSpeed)) { ok = true; break; }
+      SD.end();
+      delay(500);
+    }
+    if (ok) {
+      sdCardAvailable      = true;
+      sdTotalBytes         = SD.cardSize();
+      sdUsedBytes          = SD.usedBytes();
+      gifAudioRefreshNeeded    = true;
+      sdFoldersInvalidateNeeded = true;
+      logMsg("SD remount OK");
+      request->send(200, "text/plain", "OK");
+    } else {
+      sdCardAvailable = false;
+      logMsg("SD remount FAILED");
+      request->send(503, "text/plain", "Mount failed");
+    }
   });
 
   // GET /sd_folders — gibt gecachten Status zurück, kein SD Zugriff im Webserver Task!
@@ -2921,6 +3058,7 @@ void StartServer() {
       static String targetPath;
       if (!sdCardAvailable) return;
       if (index == 0) {
+        if (uploadFile) { uploadFile.close(); SD.remove((targetPath + ".tmp").c_str()); }
         if (!SD.exists(GIF_AUDIO_DIR)) SD.mkdir(GIF_AUDIO_DIR);
         targetPath = String(GIF_AUDIO_DIR) + "/" + filename;
         uploadFile = SD.open((targetPath + ".tmp").c_str(), FILE_WRITE);
@@ -2938,6 +3076,7 @@ void StartServer() {
       request->send(400, "text/plain", "Missing name");
       return;
     }
+    if (!sdCardAvailable) { request->send(503, "text/plain", "SD not available"); return; }
     String path = String(GIF_AUDIO_DIR) + "/" + request->getParam("name", true)->value();
     SD.remove(path.c_str());
     InvalidateGifAudioCache();
@@ -2949,8 +3088,9 @@ void StartServer() {
   // Optionaler Query-Parameter ?folder=Name überschreibt screensaverPaths
   server->on("/upload_sd", HTTP_POST,
     [](AsyncWebServerRequest *request) {
-      InvalidateAllFolderCaches();
+      InvalidateFolderCache(lastUploadFolder);
       screensaverReloadNeeded = true;
+      sdFoldersRefreshNeeded = true;
       request->send(200, "text/plain", "Upload OK");
     },
     [](AsyncWebServerRequest *request, String filename, size_t index,
@@ -2959,6 +3099,7 @@ void StartServer() {
       static String targetPath;
       if (!sdCardAvailable) return;
       if (index == 0) {
+        if (uploadFile) { uploadFile.close(); SD.remove((targetPath + ".tmp").c_str()); }
         String folder;
         if (request->hasParam("folder")) {
           folder = request->getParam("folder")->value();
@@ -2972,6 +3113,7 @@ void StartServer() {
           if (!folder.startsWith("/")) folder = "/" + folder;
         }
         if (!SD.exists(folder)) SD.mkdir(folder);
+        lastUploadFolder = folder;
         targetPath = folder + "/" + filename;
         uploadFile = SD.open(targetPath + ".tmp", FILE_WRITE);
         Serial.printf("SD Upload: %s\n", targetPath.c_str());
@@ -3012,7 +3154,7 @@ void StartServer() {
   server->on("/delete_sd_file", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (sdCardAvailable && request->hasParam("folder") && request->hasParam("file")) {
       String path = "/" + request->getParam("folder")->value() + "/" + request->getParam("file")->value();
-      InvalidateAllFolderCaches();
+      InvalidateFolderCache("/" + request->getParam("folder")->value());
       SD.remove(path) ?
         request->send(200, "text/plain", "OK") :
         request->send(500, "text/plain", "Delete failed");
@@ -3091,6 +3233,7 @@ void StartServer() {
       static String targetPath;
       if (!filename.endsWith(".html") && !filename.endsWith(".htm")) return;
       if (index == 0) {
+        if (uploadFile) { uploadFile.close(); LittleFS.remove((targetPath + ".tmp").c_str()); }
         targetPath = "/" + filename;
         uploadFile = LittleFS.open(targetPath + ".tmp", "w");
       }
@@ -3238,6 +3381,7 @@ void StartWiFi() {
     unsigned long startTime = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
       CheckMenuButton();
+      esp_task_wdt_reset();
       vTaskDelay(pdMS_TO_TICKS(100));  // FreeRTOS delay, avoids blocking
     }
 
@@ -3252,6 +3396,7 @@ void StartWiFi() {
       startTime = millis();
       while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
         CheckMenuButton();
+        esp_task_wdt_reset();
         vTaskDelay(pdMS_TO_TICKS(100));  // FreeRTOS delay, avoids blocking
       }
       if (WiFi.status() != WL_CONNECTED) {
@@ -3327,6 +3472,7 @@ void StartWiFi() {
 
 void SaveScreensaverMode() {
   File f = LittleFS.open("/screensaver_mode.val", "w");
+  if (!f) return;
   f.write(screensaverMode);
   f.close();
 }
@@ -3462,9 +3608,25 @@ void LoadWeatherConfig() {
   f.close();
 }
 
+void SaveTimezoneConfig() {
+  File f = LittleFS.open("/timezone.txt", "w");
+  if (!f) return;
+  f.println(clockTimezone);
+  f.close();
+}
+void LoadTimezoneConfig() {
+  File f = LittleFS.open("/timezone.txt", "r");
+  if (!f) return;  // kein File = Defaultwert aus clock.cpp bleibt
+  String tz = f.readStringUntil('\n');
+  f.close();
+  tz.trim();
+  if (tz.length() > 0) clockTimezone = tz;
+}
+
 // ── Wetter-Feature (Modus 3) → weather.cpp ───────────────────────────────────
 void SaveScreensaverLum() {
   File f = LittleFS.open("/screensaver_lum.val", "w");
+  if (!f) return;
   f.write(screensaverBrightness);
   f.close();
 }
@@ -3481,6 +3643,7 @@ void LoadScreensaverLum() {
 
 void SaveScreensaverDuration() {
   File f = LittleFS.open("/screensaver_dur.val", "w");
+  if (!f) return;
   f.write(screensaverDuration);
   f.close();
 }
@@ -3497,6 +3660,7 @@ void LoadScreensaverDuration() {
 
 void SaveScreensaverShuffle() {
   File f = LittleFS.open("/screensaver_shuffle.val", "w");
+  if (!f) return;
   f.write((uint8_t)screensaverShuffle);
   f.close();
 }
@@ -3512,6 +3676,7 @@ void LoadScreensaverShuffle() {
 
 void SaveScreensaverStrictTimer() {
   File f = LittleFS.open("/screensaver_strict_timer.val", "w");
+  if (!f) return;
   f.write((uint8_t)screensaverStrictTimer);
   f.close();
 }
@@ -3525,6 +3690,7 @@ void LoadScreensaverStrictTimer() {
 
 void SaveGifAudioEnabled() {
   File f = LittleFS.open("/gif_audio_enabled.val", "w");
+  if (!f) return;
   f.write((uint8_t)gifAudioEnabled);
   f.close();
 }
@@ -3795,6 +3961,14 @@ void InvalidateAllFolderCaches() {
     f = root.openNextFile();
   }
   root.close();
+}
+
+void InvalidateFolderCache(const String& path) {
+  String cacheFile = folderCacheKey(path);
+  if (LittleFS.exists(cacheFile)) {
+    LittleFS.remove(cacheFile);
+    logMsg("Cache: %s invalidiert", cacheFile.c_str());
+  }
 }
 
 // Stubs für alte Aufrufe
@@ -4083,6 +4257,7 @@ String GetSDFolders() {
 void setup() {
   Serial.begin(115200);
   delay(2000);
+  esp_task_wdt_reset();  // delay(2000) hat WDT-Budget aufgebraucht — vor dem langen setup() zurücksetzen
   // PSRAM-Puffer und Mutexe früh allozieren — vor Audio/WiFi/Codec-Initialisierungen
   logBuffer             = (char (*)[LOG_LINE_LEN])heap_caps_calloc(
                             LOG_LINES, LOG_LINE_LEN, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -4128,7 +4303,9 @@ void setup() {
       (uint16_t)(chipId ^ (chipId >> 16) ^ (chipId >> 32) ^ (chipId >> 48));
 
   bool fileSystemOK;
+  logMsg("LittleFS.begin...");
   if (fileSystemOK = LittleFS.begin()) {
+    logMsg("LittleFS OK");
     diagBoot();
     LoadSettingsMenu();
 #ifndef ZEDMD_WIFI
@@ -4153,27 +4330,34 @@ void setup() {
     LoadMqttConfig();
 #endif
     LoadWeatherConfig();
+    LoadTimezoneConfig();
 #ifdef ZEDMD_WIFI
     weatherInit();
 #endif
     LoadFavorites();
     LoadIgnore();
+    esp_task_wdt_reset();  // Load*()-Kette + LittleFS-I/O kann >2s dauern
     InitSDCard();
     if (!sdCardAvailable) sdCardWarningPending = true;
     { String _f = GetSDFolders(); psramCacheSet(&cachedSDFolders, _f); }  // Cache beim Boot befüllen
+    esp_task_wdt_reset();  // InitSDCard + GetSDFolders können auf langsamen Karten >1s dauern
     LoadScreensaverPaths();
     screensaverReloadNeeded = true;  // Dateien im Hauptloop laden (nach Display+WiFi Init)
     LoadUdpDelay();
 #ifdef ZEDMD_HD_HALF
     LoadYOffset();
 #endif
+  } else {
+    logMsg("LittleFS FAILED — Panel-Defaults gelten");
   }
 
+  logMsg("Display init...");
 #ifdef DISPLAY_RM67162_AMOLED
   display = new Rm67162Amoled();  // For AMOLED display
 #elif defined(DISPLAY_LED_MATRIX)
   display = new LedMatrix();  // For LED matrix display
 #endif
+  logMsg("Display OK");
   display->SetBrightness(brightness);
 
   if (!fileSystemOK) {
@@ -4564,7 +4748,7 @@ void loop() {
   {
     static uint32_t lastUptimeUpdate = 0;
     uint32_t nowSec = millis() / 1000;
-    if (nowSec - lastUptimeUpdate >= 60) {
+    if (nowSec - lastUptimeUpdate >= 5) {
       lastUptimeUpdate = nowSec;
       rtcLastUptime    = nowSec;
     }
@@ -4662,6 +4846,10 @@ void loop() {
   if (sdFoldersInvalidateNeeded) {
     sdFoldersInvalidateNeeded = false;
     psramCacheSet(&cachedSDFolders, String("[]"));
+  }
+  if (sdFoldersRefreshNeeded && sdCardAvailable) {
+    sdFoldersRefreshNeeded = false;
+    psramCacheSet(&cachedSDFolders, GetSDFolders());
   }
   if (sdFilesInvalidateNeeded) {
     sdFilesInvalidateNeeded = false;
@@ -4812,23 +5000,35 @@ void loop() {
       if (displayTextActive) {
         if (millis() >= displayTextEnd) {
           displayTextActive = false;
-          display->ClearScreen();
+          ClearScreen();
           Render();
         } else {
-          display->ClearScreen();
-          if (displayTextScroll) {
-            display->DisplayTextScaled(displayTextContent, displayTextScrollX, 1,
-                                       displayTextR, displayTextG, displayTextB, 5);
-            int16_t textW = (int16_t)(strlen(displayTextContent) * 20);
-            if (--displayTextScrollX < -textW) displayTextScrollX = TOTAL_WIDTH;
-          } else {
-            int16_t textW  = (int16_t)(strlen(displayTextContent) * 20);
-            int16_t xPos   = (TOTAL_WIDTH - textW) / 2;
-            if (xPos < 0) xPos = 0;
-            display->DisplayTextScaled(displayTextContent, (uint16_t)xPos, 1,
-                                       displayTextR, displayTextG, displayTextB, 5);
+          // On first activation: zero both renderBuffers so the differential
+          // Render() starts from a clean state (no GIF residue).
+          if (displayTextNeedsClear) {
+            display->ClearScreen();
+            for (int i = 0; i < NUM_RENDER_BUFFERS; i++)
+              memset(renderBuffer[i], 0, TOTAL_BYTES);
+            displayTextNeedsClear = false;
           }
-          Render();
+
+          if (displayTextScroll) {
+            display->RenderTextGFXToBuffer(renderBuffer[currentRenderBuffer],
+                                           displayTextContent, displayTextScrollX,
+                                           displayTextR, displayTextG, displayTextB);
+            Render();
+            int16_t textW = (int16_t)display->GetTextGFXWidth(displayTextContent);
+            if (--displayTextScrollX < -textW)
+              displayTextScrollX = TOTAL_WIDTH;
+          } else {
+            uint16_t textW = display->GetTextGFXWidth(displayTextContent);
+            int16_t xPos   = ((int16_t)TOTAL_WIDTH - (int16_t)textW) / 2;
+            if (xPos < 0) xPos = 0;
+            display->RenderTextGFXToBuffer(renderBuffer[currentRenderBuffer],
+                                           displayTextContent, xPos,
+                                           displayTextR, displayTextG, displayTextB);
+            Render();
+          }
           vTaskDelay(pdMS_TO_TICKS(displayTextScroll ? 20 : 200));
           return;
         }

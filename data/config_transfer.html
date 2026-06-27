@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
@@ -36,25 +36,25 @@
 </head>
 <body>
 <header>
-  <a href="/">← ZeDMD</a>
+  <a href="/">&#8592; ZeDMD</a>
   <h1>&#128260; Config Transfer</h1>
 </header>
 
 <div class="card">
-  <h2>Export — Einstellungen sichern</h2>
-  <p>L&auml;dt alle Konfigurationsdateien als JSON-Datei herunter.<br>
-     WiFi, Helligkeit, Screensaver, Uhr, MQTT, Wetter, Radio-Presets.</p>
-  <button class="btn" onclick="exportConfig()">&#8659; Einstellungen exportieren</button>
+  <h2>Export &mdash; Save Settings</h2>
+  <p>Downloads all configuration files as a JSON file.<br>
+     WiFi, Brightness, Screensaver, Clock, MQTT, Weather, Radio Presets.</p>
+  <button class="btn" onclick="exportConfig()">&#8659; Export Settings</button>
 </div>
 
 <div class="card">
-  <h2>Import — Einstellungen einspielen</h2>
-  <p>W&auml;hle eine vorher exportierte JSON-Datei und spiele sie ein.<br>
-     Das Board startet danach neu.</p>
-  <label id="importLabel" for="fileInput">&#128193; JSON-Datei ausw&auml;hlen</label>
+  <h2>Import &mdash; Restore Settings</h2>
+  <p>Select a previously exported JSON file and import it.<br>
+     The board will restart afterwards.</p>
+  <label id="importLabel" for="fileInput">&#128193; Select JSON file</label>
   <input type="file" id="fileInput" accept=".json" onchange="fileSelected(this)">
-  <div id="fileName">Keine Datei ausgew&auml;hlt</div>
-  <button class="btn" id="importBtn" onclick="importConfig()" disabled>&#8657; Einstellungen importieren</button>
+  <div id="fileName">No file selected</div>
+  <button class="btn" id="importBtn" onclick="importConfig()" disabled>&#8657; Import Settings</button>
 </div>
 
 <div id="status"></div>
@@ -72,31 +72,31 @@
       a.download = 'zedmd_config.json';
       a.click();
       URL.revokeObjectURL(url);
-      showStatus('Export erfolgreich.', true);
+      showStatus('Export successful.', true);
     } catch(e) {
-      showStatus('Export fehlgeschlagen: ' + e.message, false);
+      showStatus('Export failed: ' + e.message, false);
     }
   }
 
   function fileSelected(input) {
     selectedFile = input.files[0] || null;
-    document.getElementById('fileName').textContent = selectedFile ? selectedFile.name : 'Keine Datei ausgewählt';
+    document.getElementById('fileName').textContent = selectedFile ? selectedFile.name : 'No file selected';
     document.getElementById('importBtn').disabled = !selectedFile;
   }
 
   async function importConfig() {
     if (!selectedFile) return;
-    if (!confirm('Alle gespeicherten Einstellungen werden überschrieben. Fortfahren?')) return;
+    if (!confirm('All saved settings will be overwritten. Continue?')) return;
     try {
       const text = await selectedFile.text();
       const fd = new FormData();
       fd.append('data', text);
       const r = await fetch('/import_config', { method: 'POST', body: fd });
       const msg = await r.text();
-      showStatus(msg + ' — Board startet neu...', r.ok);
+      showStatus(msg + ' — Board restarting...', r.ok);
       if (r.ok) setTimeout(() => fetch('/restart', { method: 'POST' }), 1500);
     } catch(e) {
-      showStatus('Import fehlgeschlagen: ' + e.message, false);
+      showStatus('Import failed: ' + e.message, false);
     }
   }
 

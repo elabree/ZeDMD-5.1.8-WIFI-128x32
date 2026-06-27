@@ -164,7 +164,7 @@ void radioInit() {
   audio.setVolume(radioVolume);
   radioLoadPresets();
   loadLastPreset();
-  xTaskCreatePinnedToCore(radioTask, "radioTask", 16384, NULL, 2, NULL, 0);
+  xTaskCreatePinnedToCore(radioTask, "radioTask", 16384, NULL, 11, NULL, 0);
 }
 
 void radioPlay(const char* url, int presetIndex) {

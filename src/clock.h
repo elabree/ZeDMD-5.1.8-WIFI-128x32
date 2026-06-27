@@ -12,6 +12,7 @@ extern uint8_t       dateR,  dateG,  dateB;    // Datumfarbe    (Default: Grau)
 extern volatile bool clockColorChanged;        // Erzwingt Neuzeichnung bei Farbänderung
 extern bool          ntpSynced;
 extern String        ntpServer;
+extern String        clockTimezone;
 
 // ── Public API ────────────────────────────────────────────────────────────────
 

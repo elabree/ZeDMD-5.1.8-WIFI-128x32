@@ -1,0 +1,94 @@
+name: Upstream Protocol Watch
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'  # Jeden Montag 8:00 UTC
+  workflow_dispatch:      # Manuell auslösbar (zum Testen)
+
+jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Upstream holen
+        run: |
+          git remote add upstream https://github.com/PPUC/ZeDMD.git
+          git fetch upstream main
+
+      - name: Änderungen in src/ prüfen
+        id: check
+        run: |
+          MERGE_BASE=$(git merge-base HEAD upstream/main)
+          echo "Merge-Base: $MERGE_BASE"
+
+          CHANGED=$(git diff --name-only "$MERGE_BASE" upstream/main -- src/ platformio.ini)
+
+          if [ -n "$CHANGED" ]; then
+            echo "changes=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "files<<EOF"
+              echo "$CHANGED"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            {
+              echo "commits<<EOF"
+              git log --oneline "$MERGE_BASE..upstream/main" -- src/ platformio.ini
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "changes=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Issue erstellen (falls noch keines offen)
+        if: steps.check.outputs.changes == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '⚠️ Upstream PPUC/ZeDMD: Protokoll-relevante Änderungen erkannt';
+            const files = `${{ steps.check.outputs.files }}`;
+            const commits = `${{ steps.check.outputs.commits }}`;
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open'
+            });
+
+            const alreadyOpen = existing.data.some(i => i.title === title);
+            if (alreadyOpen) {
+              console.log('Issue bereits offen — übersprungen.');
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body: [
+                '## Upstream `PPUC/ZeDMD` hat Änderungen in Protokoll-relevanten Dateien',
+                '',
+                '**Geänderte Dateien** (seit Fork-Basispunkt):',
+                '```',
+                files,
+                '```',
+                '',
+                '**Commits:**',
+                '```',
+                commits,
+                '```',
+                '',
+                '**Was tun:** Prüfen ob Kommunikations-relevante Änderungen in diesen Fork übernommen werden müssen.',
+                '',
+                '[→ Upstream ansehen](https://github.com/PPUC/ZeDMD/commits/main)',
+                '',
+                '_Issue schließen sobald geprüft — nächste Woche erscheint ein neues wenn es weitere Änderungen gibt._'
+              ].join('\n')
+            });
