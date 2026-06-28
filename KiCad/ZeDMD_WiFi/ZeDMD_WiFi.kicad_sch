@@ -68,7 +68,7 @@
 					)
 				)
 			)
-			(property "Description" "Generic connector, single row, 01x06, script generated"
+			(property "Description" "Pin socket, single row, 01x06, P=2.54mm"
 				(at 0 0 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -113,6 +113,94 @@
 				)
 			)
 			(property "LCSC" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Pmax" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Power" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Sim.Device" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Sim.Pins" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Tolerance" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Vf" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Vmax" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Voltage" ""
 				(at 0 0 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -297,7 +385,7 @@
 				(pin passive line
 					(at 5.08 5.08 180)
 					(length 3.81)
-					(name "Pin_1"
+					(name "GND"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -315,7 +403,7 @@
 				(pin passive line
 					(at 5.08 2.54 180)
 					(length 3.81)
-					(name "Pin_2"
+					(name "VCC"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -333,7 +421,7 @@
 				(pin passive line
 					(at 5.08 0 180)
 					(length 3.81)
-					(name "Pin_3"
+					(name "MISO"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -351,7 +439,7 @@
 				(pin passive line
 					(at 5.08 -2.54 180)
 					(length 3.81)
-					(name "Pin_4"
+					(name "MOSI"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -369,7 +457,7 @@
 				(pin passive line
 					(at 5.08 -5.08 180)
 					(length 3.81)
-					(name "Pin_5"
+					(name "SCK"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -387,7 +475,7 @@
 				(pin passive line
 					(at 5.08 -7.62 180)
 					(length 3.81)
-					(name "Pin_6"
+					(name "CS"
 						(effects
 							(font
 								(size 1.27 1.27)
