@@ -488,7 +488,7 @@ Browser → **`http://<IP>/admin.html`** → "Firmware Update (OTA)"
 ## Credits
 
 - **[Markus Kalkbrenner / PPUC](https://github.com/PPUC/ZeDMD)** — original ZeDMD project
-- **elabree** — PCB design: carrier board for DevKit + SD + MAX98357A *(in preparation)*
+- **[elabree](https://github.com/elabree)** — PCB design: carrier board for DevKit + SD + MAX98357A *(in preparation)*
 - **Niels (My Son)** — coding assistance & inspiration & moral support
 - **[Claude Sonnet](https://anthropic.com)** — coding assistance
 

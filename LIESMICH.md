@@ -489,7 +489,7 @@ Browser → **`http://<IP>/admin.html`** → „Firmware Update (OTA)"
 ## Danksagung
 
 - **[Markus Kalkbrenner / PPUC](https://github.com/PPUC/ZeDMD)** — original ZeDMD project
-- **elabree** — Platinenentwurf: Trägerplatine für DevKit + SD + MAX98357A *(in Vorbereitung)*
+- **[elabree](https://github.com/elabree)** — Platinenentwurf: Trägerplatine für DevKit + SD + MAX98357A *(in Vorbereitung)*
 - **Niels (My Son)** — coding assistance & inspiration & moral support
 - **[Claude Sonnet](https://anthropic.com)** — coding assistance
 
