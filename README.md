@@ -231,7 +231,7 @@ The ESP32-audioI2S library outputs stereo I2S natively when playing stereo sourc
 
 ## 🔜 Planned Features
 
-### Custom PCB *(in preparation)*
+### Custom PCB by [elabree](https://github.com/elabree) *(in preparation)*
 A dedicated carrier board is being developed that mounts the ESP32-S3 DevKit, an SD card breakout module and a MAX98357A amplifier module on a single PCB — no flying wires, clean and compact. Details to follow once the design is finalised.
 
 ### Code cleanup *(on my list)*

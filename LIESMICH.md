@@ -231,7 +231,7 @@ Die ESP32-audioI2S-Bibliothek gibt bei Stereo-Quelldateien nativ Stereo-I2S aus.
 
 ## 🔜 Geplante Features
 
-### Eigene Platine *(in Vorbereitung)*
+### Eigene Platine von [elabree](https://github.com/elabree) *(in Vorbereitung)*
 Eine dedizierte Trägerplatine ist in Entwicklung, auf der das ESP32-S3 DevKit, ein SD-Karten-Breakout-Modul und ein MAX98357A-Verstärkermodul gemeinsam untergebracht werden — keine fliegenden Verbindungen, kompakter und sauberer Aufbau. Details folgen sobald das Design abgeschlossen ist.
 
 ### Code-Aufräumen *(steht auf meiner Liste)*
