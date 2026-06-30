@@ -35,6 +35,23 @@ https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/raw/main/docs/images/ZeDMD_WiF
 
 ## 🆕 What's new in this release
 
+### v1.5.1 *(this release)*
+
+#### Weather Icons — native 16×16 pixel art
+All 8 weather icons have been redrawn as native 16×16 pixel art — sharper and more detailed than the scaled-up 8×8 bitmaps used before. Each icon has a unique hand-crafted color gradient: sun with rays, crescent moon, cloud, rain drops, snow, lightning bolt, and partly-cloudy variants. The smaller 8×8 icons used in the 3-day forecast remain unchanged.
+
+#### SD Card — more robust initialisation
+The SD card now retries with progressively slower SPI speeds (8 → 4 → 2 MHz, up to 6 attempts) before giving up. Previously a single failed mount attempt would mark the SD as unavailable for the entire session. This resolves intermittent boot failures with marginally connected or slow-to-mount SD cards.
+
+#### Bug Fixes
+- Emoji text: cursor position 0 was treated as falsy in JavaScript — the cursor is now correctly preserved when inserting an emoji at the very start of the input field
+- Icon upload: interrupted uploads no longer leave orphaned `.tmp` files on LittleFS
+- Icon folder scan: directory handle no longer leaks when a non-directory entry is encountered
+
+---
+
+### v1.5 and earlier
+
 ### Webradio
 Stream internet radio stations directly through the ZeDMD's built-in speaker.
 Requires a **MAX98357A I2S amplifier module** — see wiring below.
@@ -179,8 +196,7 @@ Send a custom text message to the LED matrix directly from the web UI.
 - Color picker for free RGB color selection
 - Configurable display duration (5–60 seconds)
 - Instantly interrupts any running screensaver or GIF and restores it afterwards
-
-> ⚠️ Font rendering is currently being improved. ASCII characters only (no umlauts or special characters).
+- **Emoji picker** — 33 emojis (❤️ ⭐ 🔥 😊 🎉 and more) rendered as pixel-art icons directly in the scrolling text; icons are stored as RGBA files in LittleFS (`/icons/`)
 
 ---
 
@@ -215,6 +231,9 @@ The ESP32-audioI2S library outputs stereo I2S natively when playing stereo sourc
 
 ## 🔜 Planned Features
 
+### Custom PCB by [elabree](https://github.com/elabree) *(in preparation)*
+A dedicated carrier board is being developed that mounts the ESP32-S3 DevKit, an SD card breakout module and a MAX98357A amplifier module on a single PCB — no flying wires, clean and compact. Details to follow once the design is finalised.
+
 ### Code cleanup *(on my list)*
 The code has grown organically and is honestly a bit messy in places — I know. I'm planning to clean things up at some point, but no promises on when. It works, which counts for something.
 
@@ -235,7 +254,7 @@ This fork is **WiFi-only** and targets the **ESP32-S3-N16R8** with a **128×32 L
 - **Admin page** — WiFi, display, transport, MQTT, weather settings
 - **Webradio** — internet radio via I2S amplifier (MAX98357A); station search via [radio-browser.info](https://www.radio-browser.info); preset management with logo icons; LED matrix shows station info for 5 s on start, "DMD 10s" button for on-demand display
 - **Config Export/Import** — full configuration backup and restore via browser (`/config_transfer.html`)
-- **Display Text** *(experimental)* — send custom text to the LED matrix via the web UI; static or scrolling with color selection and configurable duration (5–60 s)
+- **Display Text** — send custom text with emojis to the LED matrix via the web UI; static or scrolling with color selection and configurable duration (5–60 s); 33 emojis available via built-in picker
 - **Stereo Audio** *(experimental)* — two MAX98357A modules for true stereo output; channel selection via SD-pin resistor strapping (5V only, values verified)
 
 ---
@@ -469,6 +488,7 @@ Browser → **`http://<IP>/admin.html`** → "Firmware Update (OTA)"
 ## Credits
 
 - **[Markus Kalkbrenner / PPUC](https://github.com/PPUC/ZeDMD)** — original ZeDMD project
+- **[elabree](https://github.com/elabree)** — PCB design: carrier board for DevKit + SD + MAX98357A *(in preparation)*
 - **Niels (My Son)** — coding assistance & inspiration & moral support
 - **[Claude Sonnet](https://anthropic.com)** — coding assistance
 

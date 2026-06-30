@@ -27,6 +27,7 @@ extern float    weatherLon;
 
 void weatherInit();             // Platzhalter — bei Bedarf erweitern (z.B. Mutex)
 void weatherTrigger();          // Startet HTTP-Fetch in eigenem Task (PSRAM-Stack)
+void weatherIconTest();         // TEST: alle Wetter-Icons nebeneinander (temporär)
 void weatherDisplay();          // Wetter-Vollbild
 void weatherDisplayClock();     // Uhr + Wetter kombiniert
 void weatherDisplayForecast();  // 3-Tages-Vorhersage
