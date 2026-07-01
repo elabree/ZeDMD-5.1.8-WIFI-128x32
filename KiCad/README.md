@@ -4,9 +4,11 @@ This is a carrier board for the ESP32-S3-DevKitC-1-N16R8 with the following feat
 - 5V terminal block with 2 different use cases:
   - Output for the RGB panels, using power from USB-C (a jumper on J5 selects between the DevKit or USB-C breakout at J8)
   - Input for the DevKit, in case the RGB panels are on an external supply (jumper on J6)
-- A socket (J2) for a Micro SD Card module. Note that this module needs to have a 5V - 3.3V regulator. Always check that the pinout of your module corresponds to the [schematics diagram](ZeDMD_WiFi\docs\ZeDMD_WiFi.pdf)
-- Two sockets (J1 and J3) for MAX98357A amplifier modules (Adafruit i2s class-d mono-amp). A jumper onb J4 selects between 3 power options (Devkit 3.3V, Devkit USB-C 5V, USB-C breakout at J8).
+- A socket (J2) for a Micro SD Card module. Note that this module needs to have a 5V - 3.3V regulator. Always check that the pinout of your module corresponds to the [schematics diagram](ZeDMD_WiFi/docs/ZeDMD_WiFi.pdf)
+- Two sockets (J1 and J3) for MAX98357A amplifier modules (Adafruit i2s class-d mono-amp). A jumper on J4 selects between 3 power options (Devkit 3.3V, Devkit USB-C 5V, USB-C breakout at J8).
 - A socket ()J8 for a USB-C breakout board for MAX98357A power. It can also be used if there is no other power source for the Devkit, or to power the RGB panels when selected by a jumper on J5.
+
+![ZeDMD_WiFi_PCB_top](ZeDMD_WiFi/docs/ZeDMD_WiFi_PCB_top.png)
 
 ## Power budget
 The power supply voltage is +5V.
@@ -18,7 +20,7 @@ The maximum current USB-C can deliver at 5V is 3A (Pmax = 15W). It does not matt
 Two 64x32 RGB matrix panels draw 5A (25W) at 100% intensity. Since these panels are designed for daylight operation, this intensity is really high. Usually no more than 50% is needed (2.5A, 12.5W). This leaves sufficient power (0.5A; 2.5W) for the DevKit and SD card.
 
 ### MAX98357A modules
-The required power for the amplifiers depends on the supply voltage (3.3V or 5V) and the connected speakers. If there is insufficient power avalable, the supply may dip during loud sounds causing clipping at the output. This may damage the speakers. Also, the amplifiers have a volume dependent distortion which is less at 5V at the same volume.
+The required power for the amplifiers depends on the supply voltage (3.3V or 5V) and the connected speakers. If there is insufficient power avalable, the supply may dip during loud sounds causing clipping at the output. This may damage the speakers. Also, the amplifiers have a volume dependent distortion which is less at 5V for the same volume.
 
 #### Power needs for 2 MAX98357A modules:
 | Vin | Rspeaker | Pout_max |    Iin (Pin)  |
@@ -42,11 +44,15 @@ Diode D2 will cause a voltage drop of 0.7 V to reduce voltage at the panels. The
 A jumper on J5 is needed to select the power source.
 
 ### 5Vin at J7
-As explained J6 (jumper or wire bridge) is only needed if the DevKit does not have an USB-C connection. In that case J7 becomes the 5V input.
+As explained a jumper (or wire bridge) at J6 is only needed if the DevKit does not have an USB-C connection. In that case J7 becomes the 5V input.
 
 ### MAX_Vin
 J4 selects the power source for the amplifier modules. The best option is a jumper between pins 3-4 (+5V from DevKit)
 
-### MAX98357A
+### MAX98357A gain
 J10 and J11 can be used to select the amplifier gain. The default gain is 9dB if nothing is connected. For 12dB place a jumper or wire bridge. A 100k resistor can be placed for even more gain (15dB).
 *Note that this only adjusts the volume, it will not increase the maximum output power.* TP2 and TP3 are connected to Vin. These testpoints are normally not needed. But these can be used to decrease the gain if needed...
+
+## Ordering
+1. The Gerber and Drill files are [here](/KiCad/ZeDMD_WiFi/production.zip)
+2. Example [ordering information](ZeDMD_WiFi/docs/ZeDMD_WiFi_JLCPCB_ordering.png)
