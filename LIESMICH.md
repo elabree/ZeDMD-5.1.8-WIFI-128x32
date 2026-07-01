@@ -35,6 +35,23 @@ https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/raw/main/docs/images/ZeDMD_WiF
 
 ## 🆕 Neu in dieser Version
 
+### v1.5.1 *(diese Version)*
+
+#### Wetter-Icons — native 16×16 Pixel-Art
+Alle 8 Wetter-Icons wurden als native 16×16 Pixel-Art neu gezeichnet — schärfer und detaillierter als die bisherigen hochskalierten 8×8-Bitmaps. Jedes Icon hat einen eigenen handgezeichneten Farbgradienten: Sonne mit Strahlen, Mondsichel, Wolke, Regentropfen, Schnee, Blitz und Mischbewölkt-Varianten. Die kleineren 8×8-Icons in der 3-Tages-Vorhersage bleiben unverändert.
+
+#### SD-Karte — robustere Initialisierung
+Die SD-Karte wird jetzt mit schrittweise langsameren SPI-Geschwindigkeiten erneut versucht (8 → 4 → 2 MHz, bis zu 6 Versuche) bevor aufgegeben wird. Bisher führte ein einzelner fehlgeschlagener Mount-Versuch dazu, dass die SD-Karte für die gesamte Session als nicht verfügbar galt. Behebt sporadische Boot-Fehler bei schlecht kontaktierten oder langsam mountenden SD-Karten.
+
+#### Bugfixes
+- Emoji-Text: Cursor-Position 0 wurde in JavaScript als falsy behandelt — der Cursor bleibt jetzt korrekt erhalten wenn ein Emoji ganz am Anfang des Eingabefeldes eingefügt wird
+- Icon-Upload: Abgebrochene Uploads hinterlassen keine verwaisten `.tmp`-Dateien mehr auf LittleFS
+- Icon-Ordner-Scan: Directory-Handle-Leak bei Nicht-Ordner-Einträgen behoben
+
+---
+
+### v1.5 und älter
+
 ### Webradio
 Internetradio direkt über ZeDMD streamen — über einen kleinen integrierten Lautsprecher.
 Erfordert ein **MAX98357A I2S-Verstärkermodul** — Verkabelung siehe unten.
@@ -179,8 +196,7 @@ Sendet eine individuelle Textnachricht direkt über die Web-UI an die LED-Matrix
 - Farbwahl per RGB-Colorpicker
 - Konfigurierbare Anzeigedauer (5–60 Sekunden)
 - Unterbricht sofort jeden laufenden Screensaver oder GIF und stellt ihn anschließend wieder her
-
-> ⚠️ Die Schriftdarstellung wird noch verbessert. Nur ASCII-Zeichen (keine Umlaute oder Sonderzeichen).
+- **Emoji-Picker** — 33 Emojis (❤️ ⭐ 🔥 😊 🎉 u.v.m.) werden als Pixel-Art-Icons direkt im Lauftext gerendert; Icons liegen als RGBA-Dateien in LittleFS (`/icons/`)
 
 ---
 
@@ -215,6 +231,9 @@ Die ESP32-audioI2S-Bibliothek gibt bei Stereo-Quelldateien nativ Stereo-I2S aus.
 
 ## 🔜 Geplante Features
 
+### Eigene Platine von [elabree](https://github.com/elabree) *(in Vorbereitung)*
+Eine dedizierte Trägerplatine ist in Entwicklung, auf der das ESP32-S3 DevKit, ein SD-Karten-Breakout-Modul und ein MAX98357A-Verstärkermodul gemeinsam untergebracht werden — keine fliegenden Verbindungen, kompakter und sauberer Aufbau. Details folgen sobald das Design abgeschlossen ist.
+
 ### Code-Aufräumen *(steht auf meiner Liste)*
 Der Code ist hier und da ehrlich gesagt etwas gewachsen und durcheinander geraten — ich weiß das. Ich plane irgendwann aufzuräumen, aber wann genau kann ich nicht versprechen. Er funktioniert, und das zählt erstmal.
 
@@ -235,7 +254,7 @@ Dieser Fork ist **nur WiFi** und zielt auf den **ESP32-S3-N16R8** mit einer **12
 - **Admin-Seite** — WiFi, Display, Transport, MQTT, Wetter-Einstellungen
 - **Webradio** — Internetradio via I2S-Verstärker (MAX98357A); Sendersuche via [radio-browser.info](https://www.radio-browser.info); Preset-Verwaltung mit Logo-Icons; LED-Matrix zeigt Senderinfo 5 s beim Start, „DMD 10s"-Button für On-Demand-Anzeige
 - **Konfig Export/Import** — vollständiges Konfigurations-Backup und -Restore über den Browser (`/config_transfer.html`)
-- **Display Text** *(experimentell)* — individuelle Textnachricht über die Web-UI an die LED-Matrix senden; statisch oder scrollend, mit Farbwahl und konfigurierbarer Dauer (5–60 s)
+- **Display Text** — individuelle Textnachricht mit Emojis über die Web-UI an die LED-Matrix senden; statisch oder scrollend, mit Farbwahl und konfigurierbarer Dauer (5–60 s); 33 Emojis per eingebautem Picker wählbar
 - **Stereo-Audio** *(experimentell)* — zwei MAX98357A-Module für echten Stereo-Ausgang; Kanalwahl per SD-Pin-Widerstandsbrücke (nur 5V, Werte verifiziert)
 
 ---
@@ -470,6 +489,7 @@ Browser → **`http://<IP>/admin.html`** → „Firmware Update (OTA)"
 ## Danksagung
 
 - **[Markus Kalkbrenner / PPUC](https://github.com/PPUC/ZeDMD)** — original ZeDMD project
+- **[elabree](https://github.com/elabree)** — Platinenentwurf: Trägerplatine für DevKit + SD + MAX98357A *(in Vorbereitung)*
 - **Niels (My Son)** — coding assistance & inspiration & moral support
 - **[Claude Sonnet](https://anthropic.com)** — coding assistance
 

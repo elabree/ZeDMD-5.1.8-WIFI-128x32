@@ -103,6 +103,13 @@
             }
         }
 
+        .emoji-btn {
+            width:34px; height:34px; padding:2px; margin:0;
+            background:#2c2c2c; border:1px solid #444; border-radius:6px;
+            font-size:1.2em; line-height:1; cursor:pointer; color:#e0e0e0;
+        }
+        .emoji-btn:hover { background:#3a3a3a; border-color:#666; }
+
         /* Section headers */
         .section-header {
             font-size: 1.5em;
@@ -292,6 +299,7 @@
                     <h2 class="section-header">&#128196; Display Text</h2>
                     <label for="display-text-input">Text:</label>
                     <input type="text" id="display-text-input" maxlength="127" placeholder="Enter text...">
+                    <div id="emoji-picker" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; margin-bottom:2px;"></div>
 
                     <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:15px;">
                         <div style="flex:1; min-width:160px;">
@@ -306,7 +314,8 @@
                         <div style="display:flex; align-items:center; gap:10px;">
                             <label style="margin:0;">Color:</label>
                             <input type="color" id="display-text-color" value="#ffffff"
-                                style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin:0;">
+                                style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin:0;"
+                                onchange="localStorage.setItem('dtColor', this.value)">
                         </div>
                     </div>
 
@@ -569,6 +578,9 @@
                     </select>
                     <div id="mode-status" class="status-message"></div>
 
+                    <button id="weather-icon-test-btn" onclick="toggleWeatherIconTest()" style="width:auto; padding:8px 14px; background:#555; margin-top:6px;">&#x1F324; Icon-Test</button>
+                    <div id="weather-icon-test-status" class="status-message"></div>
+
                     <!-- Clock Colors (nur wenn Clock Modus) -->
                     <div id="clock-colors-section">
                         <label>Clock Time Color:</label>
@@ -643,6 +655,46 @@
 
     <!-- JavaScript Functions -->
     <script>
+        (function() {
+            var EMOJIS = [
+                ['❤️','Herz'],         ['⭐','Stern'],        ['🌟','Glitzer-Stern'],
+                ['🌙','Mond'],          ['🔥','Feuer'],  ['😊','Lächeln'],
+                ['😀','Grinsen'],       ['😎','Cool'],   ['😡','Wütend'],
+                ['😭','Weinen'],        ['😴','Schlafen'],['🙂','Smile'],
+                ['🤔','Denken'],        ['🤖','Roboter'],['✅','Check'],
+                ['❌','Kreuz'],               ['❓','Frage'],        ['❗','Ausruf'],
+                ['👍','Daumen hoch'],  ['👎','Daumen runter'],
+                ['🍕','Pizza'],         ['🍺','Bier'],   ['🎁','Geschenk'],
+                ['🎉','Party'],         ['🎮','Gamepad'],['👾','Alien'],
+                ['💡','Idee'],          ['💰','Geld'],   ['📝','Notiz'],
+                ['📢','Lautsprecher'], ['📱','Telefon'],['🔔','Glocke'],
+                ['⚠️','Warnung']
+            ];
+            document.addEventListener('DOMContentLoaded', function() {
+                var saved = localStorage.getItem('dtColor');
+                if (saved) document.getElementById('display-text-color').value = saved;
+
+                var picker = document.getElementById('emoji-picker');
+                if (!picker) return;
+                EMOJIS.forEach(function(e) {
+                    var btn = document.createElement('button');
+                    btn.textContent = e[0];
+                    btn.title = e[1];
+                    btn.className = 'emoji-btn';
+                    btn.addEventListener('click', function() { insertEmoji(e[0]); });
+                    picker.appendChild(btn);
+                });
+            });
+        })();
+
+        function insertEmoji(emoji) {
+            var input = document.getElementById('display-text-input');
+            var pos = input.selectionStart != null ? input.selectionStart : input.value.length;
+            input.value = input.value.slice(0, pos) + emoji + input.value.slice(pos);
+            input.setSelectionRange(pos + emoji.length, pos + emoji.length);
+            input.focus();
+        }
+
         function sendDisplayText() {
             var text = document.getElementById('display-text-input').value.trim();
             var statusElem = document.getElementById('display-text-status');
@@ -1873,7 +1925,7 @@
                     statusElem.style.color = "#28a745";
                     setEjectBtn(true);
                     fetchSDInfo();
-                    loadSDFolders();
+                    setTimeout(loadSDFolders, 1500);
                 } else {
                     statusElem.innerText = "✗ Mount failed — check SD card";
                     statusElem.style.color = "#dc3545";
@@ -1885,6 +1937,24 @@
                 statusElem.innerText = "✗ Mount timed out";
                 statusElem.style.color = "#dc3545";
                 setEjectBtn(false);
+            };
+            xhr.send();
+        }
+
+        var weatherIconTestOn = false;
+        function toggleWeatherIconTest() {
+            var btn = document.getElementById('weather-icon-test-btn');
+            var status = document.getElementById('weather-icon-test-status');
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/test_weather_icons", true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState !== XMLHttpRequest.DONE) return;
+                if (xhr.status === 200) {
+                    weatherIconTestOn = (xhr.responseText === 'ON');
+                    btn.style.background = weatherIconTestOn ? '#28a745' : '#555';
+                    status.innerText = weatherIconTestOn ? '▶ Icon-Test läuft — auf Display ansehen' : '■ Icon-Test gestoppt';
+                    status.style.color = weatherIconTestOn ? '#28a745' : '#aaa';
+                }
             };
             xhr.send();
         }

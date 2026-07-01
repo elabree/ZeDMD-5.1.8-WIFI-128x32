@@ -428,6 +428,8 @@ static char* cachedGifAudioFiles  = nullptr;
 static char* cachedSdFiles        = nullptr;
 static char  cachedSdFilesFolder[CACHE_SD_FOLDER_SIZE] = "";
 volatile bool gifAudioRefreshNeeded       = false;
+volatile bool weatherIconTestActive       = false;
+volatile bool iconsReloadNeeded           = false;
 volatile bool sdFilesRefreshNeeded        = false;
 volatile bool sdFoldersInvalidateNeeded   = false;
 volatile bool sdFoldersRefreshNeeded      = false;
@@ -528,6 +530,8 @@ AnimatedGIF gif;
 File gifFile;
 
 // Forward Declarations
+void LoadIcons();
+const uint8_t* GetSmallIcon(const char* name);
 void LoadScreensaverFiles();
 void InitSDCard();
 void SaveScreensaverPaths();
@@ -2964,11 +2968,7 @@ void StartServer() {
     sdUsedBytes  = 0;
     sdFoldersInvalidateNeeded = true;
     sdFilesInvalidateNeeded   = true;
-    if (screensaverPaths.length() > 0) {
-      screensaverPaths = "";
-      SaveScreensaverPaths();
-      screensaverReloadNeeded = true;
-    }
+    screensaverReloadNeeded   = true;  // SD-Pfade aus screensaverFiles entfernen (SD nicht verfügbar)
     request->send(200, "text/plain", "OK");
   });
 
@@ -2990,8 +2990,9 @@ void StartServer() {
       sdCardAvailable      = true;
       sdTotalBytes         = SD.cardSize();
       sdUsedBytes          = SD.usedBytes();
-      gifAudioRefreshNeeded    = true;
-      sdFoldersInvalidateNeeded = true;
+      gifAudioRefreshNeeded     = true;
+      sdFoldersInvalidateNeeded  = true;
+      screensaverReloadNeeded    = true;
       logMsg("SD remount OK");
       request->send(200, "text/plain", "OK");
     } else {
@@ -2999,6 +3000,12 @@ void StartServer() {
       logMsg("SD remount FAILED");
       request->send(503, "text/plain", "Mount failed");
     }
+  });
+
+  // POST /test_weather_icons — Toggle: zeigt alle Wetter-Icons auf dem Display (temporär)
+  server->on("/test_weather_icons", HTTP_POST, [](AsyncWebServerRequest *request) {
+    weatherIconTestActive = !weatherIconTestActive;
+    request->send(200, "text/plain", weatherIconTestActive ? "ON" : "OFF");
   });
 
   // GET /sd_folders — gibt gecachten Status zurück, kein SD Zugriff im Webserver Task!
@@ -3241,6 +3248,62 @@ void StartServer() {
       if (final && uploadFile) {
         uploadFile.close();
         LittleFS.rename(targetPath + ".tmp", targetPath);
+      }
+    }
+  );
+
+  // POST /upload_icon — Upload 20×20 RGBA-Icons nach LittleFS /icons/
+  server->on("/upload_icon", HTTP_POST,
+    [](AsyncWebServerRequest *request) {
+      if (!request->authenticate("admin", "zedmd1234")) return request->requestAuthentication();
+      request->send(200, "text/plain", "OK");
+    },
+    [](AsyncWebServerRequest *request, String filename, size_t index,
+       uint8_t *data, size_t len, bool final) {
+      if (!request->authenticate("admin", "zedmd1234")) return;
+      if (!filename.endsWith(".rgba")) return;
+      static File uploadFile;
+      if (index == 0) {
+        if (!LittleFS.exists("/icons")) LittleFS.mkdir("/icons");
+        if (uploadFile) { uploadFile.close(); LittleFS.remove(("/icons/" + filename + ".tmp").c_str()); }
+        uploadFile = LittleFS.open("/icons/" + filename + ".tmp", "w");
+      }
+      if (uploadFile) uploadFile.write(data, len);
+      if (final && uploadFile) {
+        uploadFile.close();
+        String dst = "/icons/" + filename;
+        LittleFS.remove(dst);
+        LittleFS.rename("/icons/" + filename + ".tmp", dst);
+        logMsg("Icon hochgeladen: %s", dst.c_str());
+        iconsReloadNeeded = true;
+      }
+    }
+  );
+
+  // POST /upload_icon_small — Upload 10×10 RGBA-Icons nach LittleFS /icons_small/
+  server->on("/upload_icon_small", HTTP_POST,
+    [](AsyncWebServerRequest *request) {
+      if (!request->authenticate("admin", "zedmd1234")) return request->requestAuthentication();
+      request->send(200, "text/plain", "OK");
+    },
+    [](AsyncWebServerRequest *request, String filename, size_t index,
+       uint8_t *data, size_t len, bool final) {
+      if (!request->authenticate("admin", "zedmd1234")) return;
+      if (!filename.endsWith(".rgba")) return;
+      static File uploadFile;
+      if (index == 0) {
+        if (!LittleFS.exists("/icons_small")) LittleFS.mkdir("/icons_small");
+        if (uploadFile) { uploadFile.close(); LittleFS.remove(("/icons_small/" + filename + ".tmp").c_str()); }
+        uploadFile = LittleFS.open("/icons_small/" + filename + ".tmp", "w");
+      }
+      if (uploadFile) uploadFile.write(data, len);
+      if (final && uploadFile) {
+        uploadFile.close();
+        String dst = "/icons_small/" + filename;
+        LittleFS.remove(dst);
+        LittleFS.rename("/icons_small/" + filename + ".tmp", dst);
+        logMsg("Small-Icon hochgeladen: %s", dst.c_str());
+        iconsReloadNeeded = true;
       }
     }
   );
@@ -3758,6 +3821,83 @@ uint16_t nextScreensaverIndex() {
   return next;
 }
 
+// ── Icon-System ───────────────────────────────────────────────────────────────
+// Icon-System: RGBA-Pixel-Art-Icons aus LittleFS in PSRAM.
+// /icons/      → 20×20 px (Emoji-Lauftext + großes Wetter-Icon)
+// /icons_small/→ 10×10 px (kleine Wetter-Forecast-Icons)
+
+#define ICON_W        20
+#define ICON_H        20
+#define ICON_BYTES    (ICON_W * ICON_H * 4)
+#define ICON_W_S      10
+#define ICON_H_S      10
+#define ICON_BYTES_S  (ICON_W_S * ICON_H_S * 4)
+#define MAX_ICONS     48
+
+struct IconEntry {
+  char     name[24];
+  uint8_t* data;
+};
+
+static IconEntry iconTable[MAX_ICONS];
+static uint8_t   iconCount = 0;
+static IconEntry iconTableSmall[MAX_ICONS];
+static uint8_t   iconCountSmall = 0;
+
+const uint8_t* GetIcon(const char* name) {
+  for (uint8_t i = 0; i < iconCount; i++)
+    if (strcmp(iconTable[i].name, name) == 0) return iconTable[i].data;
+  return nullptr;
+}
+
+const uint8_t* GetSmallIcon(const char* name) {
+  for (uint8_t i = 0; i < iconCountSmall; i++)
+    if (strcmp(iconTableSmall[i].name, name) == 0) return iconTableSmall[i].data;
+  return nullptr;
+}
+
+static void loadIconSet(const char* dir_path, IconEntry* table, uint8_t& count,
+                        uint8_t max, uint32_t expected_bytes) {
+  for (uint8_t i = 0; i < count; i++) {
+    if (table[i].data) { heap_caps_free(table[i].data); table[i].data = nullptr; }
+  }
+  count = 0;
+  if (!LittleFS.exists(dir_path)) { LittleFS.mkdir(dir_path); return; }
+  File dir = LittleFS.open(dir_path);
+  if (!dir || !dir.isDirectory()) { dir.close(); return; }
+  File f = dir.openNextFile();
+  while (f && count < max) {
+    String fname = String(f.name());
+    uint32_t sz = f.size();
+    f.close();
+    if (fname.endsWith(".rgba") && sz == expected_bytes) {
+      String path = String(dir_path) + "/" + fname;
+      File rf = LittleFS.open(path, "r");
+      if (rf) {
+        uint8_t* buf = (uint8_t*)heap_caps_malloc(expected_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (buf && rf.read(buf, expected_bytes) == expected_bytes) {
+          String n = fname.substring(0, fname.length() - 5);
+          strncpy(table[count].name, n.c_str(), 23);
+          table[count].name[23] = '\0';
+          table[count].data = buf;
+          count++;
+        } else {
+          if (buf) heap_caps_free(buf);
+        }
+        rf.close();
+      }
+    }
+    f = dir.openNextFile();
+  }
+  dir.close();
+}
+
+void LoadIcons() {
+  loadIconSet("/icons",       iconTable,      iconCount,      MAX_ICONS, ICON_BYTES);
+  loadIconSet("/icons_small", iconTableSmall, iconCountSmall, MAX_ICONS, ICON_BYTES_S);
+  logMsg("Icons: %d gross, %d klein", iconCount, iconCountSmall);
+}
+
 void InitSDCard() {
   bool mounted = false;
 
@@ -3782,23 +3922,25 @@ void InitSDCard() {
   pinMode(SD_MISO, INPUT_PULLUP);
 
   spiSD.begin(SD_SCK, SD_MISO, SD_MOSI, SD_CS);
-  delay(200);
+  delay(800);  // SD-Karten brauchen nach Kaltstart mehr Anlaufzeit
 
-  // SPI Speed je nach Plattform
+  // SPI-Speed-Stufen: bei Fehlschlag schrittweise reduzieren
 #ifdef CONFIG_IDF_TARGET_ESP32S3
-  uint32_t spiSpeed = 8000000;  // 8MHz für S3
+  static const uint32_t spiSpeeds[] = {8000000, 4000000, 2000000};
 #else
-  uint32_t spiSpeed = 4000000;  // 4MHz für Standard ESP32
+  static const uint32_t spiSpeeds[] = {4000000, 2000000, 1000000};
 #endif
 
-  for (uint8_t i = 0; i < 4; i++) {
+  for (uint8_t i = 0; i < 6; i++) {
+    uint32_t spiSpeed = spiSpeeds[i < 3 ? i : 2];  // ab Versuch 3: niedrigste Speed
     if (SD.begin(SD_CS, spiSD, spiSpeed)) {
+      logMsg("SD: Erfolgreich bei %lu MHz (Versuch %d)", spiSpeed / 1000000, i + 1);
       mounted = true;
       break;
     }
-    logMsg("SD: Mount-Versuch %d fehlgeschlagen...", i + 1);
+    logMsg("SD: Mount-Versuch %d fehlgeschlagen (%lu MHz)...", i + 1, spiSpeed / 1000000);
     SD.end();
-    delay(750);  // mehr Zeit fuer SD-Karte nach Soft-Reset
+    delay(500);
   }
 #endif
 
@@ -4130,8 +4272,9 @@ void LoadScreensaverFiles() {
       if (cached > 0) continue;
 
       // Cache-Miss — SD scannen
-      logMsg("LoadScreensaver: SD Pfad=%s (kein Cache, scanne...)", sdPath.c_str());
-      File dir = SD.open(sdPath);
+      logMsg("LoadScreensaver: SD Pfad=%s (kein Cache, scanne...) exists=%d",
+             sdPath.c_str(), (int)SD.exists(sdPath.c_str()));
+      File dir = SD.open(sdPath.c_str());
       if (dir && dir.isDirectory()) {
         char pathBuf[128];
         uint16_t scanned = 0;
@@ -4175,7 +4318,23 @@ void LoadScreensaverFiles() {
         // FIX 11: Ordner-Cache speichern für nächsten Boot
         if (newFiles > 0) SaveFolderCache(sdPath, countBefore, newFiles);
       } else {
-        logMsg("LoadScreensaver: Ordner nicht gefunden: %s", sdPath.c_str());
+        logMsg("LoadScreensaver: Ordner nicht gefunden: %s — wird aus Konfiguration entfernt", sdPath.c_str());
+        // Pfad aus screensaverPaths entfernen und neu speichern
+        {
+          String newPaths, rebuild = screensaverPaths;
+          while (rebuild.length() > 0) {
+            int c = rebuild.indexOf(',');
+            String e = (c >= 0) ? rebuild.substring(0, c) : rebuild;
+            rebuild  = (c >= 0) ? rebuild.substring(c + 1) : "";
+            e.trim();
+            if (e.length() == 0 || e == entry) continue;
+            if (newPaths.length() > 0) newPaths += ",";
+            newPaths += e;
+          }
+          screensaverPaths = newPaths;
+          File pf = LittleFS.open("/screensaver_path.val", "w");
+          if (pf) { pf.print(screensaverPaths); pf.close(); }
+        }
       }
     }
     logMsg("LoadScreensaver: %d Dateien gesamt geladen", screensaverCount);
@@ -4319,6 +4478,7 @@ void setup() {
 #endif
     LoadLum();
     LoadDebug();
+    LoadIcons();
     LoadScreensaverLum();
     LoadScreensaverDuration();
     LoadScreensaverShuffle();
@@ -4846,6 +5006,7 @@ void loop() {
   if (sdFoldersInvalidateNeeded) {
     sdFoldersInvalidateNeeded = false;
     psramCacheSet(&cachedSDFolders, String("[]"));
+    sdFoldersRefreshNeeded = true;
   }
   if (sdFoldersRefreshNeeded && sdCardAvailable) {
     sdFoldersRefreshNeeded = false;
@@ -4854,6 +5015,11 @@ void loop() {
   if (sdFilesInvalidateNeeded) {
     sdFilesInvalidateNeeded = false;
     psramCacheSet(&cachedSdFiles, String("[]"));
+  }
+
+  if (iconsReloadNeeded) {
+    iconsReloadNeeded = false;
+    LoadIcons();
   }
 
   // SD-Dateiliste für gewählten Ordner cachen
@@ -4897,6 +5063,16 @@ void loop() {
 
 
   if (!transportActive) {
+    static bool weatherIconTestRendered = false;
+    if (weatherIconTestActive) {
+      if (!weatherIconTestRendered) {
+        weatherIconTest();
+        weatherIconTestRendered = true;
+      }
+      return;
+    }
+    weatherIconTestRendered = false;
+
     if (wifiActive && !serverRunning) {
       // @see https://github.com/ESP32Async/ESPAsyncWebServer/issues/21
       // StartServer();
