@@ -53,6 +53,11 @@ J4 selects the power source for the amplifier modules. The best option is a jump
 J10 and J11 can be used to select the amplifier gain. The default gain is 9dB if nothing is connected. For 12dB place a jumper or wire bridge. A 100k resistor can be placed for even more gain (15dB).
 *Note that this only adjusts the volume, it will not increase the maximum output power.* TP2 and TP3 are connected to Vin. These testpoints are normally not needed. But these can be used to decrease the gain if needed...
 
+## More information
+[Licensed under the TAPR Open Hardware License (www.tapr.org/OHL)](LICENSE.txt)
+![ZeDMD_WiFi_PCB_top](ZeDMD_WiFi/docs/ZeDMD_WiFi_3d_overview.png)
+[info](ZeDMD_WiFi/docs)
+
 ## Ordering
 1. The Gerber and Drill files are [here](/KiCad/ZeDMD_WiFi/production.zip)
 2. Example [ordering information](ZeDMD_WiFi/docs/ZeDMD_WiFi_JLCPCB_ordering.png)
