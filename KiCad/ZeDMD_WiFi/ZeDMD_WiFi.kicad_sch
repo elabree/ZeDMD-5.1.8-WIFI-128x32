@@ -6,8 +6,8 @@
 	(paper "A4")
 	(title_block
 		(title "ZeDMD-WIFI-128x32")
-		(date "2026-06-21")
-		(rev "1.1")
+		(date "2026-07-11")
+		(rev "1.2")
 		(company "elabree")
 		(comment 1 "https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32")
 		(comment 2 "https://ppuc.github.io/docs/zedmd/")

@@ -58,6 +58,7 @@ J10 and J11 can be used to select the amplifier gain. The default gain is 9dB if
 ![ZeDMD_WiFi_PCB_top](ZeDMD_WiFi/docs/ZeDMD_WiFi_3d_overview.png)
 [info](ZeDMD_WiFi/docs)
 
-## Ordering
-1. The Gerber and Drill files are [here](/KiCad/ZeDMD_WiFi/production.zip)
-2. Example [ordering information](ZeDMD_WiFi/docs/ZeDMD_WiFi_JLCPCB_ordering.png)
+## Gerber and Drill files for PCB ordering
+1. The Espressif ESP32-S3-DevKitC has 0.9" distance between rows: [production_Rev1.1.zip](/KiCad/ZeDMD_WiFi/production_Rev1.1.zip)
+2. Most clones have 1" distance between rows: [production_Rev1.2.zip](/KiCad/ZeDMD_WiFi/production_Rev1.2.zip)
+Example [ordering information](ZeDMD_WiFi/docs/ZeDMD_WiFi_JLCPCB_ordering.png)
