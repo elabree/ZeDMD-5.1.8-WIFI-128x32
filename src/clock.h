@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CLOCK_H
+#define CLOCK_H
 #ifdef ZEDMD_WIFI
 
 #include <Arduino.h>
@@ -24,3 +25,4 @@ void DrawSegDigit(int x, int y, int digit, uint8_t r, uint8_t g, uint8_t b);
 void DrawColon(int x, int y, uint8_t r, uint8_t g, uint8_t b);
 
 #endif // ZEDMD_WIFI
+#endif // CLOCK_H

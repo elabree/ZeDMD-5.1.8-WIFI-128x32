@@ -10,4 +10,5 @@ PROJECT_STATUS.md
 REVIEW_*.md
 scripts/merge_firmware.py
 scripts/copy_firmware.py
+scripts/upload_icons.sh
 platformio_override.ini

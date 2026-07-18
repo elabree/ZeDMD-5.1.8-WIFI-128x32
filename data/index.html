@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-    <title>ZeDMD-WiFi</title>
+    <title>The Arcade</title>
     <style>
         /* Global styling for dark mode */
         body {
@@ -16,6 +16,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            overflow-y: scroll;
         }
 
         /* Style the slider container */
@@ -61,6 +62,10 @@
         .form-row input[type="radio"] {
             width: auto;
             margin-right: 10px;
+        }
+
+        .scroll-container {
+            width: 100%;
         }
 
         /* Main container for sections */
@@ -181,6 +186,7 @@
         /* Style for the slider track */
         input[type="range"] {
             -webkit-appearance: none;
+            appearance: none;
             width: 100%;
             height: 20px;
             background: #007bff;
@@ -259,19 +265,45 @@
         }
         .toggle-switch input:checked + .toggle-slider { background: #007bff; }
         .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
+
+        /* Tab navigation */
+        .tab-bar {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+        }
+        .tab-btn {
+            background: #2c2c2c;
+            color: #888;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 18px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin: 0;
+            width: auto;
+            border-bottom: 3px solid transparent;
+        }
+        .tab-btn:hover { color: #e0e0e0; background: #333; }
+        .tab-btn.active { background: #1a2e1a; color: #ffffff; border-bottom: 3px solid #27ae60; font-weight: 600; }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
     </style>
 </head>
 
 <body>
     <div class="scroll-container">
         <div class="container">
-            <h1 style="display: block; margin: 0 auto 20px auto;">ZeDMD-WiFi</h1>
-            <img src="ppuc.png" alt="PPUC Logo"
+            <h1 style="margin: 0 0 20px 0;">The Arcade</h1>
+            <img src="ppuc.png" alt="The Arcade"
                 style="max-width: 100%; margin-bottom: 20px; display: block; margin: 0 auto;">
             <br>
-            <!-- SD-Karte: globale Voraussetzung für Screensaver + GIF-Audio -->
-            <div class="section" style="margin-bottom:20px;">
-                <h2 class="section-header">&#128190; SD Card &amp; Storage</h2>
+            <!-- SD Card & Storage + Admin (always visible) -->
+            <div class="section" style="margin-bottom:12px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                    <h2 class="section-header" style="margin-bottom:0;">&#128190; SD Card &amp; Storage</h2>
+                    <a href="/admin" style="display:inline-flex; align-items:center; gap:4px; background:#555; color:#fff; padding:8px 14px; border-radius:4px; text-decoration:none; font-size:0.85em; white-space:nowrap;">&#x2699; Admin</a>
+                </div>
                 <div style="margin-bottom:10px;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
                         <span style="font-size:0.82em; color:#aaa;">LittleFS</span>
@@ -293,40 +325,350 @@
                     <button id="eject-btn" style="display:none; width:auto; padding:8px 14px; margin:0; background:#6c757d;">&#x23CF; Eject</button>
                 </div>
             </div>
-            <div class="sections-grid">
-                <!-- Display Text Section -->
-                <div class="section" style="grid-column: 1 / -1;">
-                    <h2 class="section-header">&#128196; Display Text</h2>
-                    <label for="display-text-input">Text:</label>
-                    <input type="text" id="display-text-input" maxlength="127" placeholder="Enter text...">
-                    <div id="emoji-picker" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; margin-bottom:2px;"></div>
 
-                    <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:15px;">
-                        <div style="flex:1; min-width:160px;">
-                            <label for="display-text-duration">Duration: <span id="display-text-duration-val">10</span>s</label>
-                            <div class="slider-container">
-                                <span>5s</span>
-                                <input type="range" id="display-text-duration" min="5" max="60" step="5" value="10"
-                                    oninput="document.getElementById('display-text-duration-val').innerText=this.value">
-                                <span>60s</span>
+            <!-- Tab bar -->
+            <div class="tab-bar">
+                <button class="tab-btn" data-tab="screensaver" onclick="switchTab('screensaver')">&#127902; Screensaver</button>
+                <button class="tab-btn" data-tab="display" onclick="switchTab('display')">&#128250; Display</button>
+                <button class="tab-btn" data-tab="radio" onclick="switchTab('radio')">&#127925; Radio</button>
+            </div>
+
+            <!-- Tab: Screensaver -->
+            <div id="tab-screensaver" class="tab-panel">
+                <div class="sections-grid">
+                    <!-- Screensaver Source & Upload Section -->
+                    <div class="section">
+                        <h2 class="section-header">Screensaver Source &amp; Upload</h2>
+                        <label>Select Screensaver Folder:</label>
+                        <div id="sd-folder-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+                            <span style="color:#aaa; font-size:0.85em;">Loading...</span>
+                        </div>
+                        <div id="sd-folder-status" class="status-message"></div>
+                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                            <button onclick="setScreensaverPaths()">Apply Folder Selection</button>
+                            <button id="cancel-scan-btn" onclick="cancelScan()" style="display:none; width:auto; padding:8px 14px; margin:0; background:#c0392b;">&#x2715; Cancel Scan</button>
+                        </div>
+
+                        <!-- Currently displayed file -->
+                        <div style="margin-top:14px; padding:10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;">
+                            <div style="font-size:0.82em; color:#aaa; margin-bottom:6px;">Currently displaying:</div>
+                            <div style="display:flex; align-items:center; gap:4px;">
+                                <span id="current-file-name" style="flex:1; font-size:0.9em; word-break:break-all; color:#e0e0e0;">–</span>
+                                <button id="fav-btn" onclick="toggleFavorite()" class="delete-btn" style="margin:0; background:#555;">☆</button>
+                                <button id="ign-btn" onclick="toggleIgnore()" class="delete-btn" style="margin:0; background:#555;" title="Ignore">🚫</button>
                             </div>
                         </div>
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <label style="margin:0;">Color:</label>
-                            <input type="color" id="display-text-color" value="#ffffff"
-                                style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin:0;"
-                                onchange="localStorage.setItem('dtColor', this.value)">
+
+                        <!-- Favorites list -->
+                        <div style="margin-top:10px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:8px 10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;"
+                                 onclick="toggleFavoritesList()">
+                                <span style="font-size:0.85em; color:#aaa;">⭐ Favorites</span>
+                                <span id="fav-list-arrow" style="color:#fff; font-size:1.1em;">▶&#xFE0E;</span>
+                            </div>
+                            <div id="fav-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px; max-height:200px; overflow-y:auto;">
+                                <div id="fav-list-content" style="font-size:0.82em; color:#aaa;">Loading...</div>
+                            </div>
+                        </div>
+
+                        <!-- Ignore list -->
+                        <div style="margin-top:10px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:8px 10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;"
+                                 onclick="toggleIgnoreList()">
+                                <span style="font-size:0.85em; color:#aaa;">🚫 Ignored Files</span>
+                                <span id="ign-list-arrow" style="color:#fff; font-size:1.1em;">▶&#xFE0E;</span>
+                            </div>
+                            <div id="ign-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px; max-height:200px; overflow-y:auto;">
+                                <div id="ign-list-content" style="font-size:0.82em; color:#aaa;">Loading...</div>
+                            </div>
+                        </div>
+
+                        <!-- Upload Folder Selection -->
+                        <label style="margin-top:15px;">Upload folder:</label>
+                        <div id="upload-folder-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+                            <span style="color:#aaa; font-size:0.85em;">Loading...</span>
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                            <input type="text" id="new-upload-folder" placeholder="New folder name..."
+                                style="flex:1; background:#2c2c2c; color:#e0e0e0; border:1px solid #444; padding:8px; border-radius:4px; font-size:0.9em;"
+                                onkeydown="if(event.key==='Enter') setNewUploadFolder()">
+                            <button onclick="setNewUploadFolder()" style="width:auto; padding:8px 14px; margin:0; background:#555; white-space:nowrap;">+ Set</button>
+                        </div>
+                        <div id="upload-folder-status" class="status-message" style="margin-bottom:6px; text-align:left;"></div>
+
+                        <!-- Upload to Active Folder -->
+                        <label>Upload &#x2192; <span id="upload-target-label" style="color:#4a9eff;">LittleFS</span>:</label>
+                        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                            <input type="file" id="sd-upload-file" accept=".gif,.GIF,.raw" multiple
+                                style="flex:1; background:#2c2c2c; color:#e0e0e0; border:none; padding:8px; border-radius:4px;">
+                            <button onclick="uploadToSD(false)" style="width:auto; padding:8px 14px; white-space:nowrap;">
+                                &#x2191; Upload Files
+                            </button>
+                        </div>
+                        <div id="folder-upload-div" style="display:none; gap:8px; align-items:center; margin-bottom:10px;">
+                            <input type="file" id="sd-upload-folder" accept=".gif,.GIF,.raw" webkitdirectory
+                                style="display:none;" onchange="updateFolderLabel()">
+                            <button onclick="document.getElementById('sd-upload-folder').click()" style="width:auto; padding:8px 14px; white-space:nowrap; background:#555;">
+                                &#x1F4C2; Select Folder
+                            </button>
+                            <span id="folder-label" style="flex:1; font-size:0.85em; color:#aaa; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">No folder selected</span>
+                            <button onclick="uploadToSD(true)" style="width:auto; padding:8px 14px; white-space:nowrap;">
+                                &#x2191; Upload
+                            </button>
+                        </div>
+                        <div id="sd-upload-status" class="status-message" style="margin-bottom:10px;"></div>
+
+                        <!-- Pause Button -->
+                        <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+                            <button id="pause-btn" onclick="toggleScreensaverPause()"
+                                style="width:auto; padding:8px 14px; background:#e67e22;">
+                                ⏸ Pause
+                            </button>
+                            <span id="pause-status" style="font-size:0.85em; color:#aaa;">Running</span>
+                        </div>
+
+                        <!-- GIF-Vorschau -->
+                        <div id="gif-preview-box" style="display:none; margin-bottom:10px; padding:8px; background:#111; border:1px solid #555; border-radius:6px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                <span id="gif-preview-name" style="font-size:0.8em; color:#aaa; word-break:break-all; flex:1;"></span>
+                                <div style="display:flex; gap:4px; flex-shrink:0;">
+                                    <button onclick="playPreviewFile()"
+                                        class="delete-btn" style="margin:0; background:#28a745;" title="Play">▶</button>
+                                    <button id="gif-preview-fav-btn" onclick="togglePreviewFavorite()"
+                                        class="delete-btn" style="margin:0; background:#555;" title="Favorite">☆</button>
+                                    <button id="gif-preview-ign-btn" onclick="togglePreviewIgnore()"
+                                    class="delete-btn" style="margin:0; background:#555;" title="Ignore">🚫</button>
+                                    <button onclick="closeGifPreview()"
+                                        class="delete-btn" style="margin:0; background:#555;">✕</button>
+                                </div>
+                            </div>
+                            <div style="text-align:center; background:#000; border-radius:4px; padding:4px; min-height:40px;">
+                                <img id="gif-preview-img" src="" alt=""
+                                     style="image-rendering:pixelated; image-rendering:crisp-edges; max-width:100%; height:auto; display:none;">
+                                <span id="gif-preview-msg" style="font-size:0.8em; color:#666; line-height:32px;"></span>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:10px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:8px 10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;"
+                                 onclick="toggleSsFileList()">
+                                <span style="font-size:0.85em; color:#aaa;">&#127902; Active Screensaver Files <span id="screensaver-file-count" style="color:#777; font-weight:normal;"></span></span>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <button onclick="screensaverRescan(); event.stopPropagation();" style="width:auto; padding:3px 10px; margin:0; font-size:0.78em; background:#444;">&#8635; Rescan</button>
+                                    <span id="ss-file-list-arrow" style="color:#fff; font-size:1.1em;">▶&#xFE0E;</span>
+                                </div>
+                            </div>
+                            <div id="ss-file-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px;">
+                                <div id="ss-pagination-top" style="display:none; gap:8px; align-items:center; margin-bottom:6px;">
+                                    <button id="ss-prev-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(-1)">&#9664; Back</button>
+                                    <span id="ss-page-info-top" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
+                                    <button id="ss-next-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(1)">Next &#9654;</button>
+                                </div>
+                                <ul class="screensaver-file-list" id="sd-screensaver-file-list" style="margin:0;">
+                                    <li><span>Loading...</span></li>
+                                </ul>
+                                <div id="ss-pagination" style="display:none; gap:8px; align-items:center; margin-top:6px;">
+                                    <button id="ss-prev-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(-1)">&#9664; Back</button>
+                                    <span id="ss-page-info" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
+                                    <button id="ss-next-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(1)">Next &#9654;</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div style="display:flex; gap:10px;">
-                        <button onclick="sendDisplayText()" style="flex:1; padding:8px 14px;">&#9654; Send</button>
-                        <button onclick="stopDisplayText()" style="flex:0 0 auto; width:auto; padding:8px 14px; background:#6c757d;">&#9646;&#9646; Stop</button>
+                    <!-- GIF-Audio Section -->
+                    <div class="section">
+                        <h2 class="section-header">&#127925; GIF-Audio</h2>
+                        <div style="font-size:0.8em; color:#aaa; margin-bottom:10px;">
+                            MP3 files for GIF audio — MP3 name must be contained in the GIF name (e.g. <em>defender.mp3</em> plays with <em>defender_level1.gif</em>).<br>
+                            Folder on SD: <code>/GifAudio/</code>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                            <span style="font-size:0.95em; color:#aaa;">Off</span>
+                            <label class="toggle-switch" style="margin:0;">
+                                <input type="checkbox" id="gif-audio-enabled" onchange="saveGifAudioEnabled()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span style="font-size:0.95em;">GIF Audio active</span>
+                            <span id="gif-audio-enabled-status" class="status-message" style="margin:0; flex:1;"></span>
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                            <input type="file" id="gif-audio-upload-file" accept=".mp3,.MP3" multiple
+                                style="flex:1; background:#2c2c2c; color:#e0e0e0; border:none; padding:8px; border-radius:4px;">
+                            <button onclick="gifAudioUploadBtn()" style="width:auto; padding:8px 14px; white-space:nowrap;">
+                                &#x2191; Upload
+                            </button>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                            <div id="gif-audio-upload-status" class="status-message" style="margin:0; flex:1;"></div>
+                            <button id="cancel-audio-scan-btn" onclick="cancelAudioScan()" style="display:none; width:auto; padding:8px 14px; margin:0; background:#c0392b;">&#x2715; Cancel Scan</button>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                            <button onclick="gifAudioStop()" style="width:auto; padding:8px 14px; margin:0; background:#6c757d; white-space:nowrap;">&#9646;&#9646; Stop</button>
+                            <span id="gif-audio-play-status" class="status-message" style="margin:0; flex:1; color:#666;">—</span>
+                        </div>
+                        <div style="margin-top:10px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:8px 10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;"
+                                 onclick="toggleGifAudioList()">
+                                <span style="font-size:0.85em; color:#aaa;">&#127925; Files <span id="gif-audio-count" style="color:#777; font-weight:normal;"></span></span>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <button onclick="gifAudioRescan(); event.stopPropagation();" style="width:auto; padding:3px 10px; margin:0; font-size:0.78em; background:#444;">&#8635; Rescan</button>
+                                    <span id="gif-audio-list-arrow" style="color:#fff; font-size:1.1em;">▶&#xFE0E;</span>
+                                </div>
+                            </div>
+                            <div id="gif-audio-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px;">
+                                <div id="gif-audio-pagination-top" style="display:none; gap:8px; align-items:center; margin-bottom:6px;">
+                                    <button id="ga-prev-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(-1)">&#9664; Back</button>
+                                    <span id="gif-audio-page-info-top" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
+                                    <button id="ga-next-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(1)">Next &#9654;</button>
+                                </div>
+                                <ul class="screensaver-file-list" id="gif-audio-list" style="margin:0;">
+                                    <li><span style="color:#666;">Loading...</span></li>
+                                </ul>
+                                <div id="gif-audio-pagination" style="display:none; gap:8px; align-items:center; margin-top:6px;">
+                                    <button id="ga-prev-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(-1)">&#9664; Back</button>
+                                    <span id="gif-audio-page-info" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
+                                    <button id="ga-next-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(1)">Next &#9654;</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div id="display-text-status" class="status-message"></div>
                 </div>
+            </div>
 
-                <!-- Radio Section -->
+            <!-- Tab: Display -->
+            <div id="tab-display" class="tab-panel">
+                <div class="sections-grid">
+                    <!-- Display Text Section -->
+                    <div class="section" style="grid-column: 1 / -1;">
+                        <h2 class="section-header">&#128196; Display Text</h2>
+                        <label for="display-text-input">Text:</label>
+                        <input type="text" id="display-text-input" maxlength="127" placeholder="Enter text...">
+                        <div id="emoji-picker" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; margin-bottom:2px;"></div>
+
+                        <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:15px;">
+                            <div style="flex:1; min-width:160px;">
+                                <label for="display-text-duration">Duration: <span id="display-text-duration-val">10</span>s</label>
+                                <div class="slider-container">
+                                    <span>5s</span>
+                                    <input type="range" id="display-text-duration" min="5" max="60" step="5" value="10"
+                                        oninput="document.getElementById('display-text-duration-val').innerText=this.value">
+                                    <span>60s</span>
+                                </div>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <label style="margin:0;">Color:</label>
+                                <input type="color" id="display-text-color" value="#ffffff"
+                                    style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin:0;"
+                                    onchange="localStorage.setItem('dtColor', this.value)">
+                            </div>
+                        </div>
+
+                        <div style="display:flex; gap:10px;">
+                            <button onclick="sendDisplayText()" style="flex:1; padding:8px 14px;">&#9654; Send</button>
+                            <button onclick="stopDisplayText()" style="flex:0 0 auto; width:auto; padding:8px 14px; background:#6c757d;">&#9646;&#9646; Stop</button>
+                        </div>
+                        <div id="display-text-status" class="status-message"></div>
+                    </div>
+
+                    <!-- Display Timer Section -->
+                    <div class="section" style="grid-column: 1 / -1;">
+                        <h2 class="section-header">&#128337; Display Timer</h2>
+                        <p style="font-size:0.82em; color:#888; margin:0 0 12px 0;">Turns the display off daily between the set times — e.g. off at 23:00, back on at 07:00.</p>
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+                            <label class="toggle-switch" style="margin:0;">
+                                <input type="checkbox" id="display-timer-enabled" onchange="saveDisplayTimer()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span style="font-size:0.95em;">Enable</span>
+                            <div style="display:flex; align-items:center; gap:8px; margin-left:8px;">
+                                <label style="margin:0; font-size:0.9em; color:#aaa;">Off from</label>
+                                <input type="time" id="display-timer-from" value="23:00"
+                                    style="background:#2c2c2c; color:#e0e0e0; border:1px solid #444; border-radius:4px; padding:5px 8px; font-size:0.9em; width:auto;"
+                                    onchange="saveDisplayTimer()">
+                                <label style="margin:0; font-size:0.9em; color:#aaa;">until</label>
+                                <input type="time" id="display-timer-until" value="07:00"
+                                    style="background:#2c2c2c; color:#e0e0e0; border:1px solid #444; border-radius:4px; padding:5px 8px; font-size:0.9em; width:auto;"
+                                    onchange="saveDisplayTimer()">
+                            </div>
+                            <span id="display-timer-status" class="status-message" style="margin:0;"></span>
+                        </div>
+                        <button id="display-blank-btn" onclick="toggleDisplayBlank()"
+                            style="width:auto; padding:8px 18px; background:#555;">&#x23FC; Display off</button>
+                        <span id="display-blank-status" class="status-message" style="margin-left:8px;"></span>
+                    </div>
+
+                    <!-- Screensaver Settings Section -->
+                    <div class="section" style="grid-column: 1 / -1;">
+                        <h2 class="section-header">Screensaver Settings</h2>
+
+                        <label for="screensaver-mode">Display Mode:</label>
+                        <select id="screensaver-mode" onchange="saveScreensaverMode()">
+                            <option value="0">Screensaver only</option>
+                            <option value="1">Clock only</option>
+                            <option value="2">Clock + Screensaver</option>
+                            <option value="3">Clock + Weather</option>
+                            <option value="4">Clock + Weather + Screensaver</option>
+                        </select>
+                        <div id="mode-status" class="status-message"></div>
+
+                        <div id="clock-colors-section">
+                            <label>Clock Time Color:</label>
+                            <input type="color" id="clock-color" value="#00ffc8"
+                                style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin-bottom:8px;">
+                            <label>Date Color:</label>
+                            <input type="color" id="date-color" value="#b4b4b4"
+                                style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin-bottom:8px;">
+                            <button onclick="saveClockColors()">Apply Clock Colors</button>
+                            <div id="clock-color-status" class="status-message"></div>
+                        </div>
+
+                        <label for="screensaver-brightness">Display Brightness: <span id="screensaver-brightness-value">–</span></label>
+                        <div class="slider-container">
+                            <span>&#x1F311;</span>
+                            <input type="range" id="screensaver-brightness" name="screensaverBrightness" min="1" max="15"
+                                oninput="updateScreensaverBrightness()">
+                            <span>&#x2600;</span>
+                        </div>
+                        <br>
+                        <div id="screensaver-status" class="status-message"></div>
+                        <button onclick="applyScreensaverBrightness()">Apply Display Brightness</button>
+
+                        <label for="screensaver-duration">Screensaver Duration: <span id="screensaver-duration-value">10</span>s</label>
+                        <div class="slider-container">
+                            <span>5s</span>
+                            <input type="range" id="screensaver-duration" name="screensaverDuration" min="5" max="60" step="5" value="10"
+                                oninput="updateScreensaverDuration()">
+                            <span>60s</span>
+                        </div>
+                        <br>
+                        <div id="screensaver-duration-status" class="status-message"></div>
+                        <button onclick="applyScreensaverDuration()">Apply Duration</button>
+
+                        <div style="display:flex; align-items:center; gap:24px; margin-top:14px; flex-wrap:wrap;">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <label class="toggle-switch" style="margin:0;">
+                                    <input type="checkbox" id="screensaver-az" onchange="saveScreensaverShuffle()">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span style="font-size:0.95em; color:#aaa;">A-Z</span>
+                                <button id="reshuffle-btn" onclick="reshuffleScreensaver()" style="width:auto; padding:8px 14px; margin:0 0 0 8px; background:#6c757d;">&#8652; Reshuffle</button>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <label class="toggle-switch" style="margin:0;">
+                                    <input type="checkbox" id="screensaver-strict-timer" onchange="saveScreensaverStrictTimer()">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span style="font-size:0.95em;">Strict Timer</span>
+                            </div>
+                        </div>
+                        <div id="screensaver-shuffle-status" class="status-message"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Radio -->
+            <div id="tab-radio" class="tab-panel">
                 <div class="section">
                     <h2 class="section-header">&#127925; Webradio</h2>
                     <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; min-height:1.1em;">
@@ -334,12 +676,39 @@
                         <span id="radio-station" style="font-size:0.85em; color:#ccc;"></span>
                     </div>
                     <div style="font-size:0.8em; color:#aaa; margin-bottom:8px; min-height:1em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="radio-track"></div>
-                    <div class="slider-container" style="margin-bottom:10px;">
+                    <div class="slider-container" style="margin-bottom:6px;">
                         <span>&#128263;</span>
                         <input type="range" id="radio-volume-slider" min="0" max="21" value="15"
                             oninput="setRadioVolume(parseInt(this.value))">
                         <span>&#128266;</span>
                         <span id="radio-vol-val" style="min-width:30px; text-align:right; font-size:0.85em; color:#aaa; margin-left:4px;">15</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                        <span style="font-size:0.75em; color:#aaa; min-width:46px;">Channel</span>
+                        <button id="btn-stereo" onclick="setRadioMono(false)"
+                            style="width:auto; padding:5px 12px; margin:0; background:#27ae60;">Stereo</button>
+                        <button id="btn-mono" onclick="setRadioMono(true)"
+                            style="width:auto; padding:5px 12px; margin:0; background:#555;">Mono</button>
+                        <button id="btn-swap" onclick="toggleRadioSwap()"
+                            style="width:auto; padding:5px 12px; margin:0; background:#555;">L/R Swap</button>
+                    </div>
+                    <div style="margin-bottom:10px; padding:6px 8px; background:#1e1e1e; border-radius:6px; border:1px solid #333;">
+                        <div style="font-size:0.75em; color:#888; margin-bottom:4px;">EQ</div>
+                        <div class="slider-container" style="margin-bottom:4px;">
+                            <span style="font-size:0.75em; color:#aaa; min-width:46px;">Bass</span>
+                            <input type="range" id="eq-bass-slider" min="-6" max="6" value="0" oninput="setRadioEq()">
+                            <span id="eq-bass-val" style="min-width:28px; text-align:right; font-size:0.85em; color:#aaa; margin-left:4px;">0</span>
+                        </div>
+                        <div class="slider-container" style="margin-bottom:4px;">
+                            <span style="font-size:0.75em; color:#aaa; min-width:46px;">Mid</span>
+                            <input type="range" id="eq-mid-slider" min="-6" max="6" value="0" oninput="setRadioEq()">
+                            <span id="eq-mid-val" style="min-width:28px; text-align:right; font-size:0.85em; color:#aaa; margin-left:4px;">0</span>
+                        </div>
+                        <div class="slider-container">
+                            <span style="font-size:0.75em; color:#aaa; min-width:46px;">Treble</span>
+                            <input type="range" id="eq-treble-slider" min="-6" max="6" value="0" oninput="setRadioEq()">
+                            <span id="eq-treble-val" style="min-width:28px; text-align:right; font-size:0.85em; color:#aaa; margin-left:4px;">0</span>
+                        </div>
                     </div>
                     <div style="display:flex; gap:8px; align-items:stretch;">
                         <button id="radio-toggle-btn" onclick="toggleRadio()"
@@ -361,295 +730,16 @@
                         <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:8px 10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;"
                              onclick="togglePresetList()">
                             <span style="font-size:0.85em; color:#aaa;">&#128251; Saved Stations</span>
-                            <span id="preset-list-arrow" style="color:#aaa; font-size:0.85em;">&#9654;</span>
+                            <span id="preset-list-arrow" style="color:#fff; font-size:1.1em;">▼&#xFE0E;</span>
                         </div>
-                        <div id="preset-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px; max-height:220px; overflow-y:auto;">
+                        <div id="preset-list-panel" style="display:block; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px; max-height:220px; overflow-y:auto;">
                             <div id="preset-list-content" style="font-size:0.85em; color:#aaa;">Loading...</div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Screensaver Source & Upload Section -->
-                <div class="section">
-                    <h2 class="section-header">Screensaver Source &amp; Upload</h2>
-
-
-                                        <label>Select Screensaver Folder:</label>
-                    <div id="sd-folder-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
-                        <span style="color:#aaa; font-size:0.85em;">Loading...</span>
-                    </div>
-                    <div id="sd-folder-status" class="status-message"></div>
-                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                        <button onclick="setScreensaverPaths()">Apply Folder Selection</button>
-                        <button id="cancel-scan-btn" onclick="cancelScan()" style="display:none; width:auto; padding:8px 14px; margin:0; background:#c0392b;">&#x2715; Cancel Scan</button>
-                    </div>
-
-                    <!-- Currently displayed file -->
-                    <div style="margin-top:14px; padding:10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;">
-                        <div style="font-size:0.82em; color:#aaa; margin-bottom:6px;">Currently displaying:</div>
-                        <div style="display:flex; align-items:center; gap:4px;">
-                            <span id="current-file-name" style="flex:1; font-size:0.9em; word-break:break-all; color:#e0e0e0;">–</span>
-                            <button id="fav-btn" onclick="toggleFavorite()" class="delete-btn" style="margin:0; background:#555;">☆</button>
-                            <button id="ign-btn" onclick="toggleIgnore()" class="delete-btn" style="margin:0; background:#555;" title="Ignore">🚫</button>
-                        </div>
-                    </div>
-
-                    <!-- Favorites list -->
-                    <div style="margin-top:10px;">
-                        <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:8px 10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;"
-                             onclick="toggleFavoritesList()">
-                            <span style="font-size:0.85em; color:#aaa;">⭐ Favorites</span>
-                            <span id="fav-list-arrow" style="color:#aaa; font-size:0.85em;">▶</span>
-                        </div>
-                        <div id="fav-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px; max-height:200px; overflow-y:auto;">
-                            <div id="fav-list-content" style="font-size:0.82em; color:#aaa;">Loading...</div>
-                        </div>
-                    </div>
-
-                    <!-- Ignore list -->
-                    <div style="margin-top:10px;">
-                        <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:8px 10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;"
-                             onclick="toggleIgnoreList()">
-                            <span style="font-size:0.85em; color:#aaa;">🚫 Ignored Files</span>
-                            <span id="ign-list-arrow" style="color:#aaa; font-size:0.85em;">▶</span>
-                        </div>
-                        <div id="ign-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px; max-height:200px; overflow-y:auto;">
-                            <div id="ign-list-content" style="font-size:0.82em; color:#aaa;">Loading...</div>
-                        </div>
-                    </div>
-
-                    <!-- Upload Folder Selection (entkoppelt von Screensaver-Quelle) -->
-                    <label style="margin-top:15px;">Upload folder:</label>
-                    <div id="upload-folder-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
-                        <span style="color:#aaa; font-size:0.85em;">Loading...</span>
-                    </div>
-                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-                        <input type="text" id="new-upload-folder" placeholder="New folder name..."
-                            style="flex:1; background:#2c2c2c; color:#e0e0e0; border:1px solid #444; padding:8px; border-radius:4px; font-size:0.9em;"
-                            onkeydown="if(event.key==='Enter') setNewUploadFolder()">
-                        <button onclick="setNewUploadFolder()" style="width:auto; padding:8px 14px; margin:0; background:#555; white-space:nowrap;">+ Set</button>
-                    </div>
-                    <div id="upload-folder-status" class="status-message" style="margin-bottom:6px; text-align:left;"></div>
-
-                    <!-- Upload to Active Folder -->
-                    <label>Upload &#x2192; <span id="upload-target-label" style="color:#4a9eff;">LittleFS</span>:</label>
-                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-                        <input type="file" id="sd-upload-file" accept=".gif,.GIF,.raw" multiple
-                            style="flex:1; background:#2c2c2c; color:#e0e0e0; border:none; padding:8px; border-radius:4px;">
-                        <button onclick="uploadToSD(false)" style="width:auto; padding:8px 14px; white-space:nowrap;">
-                            &#x2191; Upload Files
-                        </button>
-                    </div>
-                    <div id="folder-upload-div" style="display:none; gap:8px; align-items:center; margin-bottom:10px;">
-                        <input type="file" id="sd-upload-folder" accept=".gif,.GIF,.raw" webkitdirectory
-                            style="display:none;" onchange="updateFolderLabel()">
-                        <button onclick="document.getElementById('sd-upload-folder').click()" style="width:auto; padding:8px 14px; white-space:nowrap; background:#555;">
-                            &#x1F4C2; Select Folder
-                        </button>
-                        <span id="folder-label" style="flex:1; font-size:0.85em; color:#aaa; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">No folder selected</span>
-                        <button onclick="uploadToSD(true)" style="width:auto; padding:8px 14px; white-space:nowrap;">
-                            &#x2191; Upload
-                        </button>
-                    </div>
-                    <div id="sd-upload-status" class="status-message" style="margin-bottom:10px;"></div>
-
-                    <!-- Pause Button -->
-                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
-                        <button id="pause-btn" onclick="toggleScreensaverPause()"
-                            style="width:auto; padding:8px 14px; background:#e67e22;">
-                            ⏸ Pause
-                        </button>
-                        <span id="pause-status" style="font-size:0.85em; color:#aaa;">Running</span>
-                    </div>
-
-                    <!-- GIF-Vorschau -->
-                    <div id="gif-preview-box" style="display:none; margin-bottom:10px; padding:8px; background:#111; border:1px solid #555; border-radius:6px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                            <span id="gif-preview-name" style="font-size:0.8em; color:#aaa; word-break:break-all; flex:1;"></span>
-                            <div style="display:flex; gap:4px; flex-shrink:0;">
-                                <button onclick="playPreviewFile()"
-                                    class="delete-btn" style="margin:0; background:#28a745;" title="Play">▶</button>
-                                <button id="gif-preview-fav-btn" onclick="togglePreviewFavorite()"
-                                    class="delete-btn" style="margin:0; background:#555;" title="Favorite">☆</button>
-                                <button id="gif-preview-ign-btn" onclick="togglePreviewIgnore()"
-                                    class="delete-btn" style="margin:0; background:#555;" title="Ignore">🚫</button>
-                                <button onclick="closeGifPreview()"
-                                    class="delete-btn" style="margin:0; background:#555;">✕</button>
-                            </div>
-                        </div>
-                        <div style="text-align:center; background:#000; border-radius:4px; padding:4px; min-height:40px;">
-                            <img id="gif-preview-img" src="" alt=""
-                                 style="image-rendering:pixelated; image-rendering:crisp-edges; max-width:100%; height:auto; display:none;">
-                            <span id="gif-preview-msg" style="font-size:0.8em; color:#666; line-height:32px;"></span>
-                        </div>
-                    </div>
-
-                    <div style="margin-top:10px;">
-                        <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:8px 10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;"
-                             onclick="toggleSsFileList()">
-                            <span style="font-size:0.85em; color:#aaa;">&#127902; Active Screensaver Files <span id="screensaver-file-count" style="color:#777; font-weight:normal;"></span></span>
-                            <span id="ss-file-list-arrow" style="color:#aaa; font-size:0.85em;">&#9654;</span>
-                        </div>
-                        <div id="ss-file-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px;">
-                            <div id="ss-pagination-top" style="display:none; gap:8px; align-items:center; margin-bottom:6px;">
-                                <button id="ss-prev-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(-1)">&#9664; Back</button>
-                                <span id="ss-page-info-top" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
-                                <button id="ss-next-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(1)">Next &#9654;</button>
-                            </div>
-                            <ul class="screensaver-file-list" id="sd-screensaver-file-list" style="margin:0;">
-                                <li><span>Loading...</span></li>
-                            </ul>
-                            <div id="ss-pagination" style="display:none; gap:8px; align-items:center; margin-top:6px;">
-                                <button id="ss-prev-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(-1)">&#9664; Back</button>
-                                <span id="ss-page-info" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
-                                <button id="ss-next-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(1)">Next &#9654;</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- GIF-Audio Section -->
-                <div class="section">
-                    <h2 class="section-header">&#127925; GIF-Audio</h2>
-                    <div style="font-size:0.8em; color:#aaa; margin-bottom:10px;">
-                        MP3 files for GIF audio — MP3 name must be contained in the GIF name (e.g. <em>defender.mp3</em> plays with <em>defender_level1.gif</em>).<br>
-                        Folder on SD: <code>/GifAudio/</code>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
-                        <span style="font-size:0.95em; color:#aaa;">Off</span>
-                        <label class="toggle-switch" style="margin:0;">
-                            <input type="checkbox" id="gif-audio-enabled" onchange="saveGifAudioEnabled()">
-                            <span class="toggle-slider"></span>
-                        </label>
-                        <span style="font-size:0.95em;">GIF Audio active</span>
-                        <span id="gif-audio-enabled-status" class="status-message" style="margin:0; flex:1;"></span>
-                    </div>
-                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-                        <input type="file" id="gif-audio-upload-file" accept=".mp3,.MP3" multiple
-                            style="flex:1; background:#2c2c2c; color:#e0e0e0; border:none; padding:8px; border-radius:4px;">
-                        <button onclick="gifAudioUploadBtn()" style="width:auto; padding:8px 14px; white-space:nowrap;">
-                            &#x2191; Upload
-                        </button>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-                        <div id="gif-audio-upload-status" class="status-message" style="margin:0; flex:1;"></div>
-                        <button id="cancel-audio-scan-btn" onclick="cancelAudioScan()" style="display:none; width:auto; padding:8px 14px; margin:0; background:#c0392b;">&#x2715; Cancel Scan</button>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-                        <button onclick="gifAudioStop()" style="width:auto; padding:8px 14px; margin:0; background:#6c757d; white-space:nowrap;">&#9646;&#9646; Stop</button>
-                        <span id="gif-audio-play-status" class="status-message" style="margin:0; flex:1; color:#666;">—</span>
-                    </div>
-                    <div style="margin-top:10px;">
-                        <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:8px 10px; background:#2c2c2c; border-radius:6px; border:1px solid #444;"
-                             onclick="toggleGifAudioList()">
-                            <span style="font-size:0.85em; color:#aaa;">&#127925; Files <span id="gif-audio-count" style="color:#777; font-weight:normal;"></span></span>
-                            <span id="gif-audio-list-arrow" style="color:#aaa; font-size:0.85em;">&#9654;</span>
-                        </div>
-                        <div id="gif-audio-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px;">
-                            <div id="gif-audio-pagination-top" style="display:none; gap:8px; align-items:center; margin-bottom:6px;">
-                                <button id="ga-prev-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(-1)">&#9664; Back</button>
-                                <span id="gif-audio-page-info-top" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
-                                <button id="ga-next-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(1)">Next &#9654;</button>
-                            </div>
-                            <ul class="screensaver-file-list" id="gif-audio-list" style="margin:0;">
-                                <li><span style="color:#666;">Loading...</span></li>
-                            </ul>
-                            <div id="gif-audio-pagination" style="display:none; gap:8px; align-items:center; margin-top:6px;">
-                                <button id="ga-prev-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(-1)">&#9664; Back</button>
-                                <span id="gif-audio-page-info" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
-                                <button id="ga-next-btn" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(1)">Next &#9654;</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Screensaver Settings Section -->
-                <div class="section">
-                    <h2 class="section-header">Screensaver Settings</h2>
-
-                    <!-- Screensaver Mode -->
-                    <label for="screensaver-mode">Display Mode:</label>
-                    <select id="screensaver-mode" onchange="saveScreensaverMode()">
-                        <option value="0">Screensaver only</option>
-                        <option value="1">Clock only</option>
-                        <option value="2">Clock + Screensaver</option>
-                        <option value="3">Clock + Weather</option>
-                        <option value="4">Clock + Weather + Screensaver</option>
-                    </select>
-                    <div id="mode-status" class="status-message"></div>
-
-                    <button id="weather-icon-test-btn" onclick="toggleWeatherIconTest()" style="width:auto; padding:8px 14px; background:#555; margin-top:6px;">&#x1F324; Icon-Test</button>
-                    <div id="weather-icon-test-status" class="status-message"></div>
-
-                    <!-- Clock Colors (nur wenn Clock Modus) -->
-                    <div id="clock-colors-section">
-                        <label>Clock Time Color:</label>
-                        <input type="color" id="clock-color" value="#00ffc8"
-                            style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin-bottom:8px;">
-
-                        <label>Date Color:</label>
-                        <input type="color" id="date-color" value="#b4b4b4"
-                            style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin-bottom:8px;">
-
-                        <button onclick="saveClockColors()">Apply Clock Colors</button>
-                        <div id="clock-color-status" class="status-message"></div>
-                    </div>
-
-                    <!-- Screensaver Brightness Slider -->
-                    <label for="screensaver-brightness">Screensaver Brightness: <span id="screensaver-brightness-value">–</span></label>
-                    <div class="slider-container">
-                        <span>&#x1F311;</span>
-                        <input type="range" id="screensaver-brightness" name="screensaverBrightness" min="1" max="15"
-                            oninput="updateScreensaverBrightness()">
-                        <span>&#x2600;</span>
-                    </div>
-                    <br>
-                    <div id="screensaver-status" class="status-message"></div>
-                    <button onclick="applyScreensaverBrightness()">Apply Screensaver Brightness</button>
-
-                    <!-- Screensaver Duration Slider -->
-                    <label for="screensaver-duration">Screensaver Duration: <span id="screensaver-duration-value">10</span>s</label>
-                    <div class="slider-container">
-                        <span>5s</span>
-                        <input type="range" id="screensaver-duration" name="screensaverDuration" min="5" max="60" step="5" value="10"
-                            oninput="updateScreensaverDuration()">
-                        <span>60s</span>
-                    </div>
-                    <br>
-                    <div id="screensaver-duration-status" class="status-message"></div>
-                    <button onclick="applyScreensaverDuration()">Apply Duration</button>
-
-                    <!-- Order + Strict Timer -->
-                    <div style="display:flex; align-items:center; gap:24px; margin-top:14px; flex-wrap:wrap;">
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <label class="toggle-switch" style="margin:0;">
-                                <input type="checkbox" id="screensaver-az" onchange="saveScreensaverShuffle()">
-                                <span class="toggle-slider"></span>
-                            </label>
-                            <span style="font-size:0.95em; color:#aaa;">A-Z</span>
-                            <button id="reshuffle-btn" onclick="reshuffleScreensaver()" style="width:auto; padding:8px 14px; margin:0 0 0 8px; background:#6c757d;">&#8652; Reshuffle</button>
-                        </div>
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <label class="toggle-switch" style="margin:0;">
-                                <input type="checkbox" id="screensaver-strict-timer" onchange="saveScreensaverStrictTimer()">
-                                <span class="toggle-slider"></span>
-                            </label>
-                            <span style="font-size:0.95em;">Strict Timer</span>
-                        </div>
-                    </div>
-                    <div id="screensaver-shuffle-status" class="status-message"></div>
-                </div>
-
-                <!-- WiFi + Advanced Settings → Admin Seite -->
-                <div class="section">
-                    <h2 class="section-header">Settings</h2>
-                    <p style="color:#aaa; font-size:0.85em;">WiFi, Display, RGB Order and advanced settings are available on the admin page.</p>
-                    <a href="/admin" style="display:inline-block; background:#555; color:#fff; padding:10px 16px; border-radius:4px; text-decoration:none; margin-top:8px;">&#x2699; Open Admin Page</a>
-                </div>
-
             </div>
-        </div>
 
+        </div>
     </div>
 
 
@@ -668,7 +758,7 @@
                 ['🎉','Party'],         ['🎮','Gamepad'],['👾','Alien'],
                 ['💡','Idee'],          ['💰','Geld'],   ['📝','Notiz'],
                 ['📢','Lautsprecher'], ['📱','Telefon'],['🔔','Glocke'],
-                ['⚠️','Warnung']
+                ['🎵','Musiknote'],   ['⚠️','Warnung']
             ];
             document.addEventListener('DOMContentLoaded', function() {
                 var saved = localStorage.getItem('dtColor');
@@ -693,6 +783,53 @@
             input.value = input.value.slice(0, pos) + emoji + input.value.slice(pos);
             input.setSelectionRange(pos + emoji.length, pos + emoji.length);
             input.focus();
+        }
+
+        function switchTab(name) {
+            document.querySelectorAll('.tab-btn').forEach(function(btn) {
+                btn.classList.toggle('active', btn.dataset.tab === name);
+            });
+            document.querySelectorAll('.tab-panel').forEach(function(panel) {
+                panel.classList.toggle('active', panel.id === 'tab-' + name);
+            });
+            localStorage.setItem('activeTab', name);
+        }
+
+        function loadDisplayTimer() {
+            fetch('/display_timer').then(function(r){ return r.json(); }).then(function(d) {
+                document.getElementById('display-timer-enabled').checked = d.enabled;
+                document.getElementById('display-timer-from').value  = d.from;
+                document.getElementById('display-timer-until').value = d.until;
+                updateBlankBtn(d.blank);
+            }).catch(function(){});
+        }
+
+        function saveDisplayTimer() {
+            var fd = new FormData();
+            fd.append('enabled', document.getElementById('display-timer-enabled').checked ? '1' : '0');
+            fd.append('from',  document.getElementById('display-timer-from').value);
+            fd.append('until', document.getElementById('display-timer-until').value);
+            var st = document.getElementById('display-timer-status');
+            fetch('/display_timer', { method: 'POST', body: fd })
+                .then(function(r){ st.style.color='#27ae60'; st.innerText='Saved'; setTimeout(function(){ st.innerText=''; }, 2000); })
+                .catch(function(){ st.style.color='red'; st.innerText='Error'; });
+        }
+
+        var _isBlank = false;
+        function updateBlankBtn(blank) {
+            _isBlank = blank;
+            var btn = document.getElementById('display-blank-btn');
+            btn.innerHTML = blank ? '&#x23FC; Display on' : '&#x23FC; Display off';
+            btn.style.background = blank ? '#27ae60' : '#555';
+        }
+        function toggleDisplayBlank() {
+            var fd = new FormData();
+            fd.append('blank', _isBlank ? '0' : '1');
+            var st = document.getElementById('display-blank-status');
+            fetch('/display_blank', { method: 'POST', body: fd })
+                .then(function(r){ return r.json(); })
+                .then(function(d){ updateBlankBtn(d.blank); st.innerText=''; })
+                .catch(function(){ st.style.color='red'; st.innerText='Error'; });
         }
 
         function sendDisplayText() {
@@ -939,11 +1076,11 @@
             var arrow = document.getElementById('fav-list-arrow');
             if (panel.style.display === 'none') {
                 panel.style.display = 'block';
-                arrow.textContent = '▼';
+                arrow.textContent = '▼︎';
                 loadFavoritesList();
             } else {
                 panel.style.display = 'none';
-                arrow.textContent = '▶';
+                arrow.textContent = '▶︎';
             }
         }
 
@@ -1041,11 +1178,11 @@
             var arrow = document.getElementById('ign-list-arrow');
             if (panel.style.display === 'none') {
                 panel.style.display = 'block';
-                arrow.textContent = '▼';
+                arrow.textContent = '▼︎';
                 loadIgnoreList();
             } else {
                 panel.style.display = 'none';
-                arrow.textContent = '▶';
+                arrow.textContent = '▶︎';
             }
         }
 
@@ -1054,11 +1191,31 @@
             var arrow = document.getElementById('gif-audio-list-arrow');
             if (panel.style.display === 'none') {
                 panel.style.display = 'block';
-                arrow.textContent = '▼';
+                arrow.textContent = '▼︎';
             } else {
                 panel.style.display = 'none';
-                arrow.textContent = '▶';
+                arrow.textContent = '▶︎';
             }
+        }
+
+        function screensaverRescan() {
+            if (!confirm('Start screensaver rescan? This may take several minutes.')) return;
+            var countEl = document.getElementById('screensaver-file-count');
+            countEl.textContent = ' (rescanning…)';
+            countEl.style.color = '#aaa';
+            fetch('/screensaver_rescan', {method:'POST'})
+                .then(function() { ssPollReady(0); })
+                .catch(function() { countEl.textContent = ' (error)'; countEl.style.color = '#e74c3c'; });
+        }
+
+        function ssPollReady(attempt) {
+            if (attempt > 20) { sdFileOffset = 0; loadSDScreensaverFiles(); return; }
+            setTimeout(function() {
+                fetch('/screensaver_folder_count').then(function(r) { return r.json(); }).then(function(d) {
+                    if (d.total > 0) { sdFileOffset = 0; loadSDScreensaverFiles(); }
+                    else { ssPollReady(attempt + 1); }
+                }).catch(function() { ssPollReady(attempt + 1); });
+            }, 3000);
         }
 
         function toggleSsFileList() {
@@ -1066,10 +1223,10 @@
             var arrow = document.getElementById('ss-file-list-arrow');
             if (panel.style.display === 'none') {
                 panel.style.display = 'block';
-                arrow.textContent = '▼';
+                arrow.textContent = '▼︎';
             } else {
                 panel.style.display = 'none';
-                arrow.textContent = '▶';
+                arrow.textContent = '▶︎';
             }
         }
 
@@ -1275,11 +1432,11 @@
             var arrow = document.getElementById('preset-list-arrow');
             if (panel.style.display === 'none') {
                 panel.style.display = 'block';
-                arrow.textContent = '▼';
+                arrow.textContent = '▼︎';
                 loadPresetList();
             } else {
                 panel.style.display = 'none';
-                arrow.textContent = '▶';
+                arrow.textContent = '▶︎';
             }
         }
 
@@ -1577,16 +1734,37 @@
         var _radioLastPreset  = -1;
         var _radioDisplayActive = false;
         var _radioVolume      = 15;
+        var _radioMono        = false;
 
         // ── GIF-Audio ─────────────────────────────────────────────────────────
         var gifAudioAllFiles = [];
         var gifAudioOffset   = 0;
         var gifAudioPageSize = 20;
 
+        function gifAudioRescan() {
+            if (!confirm('Start GIF audio rescan? This may take several minutes.')) return;
+            var countEl = document.getElementById('gif-audio-count');
+            countEl.textContent = ' (rescanning…)';
+            countEl.style.color = '#aaa';
+            fetch('/gif_audio_rescan', {method:'POST'})
+                .then(function() { gifAudioPollReady(0); })
+                .catch(function() { countEl.textContent = ' (error)'; countEl.style.color = '#e74c3c'; });
+        }
+
+        function gifAudioPollReady(attempt) {
+            if (attempt > 20) { gifAudioLoad(false); return; }
+            setTimeout(function() {
+                fetch('/gif_audio_files').then(function(r) { return r.json(); }).then(function(files) {
+                    if (files.length > 0) { gifAudioLoad(false); }
+                    else { gifAudioPollReady(attempt + 1); }
+                }).catch(function() { gifAudioPollReady(attempt + 1); });
+            }, 3000);
+        }
+
         function gifAudioLoad(retry) {
             fetch('/gif_audio_files').then(function(r) { return r.json(); }).then(function(files) {
                 if (files.length === 0 && !retry) { setTimeout(function() { gifAudioLoad(true); }, 1500); return; }
-                gifAudioAllFiles = files;
+                gifAudioAllFiles = files.sort(function(a, b) { return a.name.localeCompare(b.name); });
                 if (gifAudioOffset >= gifAudioAllFiles.length) gifAudioOffset = 0;
                 gifAudioRender();
                 var cancelBtn = document.getElementById('cancel-audio-scan-btn');
@@ -1779,6 +1957,59 @@
             }
         }
 
+        function setRadioEq(skipSend) {
+            var bass   = parseInt(document.getElementById('eq-bass-slider').value);
+            var mid    = parseInt(document.getElementById('eq-mid-slider').value);
+            var treble = parseInt(document.getElementById('eq-treble-slider').value);
+            document.getElementById('eq-bass-val').innerText   = bass;
+            document.getElementById('eq-mid-val').innerText    = mid;
+            document.getElementById('eq-treble-val').innerText = treble;
+            localStorage.setItem('eqBass', bass);
+            localStorage.setItem('eqMid', mid);
+            localStorage.setItem('eqTreble', treble);
+            if (!skipSend) {
+                var fd = new FormData();
+                fd.append('bass', bass); fd.append('mid', mid); fd.append('treble', treble);
+                fetch('/radio_eq', { method: 'POST', body: fd })
+                    .catch(function(e) { console.warn('ZeDMD radio_eq:', e); });
+            }
+        }
+
+        function loadRadioEq(bass, mid, treble) {
+            document.getElementById('eq-bass-slider').value   = bass;
+            document.getElementById('eq-mid-slider').value    = mid;
+            document.getElementById('eq-treble-slider').value = treble;
+            setRadioEq(true);
+        }
+
+        function setRadioMono(mono, skipSend) {
+            _radioMono = mono;
+            var btnS = document.getElementById('btn-stereo');
+            var btnM = document.getElementById('btn-mono');
+            if (btnS) btnS.style.background = mono ? '#555' : '#27ae60';
+            if (btnM) btnM.style.background = mono ? '#27ae60' : '#555';
+            if (!skipSend) {
+                var fd = new FormData(); fd.append('mono', mono ? '1' : '0');
+                fetch('/radio_mono', { method: 'POST', body: fd })
+                    .catch(function(e) { console.warn('ZeDMD radio_mono:', e); });
+            }
+        }
+
+        function setRadioSwap(swap, skipSend) {
+            var btn = document.getElementById('btn-swap');
+            if (btn) { btn.style.background = swap ? '#e67e22' : '#555'; btn.dataset.active = swap ? '1' : '0'; }
+            if (!skipSend) {
+                var fd = new FormData(); fd.append('swap', swap ? '1' : '0');
+                fetch('/radio_swap', { method: 'POST', body: fd })
+                    .catch(function(e) { console.warn('ZeDMD radio_swap:', e); });
+            }
+        }
+
+        function toggleRadioSwap() {
+            var btn = document.getElementById('btn-swap');
+            setRadioSwap(!(btn && btn.dataset.active === '1'));
+        }
+
         function updateDisplayBtn(active) {
             var btn = document.getElementById('radio-display-btn');
             if (!btn) return;
@@ -1941,23 +2172,6 @@
             xhr.send();
         }
 
-        var weatherIconTestOn = false;
-        function toggleWeatherIconTest() {
-            var btn = document.getElementById('weather-icon-test-btn');
-            var status = document.getElementById('weather-icon-test-status');
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", "/test_weather_icons", true);
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState !== XMLHttpRequest.DONE) return;
-                if (xhr.status === 200) {
-                    weatherIconTestOn = (xhr.responseText === 'ON');
-                    btn.style.background = weatherIconTestOn ? '#28a745' : '#555';
-                    status.innerText = weatherIconTestOn ? '▶ Icon-Test läuft — auf Display ansehen' : '■ Icon-Test gestoppt';
-                    status.style.color = weatherIconTestOn ? '#28a745' : '#aaa';
-                }
-            };
-            xhr.send();
-        }
 
         function loadSDFolders(retried) {
             var xhr = new XMLHttpRequest();
@@ -2410,31 +2624,65 @@
         }
 
         window.onload = function () {
+            switchTab(localStorage.getItem('activeTab') || 'screensaver');
+
+            // Requests gestaffelt statt simultan — reduziert Peak-SRAM-Verbrauch
+            // (jede TCP-Verbindung kostet ~3-4 KB internen SRAM; 10 gleichzeitig = ~40 KB Peak)
+
+            // EQ sofort aus localStorage laden (vor async Fetch)
+            loadRadioEq(
+                parseInt(localStorage.getItem('eqBass')   || '0'),
+                parseInt(localStorage.getItem('eqMid')    || '0'),
+                parseInt(localStorage.getItem('eqTreble') || '0')
+            );
+
+            // Gruppe 1 (sofort): UI-kritisch
             loadConfig();
-            refreshFavIgnCache();
-            gifAudioLoad();
-            fetchFsInfo();
-            fetchSDInfo();
-            loadSDFolders();
-            fetchCurrentFile();
-            setInterval(fetchCurrentFile, 5000);
-            fetch('/screensaver_status').then(function(r) { return r.json(); }).then(function(d) {
-                var btn = document.getElementById('pause-btn');
-                var status = document.getElementById('pause-status');
-                if (btn && status) {
-                    if (d.paused) {
-                        btn.innerText = '▶ Play';
-                        btn.style.background = '#27ae60';
-                        status.innerText = 'Paused';
-                        status.style.color = '#e67e22';
-                    } else {
-                        btn.innerText = '⏸ Pause';
-                        btn.style.background = '#e67e22';
-                        status.innerText = 'Running';
-                        status.style.color = '#aaa';
+            updateRadioBtns();
+
+            // Gruppe 2 (100ms): Status-Anzeigen
+            setTimeout(function() {
+                fetchCurrentFile();
+                fetch('/screensaver_status').then(function(r) { return r.json(); }).then(function(d) {
+                    var btn = document.getElementById('pause-btn');
+                    var status = document.getElementById('pause-status');
+                    if (btn && status) {
+                        if (d.paused) {
+                            btn.innerText = '▶ Play';
+                            btn.style.background = '#27ae60';
+                            status.innerText = 'Paused';
+                            status.style.color = '#e67e22';
+                        } else {
+                            btn.innerText = '⏸ Pause';
+                            btn.style.background = '#e67e22';
+                            status.innerText = 'Running';
+                            status.style.color = '#aaa';
+                        }
                     }
-                }
-            }).catch(function() {});
+                }).catch(function() {});
+            }, 100);
+
+            // Gruppe 3 (250ms): Speicher-Info
+            setTimeout(function() {
+                fetchFsInfo();
+                fetchSDInfo();
+            }, 250);
+
+            // Gruppe 4 (450ms): SD-Ordner + Favoriten/Ignores (3 Requests)
+            setTimeout(function() {
+                loadSDFolders();
+                refreshFavIgnCache();
+            }, 450);
+
+            // Gruppe 5 (700ms): GIF-Audio-Liste + Preset-Liste + Display-Timer
+            setTimeout(function() {
+                gifAudioLoad();
+                loadPresetList();
+                loadDisplayTimer();
+            }, 700);
+
+            setInterval(fetchCurrentFile, 5000);
+            setInterval(updateRadioBtns, 5000);
 
             // Radio-Status aktualisieren
             function updateRadioBtns() {
@@ -2443,6 +2691,9 @@
                     _radioPreset     = d.preset;
                     _radioLastPreset = (d.lastPreset !== undefined && d.lastPreset >= 0) ? d.lastPreset : _radioLastPreset;
                     if (d.volume !== undefined) setRadioVolume(d.volume, true);
+                    if (d.eqBass !== undefined) loadRadioEq(d.eqBass, d.eqMid, d.eqTreble);
+                    if (d.mono !== undefined) setRadioMono(d.mono, true);
+                    if (d.swapChannels !== undefined) setRadioSwap(d.swapChannels, true);
                     if (d.displayActive !== undefined) {
                         _radioDisplayActive = d.displayActive;
                         updateDisplayBtn(_radioDisplayActive);
@@ -2479,8 +2730,6 @@
                     if (panel && panel.style.display !== 'none') loadPresetList();
                 }).catch(function() {});
             }
-            updateRadioBtns();
-            setInterval(updateRadioBtns, 5000);
 
             // Safari BFCache: Seite wird eingefroren/wiederhergestellt statt neu geladen.
             // _radioLastPreset kann dabei -1 bleiben → Play-Button öffnet radio.html.
@@ -2488,6 +2737,7 @@
             window.addEventListener('pageshow', function(e) {
                 if (e.persisted) { _radioLastPreset = -1; updateRadioBtns(); }
             });
+
         };
     </script>
 </body>
