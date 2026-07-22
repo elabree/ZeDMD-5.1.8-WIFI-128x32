@@ -4607,11 +4607,12 @@ void InvalidateAllFolderCaches() {
   File f = root.openNextFile();
   while (f) {
     esp_task_wdt_reset();
-    String name = String(f.name());  // f.name() gibt vollen Pfad: "/sc_foo.bin"
-    if (name.startsWith("/sc_") && name.endsWith(".bin")) {
+    String name = String(f.name());  // f.name() kann mit oder ohne "/" kommen
+    if ((name.startsWith("/sc_") || name.startsWith("sc_")) && name.endsWith(".bin")) {
       f.close();
-      LittleFS.remove(name);
-      logMsg("Cache: %s geloescht", name.c_str());
+      String removePath = name.startsWith("/") ? name : ("/" + name);
+      LittleFS.remove(removePath);
+      logMsg("Cache: %s geloescht", removePath.c_str());
     } else {
       f.close();
     }
