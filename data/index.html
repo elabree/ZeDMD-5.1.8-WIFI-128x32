@@ -696,17 +696,17 @@
                         <div style="font-size:0.75em; color:#888; margin-bottom:4px;">EQ</div>
                         <div class="slider-container" style="margin-bottom:4px;">
                             <span style="font-size:0.75em; color:#aaa; min-width:46px;">Bass</span>
-                            <input type="range" id="eq-bass-slider" min="-6" max="6" value="0" oninput="setRadioEq()">
+                            <input type="range" id="eq-bass-slider" min="-6" max="6" value="0" oninput="setRadioEq()" onchange="saveRadioEqPersist()">
                             <span id="eq-bass-val" style="min-width:28px; text-align:right; font-size:0.85em; color:#aaa; margin-left:4px;">0</span>
                         </div>
                         <div class="slider-container" style="margin-bottom:4px;">
                             <span style="font-size:0.75em; color:#aaa; min-width:46px;">Mid</span>
-                            <input type="range" id="eq-mid-slider" min="-6" max="6" value="0" oninput="setRadioEq()">
+                            <input type="range" id="eq-mid-slider" min="-6" max="6" value="0" oninput="setRadioEq()" onchange="saveRadioEqPersist()">
                             <span id="eq-mid-val" style="min-width:28px; text-align:right; font-size:0.85em; color:#aaa; margin-left:4px;">0</span>
                         </div>
                         <div class="slider-container">
                             <span style="font-size:0.75em; color:#aaa; min-width:46px;">Treble</span>
-                            <input type="range" id="eq-treble-slider" min="-6" max="6" value="0" oninput="setRadioEq()">
+                            <input type="range" id="eq-treble-slider" min="-6" max="6" value="0" oninput="setRadioEq()" onchange="saveRadioEqPersist()">
                             <span id="eq-treble-val" style="min-width:28px; text-align:right; font-size:0.85em; color:#aaa; margin-left:4px;">0</span>
                         </div>
                     </div>
@@ -1970,6 +1970,11 @@
                 fetch('/radio_eq', { method: 'POST', body: fd })
                     .catch(function(e) { console.warn('ZeDMD radio_eq:', e); });
             }
+        }
+
+        function saveRadioEqPersist() {
+            fetch('/radio_eq_save', { method: 'POST' })
+                .catch(function(e) { console.warn('ZeDMD radio_eq_save:', e); });
         }
 
         function loadRadioEq(bass, mid, treble) {

@@ -379,7 +379,6 @@ void radioSetEq(int8_t bass, int8_t mid, int8_t treble) {
   radioEqMid    = (int8_t)constrain(mid,    -40, 6);
   radioEqTreble = (int8_t)constrain(treble, -40, 6);
   audio.setTone(radioEqBass, radioEqMid, radioEqTreble);
-  saveRadioEq();
 }
 
 void radioSetSwapChannels(bool swap) {
@@ -522,6 +521,11 @@ void radioRegisterRoutes(AsyncWebServer* server) {
       (int8_t)request->getParam("mid",    true)->value().toInt(),
       (int8_t)request->getParam("treble", true)->value().toInt()
     );
+    request->send(200, "text/plain", "OK");
+  });
+
+  server->on("/radio_eq_save", HTTP_POST, [](AsyncWebServerRequest *request) {
+    saveRadioEq();
     request->send(200, "text/plain", "OK");
   });
 
