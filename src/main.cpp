@@ -566,6 +566,7 @@ void SaveScreensaverCache();
 bool TryLoadScreensaverCache();
 void InvalidateAllFolderCaches();
 void InvalidateFolderCache(const String& path);
+void checkSDCardIdentity();
 static void psramCacheSet(char** ptr, const String& json);
 void SaveGifAudioCache();
 bool TryLoadGifAudioCache();
@@ -3139,6 +3140,7 @@ void StartServer() {
       sdCardAvailable      = true;
       sdTotalBytes         = SD.cardSize();
       sdUsedBytes          = SD.usedBytes();
+      checkSDCardIdentity();       // Karte bekannt? Sonst Caches invalidieren
       gifAudioRefreshNeeded     = true;
       sdFoldersInvalidateNeeded  = true;
       screensaverReloadNeeded    = true;
@@ -3202,7 +3204,14 @@ void StartServer() {
   server->on("/screensaver_rescan", HTTP_POST, [](AsyncWebServerRequest *request) {
     InvalidateAllFolderCaches();
     screensaverReloadNeeded = true;
+    sdFoldersRefreshNeeded  = true;
     request->send(200, "application/json", "{\"ok\":1}");
+  });
+
+  // POST /sd_folders_refresh — Nur Ordnerliste neu einlesen (kein Cache-Löschen, kein File-Scan)
+  server->on("/sd_folders_refresh", HTTP_POST, [](AsyncWebServerRequest *request) {
+    sdFoldersRefreshNeeded = true;
+    request->send(200, "text/plain", "OK");
   });
 
   // GET /clear_screensaver_cache — Cache-Dateien löschen ohne Neu-Scan
@@ -4921,6 +4930,47 @@ done:
   }
 }
 
+// Liest/schreibt UUID auf SD-Karte (/zedmd_id.txt) und vergleicht mit gespeicherter UUID in
+// LittleFS (/sd_card_id.txt). Bei Kartenwechsel: alle Ordner-Caches invalidieren.
+void checkSDCardIdentity() {
+  if (!sdCardAvailable) return;
+
+  char newUUID[37] = {0};
+
+  File f = SD.open("/zedmd_id.txt");
+  if (f) {
+    size_t len = f.readBytes(newUUID, 36);
+    newUUID[len] = '\0';
+    f.close();
+  }
+
+  if (strlen(newUUID) < 8) {
+    uint32_t a = esp_random(), b = esp_random(), c = esp_random(), d = esp_random();
+    snprintf(newUUID, sizeof(newUUID), "%08x-%04x-%04x-%04x-%04x%08x",
+             a, b >> 16, b & 0xFFFF, c >> 16, c & 0xFFFF, d);
+    File fw = SD.open("/zedmd_id.txt", FILE_WRITE);
+    if (fw) { fw.print(newUUID); fw.close(); }
+    logMsg("SD: Neue Karten-ID generiert: %s", newUUID);
+  }
+
+  char storedUUID[37] = {0};
+  File lf = LittleFS.open("/sd_card_id.txt", "r");
+  if (lf) {
+    size_t len = lf.readBytes(storedUUID, 36);
+    storedUUID[len] = '\0';
+    lf.close();
+  }
+
+  if (strcmp(newUUID, storedUUID) != 0) {
+    if (storedUUID[0] != '\0') {
+      logMsg("SD: Karte gewechselt — alle Ordner-Caches invalidiert");
+      InvalidateAllFolderCaches();
+    }
+    File lfw = LittleFS.open("/sd_card_id.txt", "w");
+    if (lfw) { lfw.print(newUUID); lfw.close(); }
+  }
+}
+
 // Listet alle Ordner auf der SD Karte — schreibt direkt in cachedSDFolders (kein String-Heap)
 void GetSDFolders() {
   if (!sdCardAvailable) { psramCacheSet(&cachedSDFolders, "[]"); return; }
@@ -5099,6 +5149,8 @@ void setup() {
     esp_task_wdt_reset();  // Load*()-Kette + LittleFS-I/O kann >2s dauern
     InitSDCard();
     if (!sdCardAvailable) sdCardWarningPending = true;
+    checkSDCardIdentity();  // Karte bekannt? Sonst Caches invalidieren
+    esp_task_wdt_reset();   // checkSDCardIdentity kann SD+LittleFS schreiben
     GetSDFolders();  // Cache beim Boot befüllen — schreibt direkt in cachedSDFolders
     logMsg("[HEAP] nach SD-Init: free=%u", (uint32_t)ESP.getFreeHeap());
     esp_task_wdt_reset();  // InitSDCard + GetSDFolders können auf langsamen Karten >1s dauern

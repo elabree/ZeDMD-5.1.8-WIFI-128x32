@@ -346,7 +346,8 @@
                         <div id="sd-folder-status" class="status-message"></div>
                         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                             <button onclick="setScreensaverPaths()">Apply Folder Selection</button>
-                            <button onclick="screensaverRescan()" style="width:auto; padding:8px 14px; margin:0; background:#444;">&#8635; Rescan SD</button>
+                            <button onclick="sdFolderRefresh()" style="width:auto; padding:8px 14px; margin:0; background:#555;">&#8635; Refresh Folders</button>
+                            <button onclick="screensaverRescan()" style="width:auto; padding:8px 14px; margin:0; background:#444;">&#8635; Full Rescan</button>
                             <button id="cancel-scan-btn" onclick="cancelScan()" style="display:none; width:auto; padding:8px 14px; margin:0; background:#c0392b;">&#x2715; Cancel Scan</button>
                         </div>
 
@@ -1195,8 +1196,23 @@
             }
         }
 
+        function sdFolderRefresh() {
+            var statusEl = document.getElementById('sd-folder-status');
+            if (statusEl) { statusEl.innerText = 'Refreshing folders…'; statusEl.style.color = '#aaa'; }
+            fetch('/sd_folders_refresh', {method:'POST'})
+                .then(function() {
+                    setTimeout(function() {
+                        loadSDFolders();
+                        if (statusEl) { statusEl.innerText = ''; }
+                    }, 800);
+                })
+                .catch(function() {
+                    if (statusEl) { statusEl.innerText = '✗ Refresh failed'; statusEl.style.color = '#e74c3c'; }
+                });
+        }
+
         function screensaverRescan() {
-            if (!confirm('Start screensaver rescan? This may take several minutes.')) return;
+            if (!confirm('Start full rescan? All caches will be cleared. This may take several minutes.')) return;
             var countEl = document.getElementById('screensaver-file-count');
             countEl.textContent = ' (rescanning…)';
             countEl.style.color = '#aaa';
@@ -1206,10 +1222,10 @@
         }
 
         function ssPollReady(attempt) {
-            if (attempt > 20) { sdFileOffset = 0; loadSDScreensaverFiles(); return; }
+            if (attempt > 20) { sdFileOffset = 0; loadSDScreensaverFiles(); loadSDFolders(); return; }
             setTimeout(function() {
                 fetch('/screensaver_folder_count').then(function(r) { return r.json(); }).then(function(d) {
-                    if (d.total > 0) { sdFileOffset = 0; loadSDScreensaverFiles(); }
+                    if (d.total > 0) { sdFileOffset = 0; loadSDScreensaverFiles(); loadSDFolders(); }
                     else { ssPollReady(attempt + 1); }
                 }).catch(function() { ssPollReady(attempt + 1); });
             }, 3000);
@@ -2177,21 +2193,31 @@
 
         function loadSDFolders(retried) {
             var xhr = new XMLHttpRequest();
+            var _done = false;
             xhr.open("GET", "/sd_folders", true);
             xhr.timeout = 5000;
             var onFail = function(msg) {
+                if (_done) return;
+                _done = true;
+                clearTimeout(_watchdog);
                 var statusElem = document.getElementById('sd-card-status');
                 statusElem.innerText = msg;
                 statusElem.style.color = "red";
                 loadSDScreensaverFiles();
                 if (!retried) setTimeout(function() { fetchSDInfo(); loadSDFolders(true); }, 8000);
             };
+            var _watchdog = setTimeout(function() {
+                xhr.abort();
+                onFail(retried ? "✗ SD card check timed out" : "✗ SD card check timed out – retrying...");
+            }, 6000);
             xhr.ontimeout = function() { onFail(retried ? "✗ SD card check timed out" : "✗ SD card check timed out – retrying..."); };
             xhr.onerror = function() { onFail(retried ? "✗ SD card check failed" : "✗ SD card check failed – retrying..."); };
             xhr.onreadystatechange = function () {
                 if (xhr.readyState !== XMLHttpRequest.DONE) return;
                 if (xhr.status === 0) { onFail(retried ? "✗ SD card check failed" : "✗ SD card check failed – retrying..."); return; }
                 if (xhr.status === 200) {
+                    _done = true;
+                    clearTimeout(_watchdog);
                     var data = JSON.parse(xhr.responseText);
                     var selectedPaths = (data.currentPaths || '').split(',').map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 0; });
                     var statusElem = document.getElementById('sd-card-status');
