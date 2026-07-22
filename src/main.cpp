@@ -570,6 +570,8 @@ static void psramCacheSet(char** ptr, const String& json);
 void SaveGifAudioCache();
 bool TryLoadGifAudioCache();
 void InvalidateGifAudioCache();
+void ClearScreensaverFilesNow();
+void TriggerGifAudioRescan();
 String folderCacheKey(const String& path);
 uint16_t TryLoadFolderCache(const String& sdPath);
 void SaveFolderCache(const String& sdPath, uint16_t fromIndex, uint16_t count);
@@ -671,13 +673,13 @@ void DisplayLum(uint8_t r = 128, uint8_t g = 128, uint8_t b = 128) {
 
 void DisplayRGB(uint8_t r = 128, uint8_t g = 128, uint8_t b = 128) {
 #ifndef DISPLAY_RM67162_AMOLED
-  display->DisplayText("red", 0, 0, 0, 0, 0, true, true);
+  display->DisplayText("red",   0,                      0,              255,   0,   0);
+  display->DisplayText("blue",  TOTAL_WIDTH - (4 * 4),  0,                0,   0, 255);
+  display->DisplayText("green", 0,                      TOTAL_HEIGHT - 6, 0, 255,   0);
   for (uint8_t i = 0; i < 6; i++) {
     display->DrawPixel(TOTAL_WIDTH - (4 * 4) - 1, i, 0, 0, 0);
     display->DrawPixel((TOTAL_WIDTH / 2) - (6 * 4) - 1, i, 0, 0, 0);
   }
-  display->DisplayText("blue", TOTAL_WIDTH - (4 * 4), 0, 0, 0, 0, true, true);
-  display->DisplayText("green", 0, TOTAL_HEIGHT - 6, 0, 0, 0, true, true);
   display->DisplayText("RGB Order:", (TOTAL_WIDTH / 2) - (6 * 4), 0, r, g, b);
   DisplayNumber(rgbMode, 2, (TOTAL_WIDTH / 2) + (4 * 4), 0, 255, 191, 0);
 #endif
@@ -1440,44 +1442,9 @@ void ScreenSaver() {
 }
 
 void RefreshSetupScreen() {
+  // Alles über admin.html konfigurierbar — Display zeigt nur das Boot-Logo.
+  // RGB-Farbtest wird explizit von DisplayRGB() gezeichnet wenn nötig.
   DisplayLogo();
-  for (uint16_t y = (TOTAL_HEIGHT / 32 * 5);
-       y < TOTAL_HEIGHT - (TOTAL_HEIGHT / 32 * 5); y++) {
-    for (uint16_t x = (TOTAL_WIDTH / 128 * 5);
-         x < TOTAL_WIDTH - (TOTAL_WIDTH / 128 * 5); x++) {
-      display->DrawPixel(x, y, 0, 0, 0);
-    }
-  }
-  DisplayRGB();
-  DisplayLum();
-  display->DisplayText(
-      transport == TRANSPORT_USB
-          ? "USB "
-          : (transport == TRANSPORT_WIFI_UDP
-                 ? "WiFi UDP"
-                 : (transport == TRANSPORT_WIFI_TCP ? "WiFi TCP" : "SPI ")),
-      7 * (TOTAL_WIDTH / 128), (TOTAL_HEIGHT / 2) - 3, 128, 128, 128);
-  display->DisplayText("Debug:", 7 * (TOTAL_WIDTH / 128),
-                       (TOTAL_HEIGHT / 2) - 10, 128, 128, 128);
-  DisplayNumber(debug, 1, 7 * (TOTAL_WIDTH / 128) + (6 * 4),
-                (TOTAL_HEIGHT / 2) - 10, 255, 191, 0);
-  display->DisplayText("USB Packet Size:", 7 * (TOTAL_WIDTH / 128),
-                       (TOTAL_HEIGHT / 2) + 4, 128, 128, 128);
-  DisplayNumber(usbPackageSizeMultiplier * 32, 4,
-                7 * (TOTAL_WIDTH / 128) + (16 * 4), (TOTAL_HEIGHT / 2) + 4, 255,
-                191, 0);
-  display->DisplayText(
-      "UDP Delay:", TOTAL_WIDTH - (7 * (TOTAL_WIDTH / 128)) - (11 * 4),
-      (TOTAL_HEIGHT / 2) - 3, 128, 128, 128);
-  DisplayNumber(udpDelay, 1, TOTAL_WIDTH - (7 * (TOTAL_WIDTH / 128)) - 4,
-                (TOTAL_HEIGHT / 2) - 3, 255, 191, 0);
-
-#ifdef ZEDMD_HD_HALF
-  display->DisplayText("Y-Offset", TOTAL_WIDTH - (7 * (TOTAL_WIDTH / 128)) - 32,
-                       (TOTAL_HEIGHT / 2) - 10, 128, 128, 128);
-#endif
-  display->DisplayText("Exit", TOTAL_WIDTH - (7 * (TOTAL_WIDTH / 128)) - 16,
-                       (TOTAL_HEIGHT / 2) + 4, 128, 128, 128);
 }
 
 static uint8_t IRAM_ATTR HandleData(uint8_t *pData, size_t len) {
@@ -2263,6 +2230,7 @@ void StartServer() {
       setupScreenUntil = millis() + 8000;
       logoWaitCounter = 200;  // DisplayLogo() hätte Counter auf 0 zurückgesetzt → Logo-Sequenz überspringen
       RefreshSetupScreen();
+      DisplayRGB();
       request->send(200, "text/plain", "RGB order updated successfully");
     } else {
       request->send(400, "text/plain", "Missing RGB order parameter");
@@ -3237,6 +3205,12 @@ void StartServer() {
     request->send(200, "application/json", "{\"ok\":1}");
   });
 
+  // GET /clear_screensaver_cache — Cache-Dateien löschen ohne Neu-Scan
+  server->on("/clear_screensaver_cache", HTTP_GET, [](AsyncWebServerRequest *request) {
+    InvalidateAllFolderCaches();
+    request->send(200, "application/json", "{\"ok\":1}");
+  });
+
   // POST /cancel_gif_audio_scan — GIF-Audio-Scan abbrechen
   server->on("/cancel_gif_audio_scan", HTTP_POST, [](AsyncWebServerRequest *request) {
     cancelSdScan = true;
@@ -3252,8 +3226,7 @@ void StartServer() {
   server->on("/gif_audio_upload", HTTP_POST,
     [](AsyncWebServerRequest *request) {
       if (!sdCardAvailable) { request->send(503, "text/plain", "SD-Karte nicht verfügbar"); return; }
-      InvalidateGifAudioCache();
-      gifAudioRefreshNeeded = true;
+      TriggerGifAudioRescan();
       request->send(200, "text/plain", "OK");
     },
     [](AsyncWebServerRequest *request, String filename, size_t index,
@@ -4747,10 +4720,10 @@ void InvalidateGifAudioCache() {
   LittleFS.remove(GIF_AUDIO_CACHE_FILE);
   logMsg("GifAudioCache: invalidiert");
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
-void LoadScreensaverFiles() {
-  // Alten Puffer atomar austauschen — Webserver-Callbacks lesen screensaverFiles unter Mutex
+// Leert screensaverFiles sofort unter Mutex — kein Fenster wo Webserver-Callbacks
+// auf einem halbfertigen Puffer lesen.
+void ClearScreensaverFilesNow() {
   if (screensaverFilesMutex) {
     xSemaphoreTake(screensaverFilesMutex, portMAX_DELAY);
     char (*oldBuf)[128] = screensaverFiles;
@@ -4765,7 +4738,20 @@ void LoadScreensaverFiles() {
     screensaverCount         = 0;
     screensaverFilesCapacity = 0;
   }
-  screensaverCount = 0;
+}
+
+// Vollständiger GIF-Audio-Rescan: RAM-Cache sofort auf "[]" (Poll sieht leere Liste),
+// Disk-Cache löschen, Scan im Haupt-Loop triggern.
+void TriggerGifAudioRescan() {
+  psramCacheSet(&cachedGifAudioFiles, "[]");
+  InvalidateGifAudioCache();
+  gifAudioRefreshNeeded = true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+void LoadScreensaverFiles() {
+  ClearScreensaverFilesNow();
 
   // Datei hinzufügen — wächst dynamisch (verdoppelt bei Bedarf)
   // Favoriten-Modus: Pfade direkt aus Favoritenliste laden
@@ -4886,23 +4872,8 @@ void LoadScreensaverFiles() {
         // FIX 11: Ordner-Cache speichern für nächsten Boot
         if (newFiles > 0) SaveFolderCache(sdPath, countBefore, newFiles);
       } else {
-        logMsg("LoadScreensaver: Ordner nicht gefunden: %s — wird aus Konfiguration entfernt", sdPath.c_str());
-        // Pfad aus screensaverPaths entfernen und neu speichern
-        {
-          String newPaths, rebuild = screensaverPaths;
-          while (rebuild.length() > 0) {
-            int c = rebuild.indexOf(',');
-            String e = (c >= 0) ? rebuild.substring(0, c) : rebuild;
-            rebuild  = (c >= 0) ? rebuild.substring(c + 1) : "";
-            e.trim();
-            if (e.length() == 0 || e == entry) continue;
-            if (newPaths.length() > 0) newPaths += ",";
-            newPaths += e;
-          }
-          screensaverPaths = newPaths;
-          File pf = LittleFS.open("/screensaver_path.val", "w");
-          if (pf) { pf.print(screensaverPaths); pf.close(); }
-        }
+        logMsg("LoadScreensaver: Ordner nicht gefunden: %s — heap=%u errno=%d",
+               sdPath.c_str(), (unsigned)esp_get_free_internal_heap_size(), errno);
       }
     }
     logMsg("LoadScreensaver: %d Dateien gesamt geladen", screensaverCount);
