@@ -66,16 +66,21 @@ if os.path.exists(audio_cpp):
         "//---------------------------------------------------------------------------------------------------------------------\n"
         "void Audio::setBalance"
     )
-    # L/R Channel-Swap: Samples in Gain() tauschen wenn m_swapChannels gesetzt.
-    # Hintergrund: MAX98357A-Verdrahtung L/R vertauscht — Korrektur per Software
-    # statt Neuverkabelung. 3 Instruktionen pro Sample-Paar, CPU-Last vernachlässigbar.
+    # swapChannels()-Logik in Gain(): tauscht LEFT/RIGHT-Samples wenn m_swapChannels gesetzt.
+    # Nur für physisch falsch verdrahtete Hardware nötig (Button im Web-UI).
     patched = patched.replace(
         "int32_t Audio::Gain(int16_t s[2]) {\n    int32_t v[2];",
         "int32_t Audio::Gain(int16_t s[2]) {\n"
         "    if(m_swapChannels) { int16_t tmp = s[LEFTCHANNEL]; s[LEFTCHANNEL] = s[RIGHTCHANNEL]; s[RIGHTCHANNEL] = tmp; }\n"
         "    int32_t v[2];"
     )
+    # Gain()-Return: ESP32-S3 Legacy-I2S-DMA gibt (LEFT<<16|RIGHT) invertiert aus.
+    # Fix: RIGHT in obere 16 Bit, LEFT in untere 16 Bit → korrekte Ausgabe ohne Swap.
+    patched = patched.replace(
+        "    return (v[LEFTCHANNEL] << 16) | (v[RIGHTCHANNEL] & 0xffff);",
+        "    return (v[RIGHTCHANNEL] << 16) | (v[LEFTCHANNEL] & 0xffff);"
+    )
     if patched != src:
         with open(audio_cpp, "w") as f:
             f.write(patched)
-        print("patch_audio_lib: Audio.cpp min()-Cast + resetBuffer memset + ICY/Chunked + L/R-Swap gepatcht.")
+        print("patch_audio_lib: Audio.cpp min()-Cast + resetBuffer memset + ICY/Chunked + L/R-Swap + Gain-Return gepatcht.")
