@@ -71,6 +71,13 @@ class DisplayDriver {
     DisplayText(text, x, y, r, g, b);
   }
 
+#ifdef FONT_TEST_ENABLED
+  virtual void RenderFontTestToBuffer(uint8_t * /*buf*/, const char * /*text*/,
+                                       const char * /*fontName*/, uint8_t /*lines*/,
+                                       uint8_t /*r*/, uint8_t /*g*/, uint8_t /*b*/) {}
+  virtual const char* GetFontListJSON() { return "[]"; }
+#endif
+
   virtual void DisplayTextGFX(const char *text, int16_t x, uint8_t r,
                                uint8_t g, uint8_t b) {
     DisplayText(text, (uint16_t)(x < 0 ? 0 : x), 0, r, g, b);
@@ -83,6 +90,14 @@ class DisplayDriver {
   virtual void EraseVLine(int16_t x) {}
   virtual void RenderTextGFXToBuffer(uint8_t *buf, const char *text, int16_t x,
                                      uint8_t r, uint8_t g, uint8_t b) {}
+  virtual void RenderRadioToBuffer(uint8_t *buf, const char *station,
+                                   const char *title,
+                                   int16_t stationX, int16_t titleX,
+                                   uint8_t stR, uint8_t stG, uint8_t stB,
+                                   uint8_t r, uint8_t g, uint8_t b) {}
+  virtual uint16_t GetRadioTitleWidth(const char *text) {
+    return (uint16_t)(strlen(text) * 9);
+  }
 
   /// @brief RGB888 24bit Zone fill
   /// @param idx index

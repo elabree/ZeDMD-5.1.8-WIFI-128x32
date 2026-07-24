@@ -1,0 +1,78 @@
+# Mapping: DAB+ Service-ID (hex) → Slug (muss zum ICY-Sendernamen passen)
+# Slug-Regel: Sendername lowercase, Sonderzeichen → '_', führende/nachfolgende '_' entfernen
+# Fuzzy-Matcher in der Firmware toleriert Abweichungen (Token-Splitting, threshold ≥ 100 Punkte)
+#
+# Format: hex_id,slug
+# Hex-IDs aus DAB+-Ensembles (Quelle: wohnort.org + Radioart-Ordner)
+
+# === NRW / WDR-Ensemble ===
+DF95,wdr_maus
+D391,1live
+DF91,1live_diggi
+D592,wdr_2_owl
+D792,wdr_2_rhein_ruhr
+D393,wdr_3
+D794,wdr_4_rhein_ruhr
+D395,wdr_5
+DF96,wdr_event
+D496,wdrcosmo
+
+# === Niedersachsen / NDR ===
+D381,ndr_1_niedersachsen
+D881,ndr_1_nds_bs
+D481,ndr_1_nds_han
+D581,ndr_1_nds_lg
+D681,ndr_1_nds_ol
+D781,ndr_1_nds_os
+D382,ndr_2
+D882,ndr_2_nds
+D383,ndr_kultur
+D384,ndr_info
+D884,ndr_info_nds
+DF84,ndr_info_spezial
+D387,ndr_schlager
+D354,ndr_blue
+D385,n_joy
+
+# Privatradios Niedersachsen
+D388,ffn
+D788,ffn
+D389,antenne_nds
+D38A,radio_21
+D0DB,89_0_rtl
+1A85,antenne_schlager
+
+# === Bundesweit — Deutschlandradio ===
+D210,dlf
+D220,dlf_kultur
+D230,dlf_nova
+D240,dradio_dok_deb
+
+# === Bundesweit — DR Deutschland (Block 5C) ===
+17FA,absolut_relax
+1A45,energy
+1A64,erf_plus
+D75B,klassik_radio
+15DD,radio_bob
+D01C,radio_horeb
+10C3,schlagerparadies
+100D,schwarzwaldradio
+15DC,sunshine_live
+
+# === Bundesweit — Antenne Deutschland ===
+1057,80s80s
+12E9,90s90s
+1219,absolut_bella
+121C,absolut_germany
+DC1A,absolut_hot
+121A,absolut_oldie
+1218,absolut_top_2000
+1259,aidaradio
+12C8,ballermann_radio
+1258,beats_radio
+1299,brillux_radio
+122A,nostalgie
+121D,oldie_antenne
+121B,rock_antenne
+1229,rtl_radio
+1298,toggo_radio

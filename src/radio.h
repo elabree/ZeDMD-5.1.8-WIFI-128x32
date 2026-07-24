@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RADIO_H
+#define RADIO_H
 #if defined(WEBRADIO_ENABLED)
 
 #include <Arduino.h>
@@ -43,6 +44,8 @@ void radioInit();
 void radioPlay(const char* url, int presetIndex = -1);
 void radioStop();
 void radioSetVolume(uint8_t vol);
+void radioSetEq(int8_t bass, int8_t mid, int8_t treble);
+void radioSetSwapChannels(bool swap);
 void radioLoadPresets();
 void radioSavePresets();
 void radioRegisterRoutes(AsyncWebServer* server);
@@ -51,3 +54,4 @@ void radioPlayLocalFile(const char* sdPath);
 void radioStopLocalFile();
 
 #endif // WEBRADIO_ENABLED
+#endif // RADIO_H

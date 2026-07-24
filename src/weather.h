@@ -1,4 +1,5 @@
-#pragma once
+#ifndef WEATHER_H
+#define WEATHER_H
 #ifdef ZEDMD_WIFI
 
 #include <Arduino.h>
@@ -27,10 +28,12 @@ extern float    weatherLon;
 
 void weatherInit();             // Platzhalter — bei Bedarf erweitern (z.B. Mutex)
 void weatherTrigger();          // Startet HTTP-Fetch in eigenem Task (PSRAM-Stack)
-void weatherIconTest();         // TEST: alle Wetter-Icons nebeneinander (temporär)
+void weatherIconTest();          // TEST: alle 16×16 Icons (6+5-Grid)
+void weatherSmallIconTest();     // TEST: alle 8×8 Icons (1 Zeile, Vorhersage-Größe)
 void weatherDisplay();          // Wetter-Vollbild
 void weatherDisplayClock();     // Uhr + Wetter kombiniert
 void weatherDisplayForecast();  // 3-Tages-Vorhersage
 bool weatherIsAvailable();      // true wenn Wetter-Daten vorhanden
 
 #endif // ZEDMD_WIFI
+#endif // WEATHER_H

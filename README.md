@@ -25,20 +25,63 @@ https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/raw/main/docs/images/ZeDMD_WiF
 
 | Clock + Weather | Weather Forecast | GIF Screensaver |
 |:-:|:-:|:-:|
-| ![Clock](docs/images/IMG_5032.jpeg) | ![Forecast](docs/images/IMG_5033.jpeg) | ![GIF](docs/images/IMG_5034.jpeg) |
+| ![Clock](docs/images/IMG_5506.jpeg) | ![Forecast](docs/images/IMG_5482.jpeg) | ![GIF](docs/images/IMG_5505.jpeg) |
 
-**Internals:**
+**Webradio — station name and logo on the display:**
 
-![Internals](docs/images/IMG_5077.jpeg)
+![Webradio](docs/images/IMG_5504.jpeg)
+
+**Internals / Back panel:**
+
+| Inside | Back panel |
+|:-:|:-:|
+| ![Internals](docs/images/Innenleben.jpeg) | ![Back panel](docs/images/Rückseite.jpeg) |
 
 ---
 
 ## 🆕 What's new in this release
 
-### v1.5.1 *(this release)*
+### v1.5.2 *(this release)*
+
+#### Tabbed Web UI
+The main page has been reorganised into three tabs — **Screensaver**, **Display** and **Radio** — making it much easier to navigate on both desktop and mobile. SD card & storage info plus the Admin button remain always visible above the tabs.
+
+#### Display Timer *(scheduled display off)*
+Set a daily on/off schedule for the LED matrix — useful for automatically turning the display off at night. Configure From/Until times under the **Display** tab. A **"Display off / Display on"** button lets you instantly turn the display off and on without changing the timer settings.
+
+#### Stereo / Mono toggle
+The **Radio** tab now shows a **Stereo / Mono** button next to the volume slider. Switch the audio output to mono without a firmware rebuild — useful if you only have one speaker connected or experience phase issues.
+
+#### Station logos on the LED matrix
+When a radio station starts playing, the matching station logo (if uploaded) is shown on the LED matrix alongside the station name and track title.
+
+#### Boot text improvements
+Status messages during boot ("booting", "loading...", "SD OK", "LittleFS OK") are now shown at the bottom-left of the display so they no longer overlap the boot logo.
+
+#### Rescan buttons
+A **Rescan** button appears in the screensaver file list and the GIF audio file list after an upload — or can be triggered manually at any time. Rescans the SD card and LittleFS without a reboot and updates the file list immediately.
+
+#### SD card SPI speed — up to 40 MHz
+On a proper PCB layout (no Dupont wires), the SD card is now initialised at 40 MHz first, with an automatic fallback chain (40 → 25 → 20 → 8 MHz). Previously the maximum was 8 MHz. Faster initialisation and file access, especially noticeable during GIF and audio scans.
+
+#### Equalizer
+A three-band **equaliser (Bass / Mid / Treble)** is now available in the **Radio** tab. Settings are saved to LittleFS and survive reboots and station switches.
+
+#### Weather icons — further improvements
+The 8×8 forecast icons (3-day view) have been completely redrawn. Three new icons added: drizzle, showers and snow now have their own symbols — previously they shared a generic rain icon. Total: 11 distinct weather icons.
+
+#### L/R channel swap
+If your left and right speakers are physically wired the wrong way around, a single **Swap L/R** button in the **Radio** tab swaps the audio channels in software — no rewiring needed. Settings survive reboots.
+
+#### Custom branding
+The boot screen and web UI header now show the **The Arcade** logo instead of the generic ZeDMD logo. The PPUC splash screen has been removed.
+
+---
+
+### v1.5.1
 
 #### Weather Icons — native 16×16 pixel art
-All 8 weather icons have been redrawn as native 16×16 pixel art — sharper and more detailed than the scaled-up 8×8 bitmaps used before. Each icon has a unique hand-crafted color gradient: sun with rays, crescent moon, cloud, rain drops, snow, lightning bolt, and partly-cloudy variants. The smaller 8×8 icons used in the 3-day forecast remain unchanged.
+All 8 weather icons have been redrawn as native 16×16 pixel art — sharper and more detailed than the scaled-up 8×8 bitmaps used before. Each icon has a unique hand-crafted color gradient: sun with rays, crescent moon, cloud, rain drops, snow, lightning bolt, and partly-cloudy variants. The smaller 8×8 icons used in the 3-day forecast were further improved in v1.5.2.
 
 #### SD Card — more robust initialisation
 The SD card now retries with progressively slower SPI speeds (8 → 4 → 2 MHz, up to 6 attempts) before giving up. Previously a single failed mount attempt would mark the SD as unavailable for the entire session. This resolves intermittent boot failures with marginally connected or slow-to-mount SD cards.
@@ -64,6 +107,9 @@ Requires a **MAX98357A I2S amplifier module** — see wiring below.
 - Presets survive firmware updates (stored in LittleFS)
 - Stable station switching — no more audio dropout on channel change
 - Stream URLs from radio-browser.info are automatically normalised (removes `?ti=` playlist hints that caused the audio library to hang)
+- **L/R channel swap** — if your left and right speakers are physically wired the wrong way around, a single button on the main page swaps the audio channels in software — no rewiring needed
+
+> **Technical note — audio library patch:** The L/R swap feature required modifying the `ESP32-audioI2S` library internally, because it does not provide this function out of the box. Rather than changing the library files by hand (which would be lost on every library update), a build-time patch script (`scripts/patch_audio_lib.py`) injects the change automatically on each compile. This script was developed with the help of **[Claude Code](https://claude.ai/code)** (AI coding assistant by Anthropic) — pinpointing the exact location inside the audio pipeline where samples could be swapped safely, and making the patch idempotent (safe to run repeatedly). I would not have attempted this alone.
 
 > **⚠️ Weather API:** Open-Meteo is accessed via HTTP instead of HTTPS. TLS handshakes consistently caused memory-related crashes in the web radio build. Since Open-Meteo provides public data without requiring a login, HTTPS is not necessary here.
 
@@ -78,6 +124,8 @@ Play a matching MP3 file from the SD card in sync with an animated GIF screensav
 - File list is cached in LittleFS — after the first boot scan, subsequent reboots load instantly (same mechanism as the screensaver file cache)
 - Paginated file list in the web UI with previous/next buttons (20 files per page)
 - Scan can be aborted via the **"Scan abbrechen"** button that appears after an upload
+
+> ⚠️ **First-boot scan time:** Depending on how many files are in `/GifAudio/`, the initial scan over SPI can take a very long time. Progress is shown on the display ("GifAudio XXXX"). After the scan the list is cached in LittleFS — every subsequent reboot loads in seconds.
 
 > **Note:** GIF audio plays once per GIF cycle — looping is not yet implemented.
 
@@ -213,9 +261,9 @@ The ESP32-audioI2S library outputs stereo I2S natively when playing stereo sourc
 
 | MAX98357A Pin | ESP32-S3 | Notes |
 |---------------|----------|-------|
-| BCLK | **GPIO 9** | shared — both modules |
-| LRC (WSEL) | **GPIO 14** | shared — both modules |
-| DIN | **GPIO 21** | shared — both modules |
+| BCLK | **GPIO 39** | shared — both modules |
+| LRC (WSEL) | **GPIO 38** | shared — both modules |
+| DIN | **GPIO 46** | shared — both modules |
 | SD — Module L | **100 kΩ to VCC** | → **Left channel** |
 | SD — Module R | **370 kΩ to VCC** | → **Right channel** |
 | VIN | **5V** *(recommended)* | each module separately |
@@ -255,7 +303,9 @@ This fork is **WiFi-only** and targets the **ESP32-S3-N16R8** with a **128×32 L
 - **Webradio** — internet radio via I2S amplifier (MAX98357A); station search via [radio-browser.info](https://www.radio-browser.info); preset management with logo icons; LED matrix shows station info for 5 s on start, "DMD 10s" button for on-demand display
 - **Config Export/Import** — full configuration backup and restore via browser (`/config_transfer.html`)
 - **Display Text** — send custom text with emojis to the LED matrix via the web UI; static or scrolling with color selection and configurable duration (5–60 s); 33 emojis available via built-in picker
-- **Stereo Audio** *(experimental)* — two MAX98357A modules for true stereo output; channel selection via SD-pin resistor strapping (5V only, values verified)
+- **Display Timer** — schedule daily on/off times for the LED matrix (e.g. off at 23:00, on at 07:00); "Display off / Display on" button for instant manual control
+- **Tabbed web UI** — main page organised into Screensaver / Display / Radio tabs; SD card & admin always visible
+- **Stereo Audio** *(experimental)* — two MAX98357A modules for true stereo output; channel selection via SD-pin resistor strapping (5V only, values verified); Stereo/Mono toggle in the web UI
 
 ---
 
@@ -266,6 +316,25 @@ This fork is **WiFi-only** and targets the **ESP32-S3-N16R8** with a **128×32 L
 The ZeDMD can draw a noticeable amount of current — especially when bright GIFs are displayed, webradio is streaming, and WiFi is active all at once. A laptop USB port or a basic phone charger may not deliver enough stable power for this, which can lead to unexpected reboots or an unstable display.
 
 **If things seem unreliable: use a decent 5V / 2A USB power adapter** (the kind that comes with a good phone or tablet). How much power is actually needed varies quite a bit depending on the content — dark GIFs with no audio use much less than a bright screensaver at full volume.
+
+---
+
+### 🧠 On the verge of a nervous breakdown — what this little chip is actually doing
+
+At any given moment, the ESP32-S3 in this build is simultaneously:
+
+- driving a 128×32 HUB75 LED matrix over DMA
+- serving a full web UI with live updates over WiFi
+- streaming and decoding webradio (MP3/AAC) over I2S in a dedicated FreeRTOS task
+- reading and playing animated GIFs from an SD card
+- playing matching MP3 files in sync with those GIFs
+- fetching live weather data and rendering icons
+- handling MQTT, OTA, file uploads, and a paginated file browser for 2 000+ files
+- maintaining a LittleFS cache, crash logs, and boot diagnostics
+
+All of this on a chip with **327 KB of internal SRAM** — of which the WiFi stack, TCP server, and audio buffers claim most at runtime, leaving sometimes less than **1 KB free** at peak load. The 8 MB PSRAM handles the large caches and pixel buffers, but anything touching WiFi or TCP must live in internal SRAM — and that is genuinely tight.
+
+The firmware works hard to keep things stable: PSRAM-backed caches, careful buffer sizing, staggered HTTP requests, and a heap monitor that logs free memory every 30 seconds. But this is a device running at the edge of what its hardware class was designed for — and it shows, in the best possible way.
 
 ---
 
@@ -408,9 +477,9 @@ Requires an **I2S amplifier module** and a small speaker.
 |---------------|----------|-------|
 | VIN           | **5V**       | 5V gives more headroom; 3.3V works but lower volume |
 | GND           | GND          | |
-| BCLK          | **GPIO 9**   | I2S Bit Clock |
-| LRC (WSEL)    | **GPIO 14**  | I2S Word Select (L/R) |
-| DIN           | **GPIO 21**  | I2S Data |
+| BCLK          | **GPIO 39**  | I2S Bit Clock |
+| LRC (WSEL)    | **GPIO 38**  | I2S Word Select (L/R) |
+| DIN           | **GPIO 46**  | I2S Data |
 | GAIN          | **GND**      | GND = 15 dB gain (max); floating = 12 dB; 3.3V = 9 dB |
 | SD (Shutdown) | 3.3V or floating | Floating = on; GND = mute |
 

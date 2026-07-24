@@ -21,6 +21,7 @@ extern bool              wifiActive;
 
 extern void Render();
 extern void logMsg(const char* fmt, ...);
+extern void ApplyBrightness(uint8_t base);
 
 #include "clock.h"  // clockR/G/B, dateR/G/B, clockColorChanged, DrawSegDigit, DrawColon
 
@@ -55,11 +56,11 @@ static WeatherInfo GetWeatherInfo(uint16_t code, bool isDay = true) {
   if (code == 1)                       return {"Heiter",        0};
   if (code == 2)                       return {"Teils bew.",    1};
   if (code == 3)                       return {"Bedeckt",       2};
-  if (code == 45 || code == 48)        return {"Nebel",         2};
+  if (code == 45 || code == 48)        return {"Nebel",        10};
   if (code >= 51 && code <= 57)        return {"Nieselregen",   3};
-  if (code >= 61 && code <= 67)        return {"Regen",         3};
+  if (code >= 61 && code <= 67)        return {"Regen",         8};
   if (code >= 71 && code <= 77)        return {"Schnee",        4};
-  if (code >= 80 && code <= 82)        return {"Schauer",       3};
+  if (code >= 80 && code <= 82)        return {"Schauer",       9};
   if (code >= 85 && code <= 86)        return {"Schneeschr.",   4};
   if (code >= 95)                      return {"Gewitter",      5};
   return {"Unbekannt", 2};
@@ -67,7 +68,7 @@ static WeatherInfo GetWeatherInfo(uint16_t code, bool isDay = true) {
 
 // 8×8 Wetter-Icons, zwei Layer, scale=Pixelgröße (1=8px, 2=16px)
 static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
-  if (idx >= 8) idx = 2;
+  if (idx >= 11) idx = 2;
 
   // Layer 1 — Hauptform
   static const uint8_t L1[8][8] = {
@@ -118,8 +119,8 @@ static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
     {0b00000000, 0b00000000, 0b00000000, 0b00000000,
      0b01000100, 0b00100010, 0b01000100, 0b00100010},  // 3 Regen — Tropfen
     {0, 0, 0, 0, 0, 0, 0, 0},  // 4 Schnee
-    {0b00000000, 0b00000000, 0b00000000, 0b00000000,
-     0b00000100, 0b00010000, 0b00000100, 0b00010000},  // 5 Gewitter — Blitz (1px, scharfer zig-zag)
+    {0b00001000, 0b00010000, 0b00111100, 0b00001000,
+     0b00010000, 0b00100000, 0b01000000, 0b00000000},  // 5 Gewitter — Blitz nach Vorlage
     {0, 0, 0, 0, 0, 0, 0, 0},  // 6 Mond
     {0b01110000, 0b11000000, 0b11000000, 0b01110000,
      0b00000000, 0b00000000, 0b00000000, 0b00000000},  // 7 Bewölkt
@@ -157,13 +158,13 @@ static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
     #define _T {255,150,  0}   // Strahlenspitzen — Orange
     #define _R {255,190,  0}   // Diagonalstrahlen — Goldgelb
     #define _I {255,230, 60}   // innerer Ring — Gelb
-    #define _C {255,255,160}   // Kern — weißlich-gelb
+    #define KK {255,255,160}   // Kern — weißlich-gelb
     static const uint8_t SUN[8][8][3] = {
       {_O, _O, _O, _T, _T, _O, _O, _O},
       {_O, _R, _O, _O, _O, _O, _R, _O},
       {_O, _O, _I, _I, _I, _I, _O, _O},
-      {_T, _O, _I, _C, _C, _I, _O, _T},
-      {_T, _O, _I, _C, _C, _I, _O, _T},
+      {_T, _O, _I, KK, KK, _I, _O, _T},
+      {_T, _O, _I, KK, KK, _I, _O, _T},
       {_O, _O, _I, _I, _I, _I, _O, _O},
       {_O, _R, _O, _O, _O, _O, _R, _O},
       {_O, _O, _O, _T, _T, _O, _O, _O},
@@ -172,7 +173,7 @@ static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
     #undef _T
     #undef _R
     #undef _I
-    #undef _C
+    #undef KK
     for (int row = 0; row < 8; row++) {
       for (int col = 0; col < 8; col++) {
         uint8_t r = SUN[row][col][0], g = SUN[row][col][1], b = SUN[row][col][2];
@@ -223,15 +224,14 @@ static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
     drawLayerGrad(L1[2], G1);
     return;
   }
-  if (idx == 3) {  // Regen: dunkle Wolke + blaue Tropfen
+  if (idx == 3) {  // Nieselregen — 2 senkrechte Tropfen (Spalten 3+6, Zeilen 5–6)
     static const uint8_t G1[8][3] = {
-      {142,147,160},{130,135,148},{118,123,136},{108,113,125},
+      {120,125,138},{108,113,126},{ 96,101,114},{ 86, 91,104},
       {  0,  0,  0},{  0,  0,  0},{  0,  0,  0},{  0,  0,  0}};
-    static const uint8_t G2[8][3] = {
-      {  0,  0,  0},{  0,  0,  0},{  0,  0,  0},{  0,  0,  0},
-      { 80,165,255},{ 65,145,240},{ 80,165,255},{ 65,145,240}};
+    static const uint8_t DRIZZLE[8] = {
+      0,0,0,0, 0,0b00100100,0,0b00100100};
     drawLayerGrad(L1[3], G1);
-    drawLayerGrad(L2[3], G2);
+    drawLayer(DRIZZLE, 90, 175, 255);
     return;
   }
   if (idx == 4) {  // Schnee: blauweißer Eiskristall, Mitte heller
@@ -243,12 +243,16 @@ static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
   }
   if (idx == 5) {  // Gewitter: sehr dunkle Wolke + heller Blitz
     static const uint8_t G1[8][3] = {
-      {118,123,136},{108,113,125},{ 98,103,115},{ 90, 95,108},
-      {  0,  0,  0},{  0,  0,  0},{  0,  0,  0},{  0,  0,  0}};
+      {  0,  0,  0},{ 96,101,114},{ 86, 91,104},{ 76, 81, 94},
+      { 68, 73, 86},{  0,  0,  0},{  0,  0,  0},{  0,  0,  0}};
     static const uint8_t G2[8][3] = {
-      {  0,  0,  0},{  0,  0,  0},{  0,  0,  0},{  0,  0,  0},
-      {255,255,220},{255,240,100},{255,210, 30},{255,170,  0}};
-    drawLayerGrad(L1[5], G1);
+      {255,230,  0},{255,230,  0},{255,230,  0},{255,230,  0},
+      {255,230,  0},{255,230,  0},{255,230,  0},{  0,  0,  0}};
+    // Wolke 1 Zeile tiefer (Zeilen 1–4), Blitz-Pixel ausgespart
+    static const uint8_t CLOUD5[8] = {
+      0, 0b00101100, 0b01000010, 0b11110111,
+      0b11101111,0,0,0};
+    drawLayerGrad(CLOUD5, G1);
     drawLayerGrad(L2[5], G2);
     return;
   }
@@ -282,15 +286,49 @@ static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
       }
     return;
   }
-  if (idx == 7) {  // Teils bewölkt: Wolke + kleines Sonneneck
-    static const uint8_t G1[8][3] = {
-      {  0,  0,  0},{  0,  0,  0},{  0,  0,  0},{  0,  0,  0},
-      {205,210,220},{182,187,198},{160,165,177},{  0,  0,  0}};
-    static const uint8_t G2[8][3] = {
-      {255,210, 50},{255,155, 10},{255,155, 10},{255,210, 50},
+  if (idx == 7) {  // Teils bewölkt Nacht: Mondsichel (cremeweiß) + Wolke wie Icon 1
+    static const uint8_t GC[8][3] = {  // Wolke (L2[1]-Form)
+      {  0,  0,  0},{  0,  0,  0},
+      {200,205,215},{182,187,198},{165,170,182},{150,155,167},{140,145,157},{  0,  0,  0}};
+    static const uint8_t GM[8][3] = {  // Mondsichel — cremeweiß statt gelb
+      {242,237,202},{220,215,182},{220,215,182},{242,237,202},
       {  0,  0,  0},{  0,  0,  0},{  0,  0,  0},{  0,  0,  0}};
-    drawLayerGrad(L1[7], G1);
-    drawLayerGrad(L2[7], G2);
+    drawLayerGrad(L2[1], GC);
+    drawLayerGrad(L2[7], GM);
+    return;
+  }
+  if (idx == 8) {  // Regen — senkrechte Tropfen
+    static const uint8_t G1[8][3] = {
+      {108,113,126},{ 96,101,114},{ 86, 91,104},{ 78, 83, 96},
+      {  0,  0,  0},{  0,  0,  0},{  0,  0,  0},{  0,  0,  0}};
+    static const uint8_t DROPS[8] = {  // diagonal \ über 4 Zeilen
+      0,0,0,0, 0b00100100,0b00010010,0b00100100,0b00010010};
+    drawLayerGrad(L1[3], G1);
+    drawLayer(DROPS, 90, 175, 255);
+    return;
+  }
+  if (idx == 9) {  // Schauer — Sonne oben links + Wolke (1px höher) + diagonale Tropfen
+    static const uint8_t GS[8][3] = {  // Sonne (wie Icon 1)
+      {255,200, 40},{255,180, 10},{255,200, 40},
+      {  0,  0,  0},{  0,  0,  0},{  0,  0,  0},{  0,  0,  0},{  0,  0,  0}};
+    static const uint8_t CLOUD9[8] = {  // Wolke 1px höher als L2[1], links erweitert
+      0b00000000, 0b00001100, 0b00111110, 0b11111111,
+      0b11111111, 0b01111110, 0b00000000, 0b00000000};
+    static const uint8_t GC[8][3] = {  // Wolken-Gradient wie Icon 8 (dunkler)
+      {  0,  0,  0},{108,113,126},{ 96,101,114},{ 86, 91,104},
+      { 78, 83, 96},{ 68, 73, 86},{  0,  0,  0},{  0,  0,  0}};
+    static const uint8_t DRPS[8] = {  // diagonale Tropfen Zeilen 6–7
+      0,0,0,0, 0,0, 0b00100010, 0b00010001};
+    drawLayerGrad(L1[1], GS);
+    drawLayerGrad(CLOUD9, GC);
+    drawLayer(DRPS, 90, 175, 255);
+    return;
+  }
+  if (idx == 10) {  // Nebel — horizontale Streifen, kein Wolken-Block
+    static const uint8_t FOG[8] = {
+      0b00000000, 0b11111100, 0b00000000, 0b00111111,
+      0b00000000, 0b11111100, 0b00000000, 0b00000000};
+    drawLayer(FOG, 185, 192, 205);
     return;
   }
 
@@ -472,7 +510,7 @@ bool weatherIsAvailable() {
 
 // ── 16×16 Wetter-Icons (direkt gezeichnet, keine Skalierung) ─────────────────
 static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
-  if (idx >= 8) idx = 2;
+  if (idx >= 11) idx = 2;
 
   auto px = [&](int dx, int dy, uint8_t r, uint8_t g, uint8_t b) {
     if (dx < 0 || dx > 15 || dy < 0 || dy > 15) return;
@@ -481,8 +519,8 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
 
   // Wolken-Bitmap: 16 Spalten × 9 Zeilen, bit15=col0, bit0=col15
   static const uint16_t CLD[9] = {
-    0x07E0, // row 0: cols 5-10
-    0x1FF8, // row 1: cols 3-12
+    0x0F00, // row 0: cols 4-7 (linker Buckel, höher)
+    0x1FB8, // row 1: cols 3-8 + cols 10-12 (Spalt bei col 9)
     0x3FFC, // row 2: cols 2-13
     0x7FFE, // row 3: cols 1-14
     0xFFFF, // row 4: alle 16
@@ -492,19 +530,25 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
     0x3FFC, // row 8: cols 2-13
   };
   // Farbverlauf: oben hell (Highlight) → unten dunkel (Schatten)
-  static const uint8_t LC[9][3] = {  // normale Wolke
-    {215,220,232},{200,205,218},{185,190,205},
-    {172,177,192},{160,165,180},{150,155,170},
-    {140,145,160},{130,135,150},{118,123,138}
+  static const uint8_t LC[9][3] = {  // normale Wolke (+20 heller)
+    {235,240,252},{220,225,238},{205,210,225},
+    {192,197,212},{180,185,200},{170,175,190},
+    {160,165,180},{150,155,170},{138,143,158}
   };
-  static const uint8_t DC[9][3] = {  // Gewitterwolke (dunkler)
-    {128,131,145},{115,118,132},{103,106,120},
-    { 93, 96,110},{ 84, 87,101},{ 76, 79, 93},
-    { 68, 71, 85},{ 60, 63, 77},{ 52, 55, 69}
+  static const uint8_t DC[9][3] = {  // Gewitterwolke (-20 dunkler)
+    {108,111,125},{ 95, 98,112},{ 83, 86,100},
+    { 73, 76, 90},{ 64, 67, 81},{ 56, 59, 73},
+    { 48, 51, 65},{ 40, 43, 57},{ 32, 35, 49}
+  };
+  static const uint8_t RC[9][3] = {  // Regenwolke (65% Richtung DC)
+    {152,156,169},{139,142,156},{126,129,144},
+    {115,118,133},{105,108,123},{ 96,100,114},
+    { 87, 91,105},{ 79, 82, 97},{ 69, 73, 87}
   };
 
-  auto drawCloud = [&](int dy0, bool dark) {
-    const uint8_t (*c)[3] = dark ? DC : LC;
+  // style: 0=normal (LC), 1=Regen (RC), 2=Gewitter (DC)
+  auto drawCloud = [&](int dy0, uint8_t style) {
+    const uint8_t (*c)[3] = (style == 2) ? DC : (style == 1) ? RC : LC;
     for (int r = 0; r < 9; r++) {
       uint16_t m = CLD[r];
       for (int col = 0; col < 16; col++)
@@ -544,7 +588,7 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
     break;
   }
 
-  case 1: { // ⛅ Teils bewölkt: kleine Sonne oben-links + Wolke unten-rechts
+  case 1: { // ⛅ Teils bewölkt: kleine Sonne oben-links + große Wolke darunter
     // Kleine Sonne (r=3) zentriert bei (3,3)
     for (int dy = 0; dy < 8; dy++) {
       for (int dx = 0; dx < 8; dx++) {
@@ -559,84 +603,53 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
     px(6,3,255,148,0); px(3,6,255,148,0);
     px(1,1,255,152,0); px(5,1,255,152,0);
     px(1,5,255,152,0); px(5,5,255,152,0);
-    // Kleine Wolke rechts unten (cols 6-15, rows 9-14)
-    static const uint16_t SC[6] = {
-      0x003C, // row 9:  cols 10-13
-      0x00FF, // row 10: cols  8-15
-      0x01FF, // row 11: cols  7-15
-      0x03FF, // row 12: cols  6-15
-      0x03FF, // row 13: cols  6-15
-      0x01FE, // row 14: cols  7-14
-    };
-    static const uint8_t SG[6][3] = {
-      {210,215,228},{193,198,213},{178,183,198},
-      {163,168,183},{150,155,170},{138,143,158}
-    };
-    for (int r = 0; r < 6; r++) {
-      uint16_t m = SC[r];
-      for (int col = 0; col < 16; col++)
-        if (m & (0x8000 >> col)) px(col, 9+r, SG[r][0], SG[r][1], SG[r][2]);
-    }
+    drawCloud(4, 0);
     break;
   }
 
   case 2: { // ☁️ Wolke — vertikal zentriert
-    drawCloud(3, false);
+    drawCloud(3, 0);
     break;
   }
 
-  case 3: { // 🌧️ Regen — Wolke + diagonale Tropfen
-    drawCloud(0, false);
-    // 4 Tropfen à 3px diagonal, direkt ab Wolkenunterkante (row 9)
-    static const int8_t DRX[] = { 3, 6,  9, 12};
-    for (int d = 0; d < 4; d++) {
-      px(DRX[d],   9,  95, 185, 255);
-      px(DRX[d]-1,10,  70, 160, 245);
-      px(DRX[d]-2,11,  50, 138, 230);
+  case 3: { // 🌦️ Nieselregen — Wolke + 6 einzelne Tropfenpunkte
+    drawCloud(0, 1);
+    static const int8_t DX[] = {4, 8, 12};
+    for (int d = 0; d < 3; d++) {
+      px(DX[d], 10, 90, 175, 255);
+      px(DX[d], 13, 90, 175, 255);
     }
     break;
   }
 
-  case 4: { // ❄️ Schneeflocke — Kreuz mit Ästen
-    // Horizontaler Arm (2px hoch), volle Breite
-    for (int c = 0; c < 16; c++) {
-      uint8_t v = (c>=6&&c<=9) ? 225 : (c>=4&&c<=11 ? 195 : 165);
-      px(c, 7, v, v+12, 255);
-      px(c, 8, v, v+12, 255);
-    }
-    // Vertikaler Arm (2px breit), volle Höhe
-    for (int r = 0; r < 16; r++) {
-      uint8_t v = (r>=6&&r<=9) ? 225 : (r>=4&&r<=11 ? 195 : 165);
-      px(7, r, v, v+12, 255);
-      px(8, r, v, v+12, 255);
-    }
-    // Äste senkrecht auf jedem Arm (symmetrisch bei pos 3 und 12)
-    static const int8_t AP[] = {3, 12};
-    for (int i = 0; i < 2; i++) {
-      int a = AP[i];
-      px(a, 5, 175,188,255); px(a, 6, 182,195,255);  // über horizontalem Arm
-      px(a, 9, 182,195,255); px(a,10, 175,188,255);  // unter horizontalem Arm
-      px(5, a, 175,188,255); px(6, a, 182,195,255);  // links vom vertikalen Arm
-      px(9, a, 182,195,255); px(10,a, 175,188,255);  // rechts vom vertikalen Arm
-    }
-    // Kern extra hell
-    px(7,7,242,250,255); px(8,7,242,250,255);
-    px(7,8,242,250,255); px(8,8,242,250,255);
+  case 4: { // ❄️ Schnee — zwei 5×5 Schneeflocken (Kreuz + Diagonalspitzen)
+    drawCloud(0, 0);
+    auto flake = [&](int cx, int cy) {
+      px(cx-2,cy-2,255,255,255); px(cx,cy-2,255,255,255); px(cx+2,cy-2,255,255,255);
+      px(cx-1,cy-1,255,255,255); px(cx,cy-1,255,255,255); px(cx+1,cy-1,255,255,255);
+      for (int dx = -2; dx <= 2; dx++) px(cx+dx, cy, 255,255,255);
+      px(cx-1,cy+1,255,255,255); px(cx,cy+1,255,255,255); px(cx+1,cy+1,255,255,255);
+      px(cx-2,cy+2,255,255,255); px(cx,cy+2,255,255,255); px(cx+2,cy+2,255,255,255);
+    };
+    flake( 3, 10);
+    flake(11, 13);
     break;
   }
 
-  case 5: { // ⛈️ Gewitter — sehr dunkle Wolke + Blitz (2px, Z mit horizontalem Kink)
-    drawCloud(0, true);
-    // Oberer Arm: 2px breit, diagonal nach links-unten (3px weiter links)
-    px( 6, 9, 255,255,195); px( 7, 9, 255,255,195);
-    px( 5,10, 255,248,165); px( 6,10, 255,248,165);
-    // Horizontaler Kink (5px, der hellste Punkt — charakteristisches Blitz-Knick)
-    for (int c = 5; c <= 9; c++) px(c, 11, 255, 232, 95);
-    // Unterer Arm: 2px breit, diagonal nach links-unten (SW)
-    px( 8,12, 255,210, 40); px( 9,12, 255,210, 40);
-    px( 7,13, 255,185, 12); px( 8,13, 255,185, 12);
-    px( 6,14, 255,155,  0); px( 7,14, 255,155,  0);
-    px( 6,15, 240,125,  0);
+  case 5: { // ⛈️ Gewitter — dunkle Wolke + Blitz (3px breit, Z-Form)
+    drawCloud(0, 2);
+    static const uint8_t TC[3][3] = {{255,255,195},{255,248,165},{255,238,125}};
+    static const uint8_t BC[3][3] = {{255,205, 45},{255,178, 10},{240,148,  0}};
+    // Oberer Arm: diagonal links-unten, 3px breit
+    for (int i = 0; i < 3; i++)
+      for (int dx = 0; dx < 3; dx++)
+        px(7-i+dx, 9+i, TC[i][0], TC[i][1], TC[i][2]);
+    // Horizontaler Kink (6px)
+    for (int c = 4; c <= 9; c++) px(c, 12, 255, 225, 85);
+    // Unterer Arm: diagonal links-unten, 3px breit
+    for (int i = 0; i < 3; i++)
+      for (int dx = 0; dx < 3; dx++)
+        px(6-i+dx, 13+i, BC[i][0], BC[i][1], BC[i][2]);
     break;
   }
 
@@ -658,19 +671,74 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
     break;
   }
 
-  case 7: { // Teils bewölkt: Sonnenecke oben-links + Wolke
-    // Kleines Sonneneck (r=2.5) bei (2,2)
-    for (int dy = 0; dy < 6; dy++) {
-      for (int dx = 0; dx < 6; dx++) {
-        float d = sqrtf((dx-2.5f)*(dx-2.5f) + (dy-2.5f)*(dy-2.5f));
-        if      (d <= 1.2f) px(dx, dy, 255, 255, 185);
-        else if (d <= 2.0f) px(dx, dy, 255, 215,  40);
-        else if (d <= 2.8f) px(dx, dy, 255, 170,   0);
+  case 7: { // 🌥️ Teils bewölkt Nacht: Mondsichel oben-links + Wolke darunter
+    for (int dy = 0; dy < 8; dy++) {
+      for (int dx = 0; dx < 8; dx++) {
+        float dOut = sqrtf((dx-3.0f)*(dx-3.0f) + (dy-3.0f)*(dy-3.0f));
+        float dIn  = sqrtf((dx-5.5f)*(dx-5.5f) + (dy-3.0f)*(dy-3.0f));
+        if (dOut <= 3.5f && dIn > 3.0f) {
+          float t = dOut / 3.5f;
+          px(dx, dy,
+            (uint8_t)(255 - t * 20),
+            (uint8_t)(250 - t * 30),
+            (uint8_t)(200 - t * 40));
+        }
       }
     }
-    px(2,0,255,145,0); px(0,2,255,145,0);
-    px(4,0,255,145,0); px(0,4,255,145,0);
-    drawCloud(4, false);
+    drawCloud(4, 0);
+    break;
+  }
+
+  case 8: { // 🌧️ Regen — Wolke + 3 diagonale \ Streifen, je 3px, 2 Gruppen
+    drawCloud(0, 1);
+    static const int8_t SX8[] = {12, 8, 4};
+    for (int d = 0; d < 3; d++) {
+      px(SX8[d]-0,  9, 90, 175, 255);
+      px(SX8[d]-1, 10, 90, 175, 255);
+      px(SX8[d]-2, 11, 55, 130, 225);
+      px(SX8[d]-0, 12, 90, 175, 255);
+      px(SX8[d]-1, 13, 90, 175, 255);
+      px(SX8[d]-2, 14, 55, 130, 225);
+    }
+    break;
+  }
+
+  case 9: { // 🌦️ Regenschauer — Sonne oben links + Wolke tiefer + diagonale Tropfen
+    // Sonne (gleiche Form wie Icon 1)
+    for (int dy = 0; dy < 8; dy++) {
+      for (int dx = 0; dx < 8; dx++) {
+        float fx = dx - 3.0f, fy = dy - 3.0f;
+        float d = sqrtf(fx*fx + fy*fy);
+        if      (d <= 1.2f) px(dx, dy, 255, 255, 185);
+        else if (d <= 2.2f) px(dx, dy, 255, 225,  55);
+        else if (d <= 3.0f) px(dx, dy, 255, 178,   5);
+      }
+    }
+    px(3, 0, 255, 148, 0); px(0, 3, 255, 148, 0);
+    px(6, 3, 255, 148, 0); px(3, 6, 255, 148, 0);
+    px(1, 1, 255, 152, 0); px(5, 1, 255, 152, 0);
+    px(1, 5, 255, 152, 0); px(5, 5, 255, 152, 0);
+    // Wolke ab Zeile 3 (überdeckt Sonnen-Unterhälfte)
+    drawCloud(3, 1);
+    // Diagonale Tropfen unterhalb der Wolke
+    static const int8_t SX9[] = {12, 8, 4};
+    for (int d = 0; d < 3; d++) {
+      px(SX9[d]-0, 12, 90, 175, 255);
+      px(SX9[d]-1, 13, 90, 175, 255);
+      px(SX9[d]-2, 14, 55, 130, 225);
+    }
+    break;
+  }
+
+  case 10: { // 🌫️ Nebel — 5 horizontale Streifen, alternierend versetzt
+    auto fogLine = [&](int dy, int x0, int x1, uint8_t v) {
+      for (int c = x0; c <= x1; c++) px(c, dy, v, (uint8_t)(v + 8), (uint8_t)(v + 18));
+    };
+    fogLine( 3,  2, 11, 200);
+    fogLine( 5,  4, 13, 185);
+    fogLine( 7,  2, 11, 170);
+    fogLine( 9,  4, 13, 155);
+    fogLine(11,  2, 11, 140);
     break;
   }
 
@@ -678,17 +746,30 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
 }
 
 void weatherIconTest() {
-  // Zeigt alle 8 Wetter-Icons in 2 Reihen à 4 (füllt 128×32 komplett)
-  display->SetBrightness(screensaverBrightness);
+  // 11 Icons: Reihe 0 → Icons 0-5 (6×, Abstand 21px), Reihe 1 → Icons 6-10 (5×, Abstand 24px)
+  ApplyBrightness(screensaverBrightness);
   display->ClearScreen();
-  for (uint8_t i = 0; i < 8; i++) {
-    DrawWeatherIcon16(i, (i % 4) * 32 + 8, (i < 4) ? 0 : 16);
+  for (uint8_t i = 0; i < 6; i++) {
+    DrawWeatherIcon16(i, i * 21 + 2, 0);
+  }
+  for (uint8_t i = 6; i < 11; i++) {
+    DrawWeatherIcon16(i, (i - 6) * 24 + 4, 16);
+  }
+  Render();
+}
+
+void weatherSmallIconTest() {
+  // 11 Icons (scale=1, 8×8px) in einer Zeile: x=0,12,24,...120 — y zentriert (12)
+  ApplyBrightness(screensaverBrightness);
+  display->ClearScreen();
+  for (uint8_t i = 0; i < 11; i++) {
+    DrawWeatherIcon(i, i * 12, 12, 1);
   }
   Render();
 }
 
 void weatherDisplay() {
-  display->SetBrightness(screensaverBrightness);
+  ApplyBrightness(screensaverBrightness);
   display->ClearScreen();
 
   WeatherInfo wi = GetWeatherInfo(weatherCode, weatherIsDay);
@@ -739,7 +820,7 @@ void weatherDisplayClock() {
   lastCWHour        = timeinfo.tm_hour;
   lastWeatherAvail  = weatherAvailable;
 
-  display->SetBrightness(screensaverBrightness);
+  ApplyBrightness(screensaverBrightness);
   display->ClearScreen();
 
   const char* days[] = {"So","Mo","Di","Mi","Do","Fr","Sa"};
@@ -845,7 +926,7 @@ void weatherDisplayForecast() {
   clockColorChanged = false;
   for (int i = 0; i < 3; i++) { lastFCode[i] = forecastCode[i]; lastFTmax[i] = forecastTempMax[i]; }
 
-  display->SetBrightness(screensaverBrightness);
+  ApplyBrightness(screensaverBrightness);
   display->ClearScreen();
 
   const char* dayNames[] = {"So","Mo","Di","Mi","Do","Fr","Sa"};

@@ -92,6 +92,17 @@ class LedMatrix : public DisplayDriver {
   uint16_t GetTextGFXWidth(const char *text);
   void RenderTextGFXToBuffer(uint8_t *buf, const char *text, int16_t x,
                               uint8_t r, uint8_t g, uint8_t b);
+  void RenderRadioToBuffer(uint8_t *buf, const char *station,
+                           const char *title,
+                           int16_t stationX, int16_t titleX,
+                           uint8_t stR, uint8_t stG, uint8_t stB,
+                           uint8_t r, uint8_t g, uint8_t b);
+  uint16_t GetRadioTitleWidth(const char *text);
+#ifdef FONT_TEST_ENABLED
+  void RenderFontTestToBuffer(uint8_t *buf, const char *text, const char *fontName,
+                               uint8_t lines, uint8_t r, uint8_t g, uint8_t b) override;
+  const char* GetFontListJSON() override;
+#endif
   void EraseVLine(int16_t x) override;
   void FillZoneRaw(uint8_t idx, uint8_t *pBuffer);
   void FillZoneRaw565(uint8_t idx, uint8_t *pBuffer);
