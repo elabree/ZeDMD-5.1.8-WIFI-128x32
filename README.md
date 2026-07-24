@@ -50,7 +50,7 @@ The main page has been reorganised into three tabs — **Screensaver**, **Displa
 Set a daily on/off schedule for the LED matrix — useful for automatically turning the display off at night. Configure From/Until times under the **Display** tab. A **"Display off / Display on"** button lets you instantly turn the display off and on without changing the timer settings.
 
 #### Stereo / Mono toggle
-The **Radio** tab now shows a **Stereo / Mono** button next to the volume slider. Switch the audio output to mono without a firmware rebuild — useful if you only have one speaker connected or experience phase issues.
+The **Radio** tab now shows separate **Stereo** and **Mono** buttons next to the volume slider. Switch the audio output to mono without a firmware rebuild — useful if you only have one speaker connected or experience phase issues.
 
 #### Station logos on the LED matrix
 When a radio station starts playing, the matching station logo (if uploaded) is shown on the LED matrix alongside the station name and track title.
@@ -71,7 +71,7 @@ A three-band **equaliser (Bass / Mid / Treble)** is now available in the **Radio
 The 8×8 forecast icons (3-day view) have been completely redrawn. Three new icons added: drizzle, showers and snow now have their own symbols — previously they shared a generic rain icon. Total: 11 distinct weather icons.
 
 #### L/R channel swap
-If your left and right speakers are physically wired the wrong way around, a single **Swap L/R** button in the **Radio** tab swaps the audio channels in software — no rewiring needed. Settings survive reboots.
+If your left and right speakers are physically wired the wrong way around, a single **L/R Swap** button in the **Radio** tab swaps the audio channels in software — no rewiring needed. Settings survive reboots.
 
 #### Custom branding
 The boot screen and web UI header now show the **The Arcade** logo instead of the generic ZeDMD logo. The PPUC splash screen has been removed.
@@ -107,7 +107,7 @@ Requires a **MAX98357A I2S amplifier module** — see wiring below.
 - Presets survive firmware updates (stored in LittleFS)
 - Stable station switching — no more audio dropout on channel change
 - Stream URLs from radio-browser.info are automatically normalised (removes `?ti=` playlist hints that caused the audio library to hang)
-- **L/R channel swap** — if your left and right speakers are physically wired the wrong way around, a single button on the main page swaps the audio channels in software — no rewiring needed
+- **L/R channel swap** — if your left and right speakers are physically wired the wrong way around, a single button in the **Radio** tab swaps the audio channels in software — no rewiring needed
 
 > **Technical note — audio library patch:** The L/R swap feature required modifying the `ESP32-audioI2S` library internally, because it does not provide this function out of the box. Rather than changing the library files by hand (which would be lost on every library update), a build-time patch script (`scripts/patch_audio_lib.py`) injects the change automatically on each compile. This script was developed with the help of **[Claude Code](https://claude.ai/code)** (AI coding assistant by Anthropic) — pinpointing the exact location inside the audio pipeline where samples could be swapped safely, and making the patch idempotent (safe to run repeatedly). I would not have attempted this alone.
 
@@ -123,7 +123,7 @@ Play a matching MP3 file from the SD card in sync with an animated GIF screensav
 
 - File list is cached in LittleFS — after the first boot scan, subsequent reboots load instantly (same mechanism as the screensaver file cache)
 - Paginated file list in the web UI with previous/next buttons (20 files per page)
-- Scan can be aborted via the **"Scan abbrechen"** button that appears after an upload
+- Scan can be aborted via the **"Cancel Scan"** button that appears after an upload
 
 > ⚠️ **First-boot scan time:** Depending on how many files are in `/GifAudio/`, the initial scan over SPI can take a very long time. Progress is shown on the display ("GifAudio XXXX"). After the scan the list is cached in LittleFS — every subsequent reboot loads in seconds.
 
@@ -244,7 +244,7 @@ Send a custom text message to the LED matrix directly from the web UI.
 - Color picker for free RGB color selection
 - Configurable display duration (5–60 seconds)
 - Instantly interrupts any running screensaver or GIF and restores it afterwards
-- **Emoji picker** — 33 emojis (❤️ ⭐ 🔥 😊 🎉 and more) rendered as pixel-art icons directly in the scrolling text; icons are stored as RGBA files in LittleFS (`/icons/`)
+- **Emoji picker** — 34 emojis (❤️ ⭐ 🔥 😊 🎉 and more) rendered as pixel-art icons directly in the scrolling text; icons are stored as RGBA files in LittleFS (`/icons/`)
 
 ---
 
@@ -255,17 +255,17 @@ Stereo output using **two MAX98357A modules** — one for the left channel, one 
 The SD pin is a voltage-level channel-select strap. The values below were measured and confirmed to work with MAX98357A breakout boards that already have a **1 MΩ resistor from SD to Vin** onboard. If your board has a different onboard resistor, these values will not apply — always check your board's schematic and measure before connecting.
 
 * **Module L (Left Channel):** Connect a **100 kΩ** resistor from SD to VCC **(5V)**.
-* **Module R (Right Channel):** Connect a **370 kΩ** resistor from SD to VCC **(5V)**.
+* **Module R (Right Channel):** Connect a **390 kΩ** resistor from SD to VCC **(5V)**.
 
 The ESP32-audioI2S library outputs stereo I2S natively when playing stereo source files. Each module automatically decodes its designated channel based on the SD pin voltage.
 
 | MAX98357A Pin | ESP32-S3 | Notes |
 |---------------|----------|-------|
-| BCLK | **GPIO 39** | shared — both modules |
-| LRC (WSEL) | **GPIO 38** | shared — both modules |
-| DIN | **GPIO 46** | shared — both modules |
+| BCLK | **GPIO 9** | shared — both modules |
+| LRC (WSEL) | **GPIO 14** | shared — both modules |
+| DIN | **GPIO 21** | shared — both modules |
 | SD — Module L | **100 kΩ to VCC** | → **Left channel** |
-| SD — Module R | **370 kΩ to VCC** | → **Right channel** |
+| SD — Module R | **390 kΩ to VCC** | → **Right channel** |
 | VIN | **5V** *(recommended)* | each module separately |
 | GND | **GND** | each module separately |
 
@@ -279,8 +279,16 @@ The ESP32-audioI2S library outputs stereo I2S natively when playing stereo sourc
 
 ## 🔜 Planned Features
 
-### Custom PCB by [elabree](https://github.com/elabree) *(in preparation)*
-A dedicated carrier board is being developed that mounts the ESP32-S3 DevKit, an SD card breakout module and a MAX98357A amplifier module on a single PCB — no flying wires, clean and compact. Details to follow once the design is finalised.
+### Custom PCB by [elabree](https://github.com/elabree) ✅
+A dedicated carrier board designed and built by [elabree](https://github.com/elabree) — tested and confirmed working with this firmware. The board hosts the ESP32-S3-DevKitC-1-N16R8, an SD card module socket, and two MAX98357A stereo amplifier sockets on a single clean PCB.
+
+Two revisions are available:
+- **Rev1.1** — for original Espressif ESP32-S3-DevKitC (0.9″ pin row spacing)
+- **Rev1.2** — for most clone boards (1″ pin row spacing)
+
+KiCad sources and Gerber files for ordering at JLCPCB: [elabree's fork, shield branch](https://github.com/elabree/ZeDMD-5.1.8-WIFI-128x32/tree/shield/KiCad/ZeDMD_WiFi) — a pull request to include the files directly in this repository is pending.
+
+A big thank-you to elabree for designing and contributing this board to the project — this would not have happened without his work.
 
 ### Code cleanup *(on my list)*
 The code has grown organically and is honestly a bit messy in places — I know. I'm planning to clean things up at some point, but no promises on when. It works, which counts for something.
@@ -302,7 +310,7 @@ This fork is **WiFi-only** and targets the **ESP32-S3-N16R8** with a **128×32 L
 - **Admin page** — WiFi, display, transport, MQTT, weather settings
 - **Webradio** — internet radio via I2S amplifier (MAX98357A); station search via [radio-browser.info](https://www.radio-browser.info); preset management with logo icons; LED matrix shows station info for 5 s on start, "DMD 10s" button for on-demand display
 - **Config Export/Import** — full configuration backup and restore via browser (`/config_transfer.html`)
-- **Display Text** — send custom text with emojis to the LED matrix via the web UI; static or scrolling with color selection and configurable duration (5–60 s); 33 emojis available via built-in picker
+- **Display Text** — send custom text with emojis to the LED matrix via the web UI; static or scrolling with color selection and configurable duration (5–60 s); 34 emojis available via built-in picker
 - **Display Timer** — schedule daily on/off times for the LED matrix (e.g. off at 23:00, on at 07:00); "Display off / Display on" button for instant manual control
 - **Tabbed web UI** — main page organised into Screensaver / Display / Radio tabs; SD card & admin always visible
 - **Stereo Audio** *(experimental)* — two MAX98357A modules for true stereo output; channel selection via SD-pin resistor strapping (5V only, values verified); Stereo/Mono toggle in the web UI
@@ -477,9 +485,9 @@ Requires an **I2S amplifier module** and a small speaker.
 |---------------|----------|-------|
 | VIN           | **5V**       | 5V gives more headroom; 3.3V works but lower volume |
 | GND           | GND          | |
-| BCLK          | **GPIO 39**  | I2S Bit Clock |
-| LRC (WSEL)    | **GPIO 38**  | I2S Word Select (L/R) |
-| DIN           | **GPIO 46**  | I2S Data |
+| BCLK          | **GPIO 9**   | I2S Bit Clock |
+| LRC (WSEL)    | **GPIO 14**  | I2S Word Select (L/R) |
+| DIN           | **GPIO 21**  | I2S Data |
 | GAIN          | **GND**      | GND = 15 dB gain (max); floating = 12 dB; 3.3V = 9 dB |
 | SD (Shutdown) | 3.3V or floating | Floating = on; GND = mute |
 
@@ -557,7 +565,7 @@ Browser → **`http://<IP>/admin.html`** → "Firmware Update (OTA)"
 ## Credits
 
 - **[Markus Kalkbrenner / PPUC](https://github.com/PPUC/ZeDMD)** — original ZeDMD project
-- **[elabree](https://github.com/elabree)** — PCB design: carrier board for DevKit + SD + MAX98357A *(in preparation)*
+- **[elabree](https://github.com/elabree)** — PCB design: carrier board for DevKit + SD + MAX98357A ([KiCad files](https://github.com/elabree/hub75_esp32s3/tree/shield))
 - **Niels (My Son)** — coding assistance & inspiration & moral support
 - **[Claude Sonnet](https://anthropic.com)** — coding assistance
 
@@ -566,7 +574,6 @@ Browser → **`http://<IP>/admin.html`** → "Firmware Update (OTA)"
 ## Commercial Use
 
 This project is licensed under GPL v2 — commercial use is permitted under those terms.
-However, if you use this fork in a hardware product — whether commercial or a personal PCB build you're proud of — I'd love to receive **2 samples** as a thank-you: one for me, one for my son Niels. Not a legal requirement, just a friendly ask from a fellow hobbyist. 😊
 
 ---
 

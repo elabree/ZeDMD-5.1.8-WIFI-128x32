@@ -50,7 +50,7 @@ Die Hauptseite ist jetzt in drei Tabs unterteilt — **Screensaver**, **Display*
 Tägliche Ein-/Ausschaltzeiten für das LED-Display lassen sich direkt im **Display**-Tab konfigurieren — z.B. ab 23:00 Uhr aus, ab 07:00 Uhr wieder an. Zusätzlich gibt es einen **„Display off / Display on"**-Button zum sofortigen manuellen Aus- und Einschalten ohne die Timer-Einstellung zu ändern.
 
 #### Stereo / Mono umschalten
-Im **Radio**-Tab gibt es jetzt einen **Stereo / Mono**-Button. Der Ausgabekanal lässt sich so umschalten ohne Firmware-Neuflash — praktisch wenn nur ein Lautsprecher angeschlossen ist.
+Im **Radio**-Tab gibt es jetzt separate **Stereo**- und **Mono**-Buttons. Der Ausgabekanal lässt sich so umschalten ohne Firmware-Neuflash — praktisch wenn nur ein Lautsprecher angeschlossen ist.
 
 #### Sender-Logos auf dem LED-Display
 Beim Senderwechsel wird das passende Sender-Logo (wenn hochgeladen) zusammen mit Sendername und Titelinfo auf dem LED-Display angezeigt.
@@ -71,7 +71,7 @@ Im **Radio**-Tab gibt es jetzt einen Drei-Band-**Equalizer (Bass / Mitten / Höh
 Die 8×8-Vorhersage-Icons (3-Tage-Ansicht) wurden komplett neu gezeichnet. Drei neue Icons hinzugekommen: Nieselregen, Schauer und Schnee haben jetzt eigene Symbole — vorher teilten sie sich ein generisches Regen-Icon. Insgesamt 11 verschiedene Wetter-Icons.
 
 #### L/R Kanal-Tausch
-Wenn linker und rechter Lautsprecher vertauscht verdrahtet sind, tauscht ein **Swap L/R**-Button im **Radio**-Tab die Audiokanäle per Software — kein Umverdrahten nötig. Einstellung bleibt nach Neustart erhalten.
+Wenn linker und rechter Lautsprecher vertauscht verdrahtet sind, tauscht ein **L/R Swap**-Button im **Radio**-Tab die Audiokanäle per Software — kein Umverdrahten nötig. Einstellung bleibt nach Neustart erhalten.
 
 #### Eigenes Branding
 Boot-Screen und Web-UI-Header zeigen jetzt das **The Arcade**-Logo statt des generischen ZeDMD-Logos. Der PPUC-Splashscreen wurde entfernt.
@@ -81,7 +81,7 @@ Boot-Screen und Web-UI-Header zeigen jetzt das **The Arcade**-Logo statt des gen
 ### v1.5.1
 
 #### Wetter-Icons — native 16×16 Pixel-Art
-Alle 8 Wetter-Icons wurden als native 16×16 Pixel-Art neu gezeichnet — schärfer und detaillierter als die bisherigen hochskalierten 8×8-Bitmaps. Jedes Icon hat einen eigenen handgezeichneten Farbgradienten: Sonne mit Strahlen, Mondsichel, Wolke, Regentropfen, Schnee, Blitz und Mischbewölkt-Varianten. Die kleineren 8×8-Icons in der 3-Tages-Vorhersage bleiben unverändert.
+Alle 8 Wetter-Icons wurden als native 16×16 Pixel-Art neu gezeichnet — schärfer und detaillierter als die bisherigen hochskalierten 8×8-Bitmaps. Jedes Icon hat einen eigenen handgezeichneten Farbgradienten: Sonne mit Strahlen, Mondsichel, Wolke, Regentropfen, Schnee, Blitz und Mischbewölkt-Varianten. Die kleineren 8×8-Icons in der 3-Tages-Vorhersage wurden in v1.5.2 weiter verbessert.
 
 #### SD-Karte — robustere Initialisierung
 Die SD-Karte wird jetzt mit schrittweise langsameren SPI-Geschwindigkeiten erneut versucht (8 → 4 → 2 MHz, bis zu 6 Versuche) bevor aufgegeben wird. Bisher führte ein einzelner fehlgeschlagener Mount-Versuch dazu, dass die SD-Karte für die gesamte Session als nicht verfügbar galt. Behebt sporadische Boot-Fehler bei schlecht kontaktierten oder langsam mountenden SD-Karten.
@@ -107,7 +107,7 @@ Erfordert ein **MAX98357A I2S-Verstärkermodul** — Verkabelung siehe unten.
 - Presets überleben Firmware-Updates (gespeichert in LittleFS)
 - Stabiler Senderwechsel — kein Audio-Aussetzer beim Umschalten mehr
 - Stream-URLs von radio-browser.info werden automatisch normalisiert (`?ti=`-Playlist-Hinweise werden entfernt, die die Audio-Bibliothek zum Hängen brachten)
-- **L/R-Kanaltausch** — wer linken und rechten Lautsprecher versehentlich vertauscht angeschlossen hat, kann die Kanäle per Knopfdruck auf der Hauptseite in Software tauschen — ohne Neuverkabelung
+- **L/R-Kanaltausch** — wer linken und rechten Lautsprecher versehentlich vertauscht angeschlossen hat, kann die Kanäle per Knopfdruck im **Radio**-Tab in Software tauschen — ohne Neuverkabelung
 
 > **Technische Anmerkung — Audio-Bibliotheks-Patch:** Der L/R-Kanaltausch erforderte einen Eingriff in die `ESP32-audioI2S`-Bibliothek, da diese Funktion dort nicht vorhanden ist. Statt die Bibliotheksdateien von Hand zu ändern (was bei jedem Library-Update verloren gehen würde), injiziert ein Build-Script (`scripts/patch_audio_lib.py`) die Änderung automatisch bei jedem Kompiliervorgang. Dieses Script entstand mit Unterstützung von **[Claude Code](https://claude.ai/code)** (KI-Coding-Assistent von Anthropic) — das die genaue Stelle in der Audio-Pipeline gefunden hat, an der die Samples sicher getauscht werden können, und das Script so gebaut hat, dass es auch bei mehrfacher Ausführung keine Doppeleinträge erzeugt. Ich hätte das alleine nicht angefasst.
 
@@ -123,7 +123,7 @@ Beim Abspielen eines animierten GIF-Screensavers passend dazu eine MP3-Datei von
 
 - Dateiliste wird in LittleFS gecacht — nach dem ersten Boot-Scan laden Neustarts sofort (identischer Mechanismus wie der Screensaver-Datei-Cache)
 - Paginierte Dateiliste in der Web-Oberfläche mit Zurück/Weiter-Buttons (20 Dateien pro Seite)
-- Scan kann per **„Scan abbrechen"**-Button abgebrochen werden, der nach einem Upload erscheint
+- Scan kann per **„Cancel Scan"**-Button abgebrochen werden, der nach einem Upload erscheint
 
 > ⚠️ **Erster Boot-Scan:** Je nach Anzahl der Dateien in `/GifAudio/` kann der erste Scan über SPI sehr lange dauern. Der Fortschritt wird auf dem Display angezeigt („GifAudio XXXX"). Nach dem Scan wird die Liste in LittleFS gecacht — alle folgenden Neustarts laden in Sekunden.
 
@@ -244,7 +244,7 @@ Sendet eine individuelle Textnachricht direkt über die Web-UI an die LED-Matrix
 - Farbwahl per RGB-Colorpicker
 - Konfigurierbare Anzeigedauer (5–60 Sekunden)
 - Unterbricht sofort jeden laufenden Screensaver oder GIF und stellt ihn anschließend wieder her
-- **Emoji-Picker** — 33 Emojis (❤️ ⭐ 🔥 😊 🎉 u.v.m.) werden als Pixel-Art-Icons direkt im Lauftext gerendert; Icons liegen als RGBA-Dateien in LittleFS (`/icons/`)
+- **Emoji-Picker** — 34 Emojis (❤️ ⭐ 🔥 😊 🎉 u.v.m.) werden als Pixel-Art-Icons direkt im Lauftext gerendert; Icons liegen als RGBA-Dateien in LittleFS (`/icons/`)
 
 ---
 
@@ -255,17 +255,17 @@ Stereo-Ausgabe mit **zwei MAX98357A-Modulen** — eines für den linken, eines f
 Der SD-Pin ist eine Spannungspegel-Kanalwahl-Brücke. Die folgenden Werte wurden gemessen und bestätigt für MAX98357A-Breakout-Boards, die bereits einen **1 MΩ Widerstand von SD nach Vin** onboard haben. Bei abweichender Boardbestückung gelten diese Werte nicht — immer Schaltplan des eigenen Boards prüfen und Spannung messen, bevor etwas angeschlossen wird.
 
 * **Modul L (linker Kanal):** **100 kΩ** Widerstand von SD nach VCC **(5V)**.
-* **Modul R (rechter Kanal):** **370 kΩ** Widerstand von SD nach VCC **(5V)**.
+* **Modul R (rechter Kanal):** **390 kΩ** Widerstand von SD nach VCC **(5V)**.
 
 Die ESP32-audioI2S-Bibliothek gibt bei Stereo-Quelldateien nativ Stereo-I2S aus. Jedes Modul dekodiert automatisch seinen zugewiesenen Kanal anhand der SD-Pin-Spannung.
 
 | MAX98357A Pin | ESP32-S3 | Hinweis |
 |---------------|----------|---------|
-| BCLK | **GPIO 39** | gemeinsam — beide Module |
-| LRC (WSEL) | **GPIO 38** | gemeinsam — beide Module |
-| DIN | **GPIO 46** | gemeinsam — beide Module |
+| BCLK | **GPIO 9** | gemeinsam — beide Module |
+| LRC (WSEL) | **GPIO 14** | gemeinsam — beide Module |
+| DIN | **GPIO 21** | gemeinsam — beide Module |
 | SD — Modul L | **100 kΩ nach VCC** | → **linker Kanal** |
-| SD — Modul R | **370 kΩ nach VCC** | → **rechter Kanal** |
+| SD — Modul R | **390 kΩ nach VCC** | → **rechter Kanal** |
 | VIN | **5V** *(empfohlen)* | jedes Modul separat |
 | GND | **GND** | jedes Modul separat |
 
@@ -279,8 +279,16 @@ Die ESP32-audioI2S-Bibliothek gibt bei Stereo-Quelldateien nativ Stereo-I2S aus.
 
 ## 🔜 Geplante Features
 
-### Eigene Platine von [elabree](https://github.com/elabree) *(in Vorbereitung)*
-Eine dedizierte Trägerplatine ist in Entwicklung, auf der das ESP32-S3 DevKit, ein SD-Karten-Breakout-Modul und ein MAX98357A-Verstärkermodul gemeinsam untergebracht werden — keine fliegenden Verbindungen, kompakter und sauberer Aufbau. Details folgen sobald das Design abgeschlossen ist.
+### Eigene Platine von [elabree](https://github.com/elabree) ✅
+Eine dedizierte Trägerplatine, entworfen und gebaut von [elabree](https://github.com/elabree) — getestet und bestätigt funktionsfähig mit dieser Firmware. Die Platine trägt das ESP32-S3-DevKitC-1-N16R8, einen SD-Karten-Modul-Sockel und zwei MAX98357A-Stereo-Verstärker-Sockel auf einer kompakten Leiterplatte.
+
+Zwei Revisionen verfügbar:
+- **Rev1.1** — für das original Espressif ESP32-S3-DevKitC (0,9″ Pin-Reihenabstand)
+- **Rev1.2** — für die meisten Clone-Boards (1″ Pin-Reihenabstand)
+
+KiCad-Quellen und Gerber-Dateien zum Bestellen bei JLCPCB: [elabrees Fork, Branch shield](https://github.com/elabree/ZeDMD-5.1.8-WIFI-128x32/tree/shield/KiCad/ZeDMD_WiFi) — ein Pull Request zur Aufnahme der Dateien direkt in dieses Repository ist ausstehend.
+
+Ein herzliches Dankeschön an elabree für den Entwurf und die Bereitstellung dieser Platine — ohne seine Arbeit wäre das nicht möglich gewesen.
 
 ### Code-Aufräumen *(steht auf meiner Liste)*
 Der Code ist hier und da ehrlich gesagt etwas gewachsen und durcheinander geraten — ich weiß das. Ich plane irgendwann aufzuräumen, aber wann genau kann ich nicht versprechen. Er funktioniert, und das zählt erstmal.
@@ -302,7 +310,7 @@ Dieser Fork ist **nur WiFi** und zielt auf den **ESP32-S3-N16R8** mit einer **12
 - **Admin-Seite** — WiFi, Display, Transport, MQTT, Wetter-Einstellungen
 - **Webradio** — Internetradio via I2S-Verstärker (MAX98357A); Sendersuche via [radio-browser.info](https://www.radio-browser.info); Preset-Verwaltung mit Logo-Icons; LED-Matrix zeigt Senderinfo 5 s beim Start, „DMD 10s"-Button für On-Demand-Anzeige
 - **Konfig Export/Import** — vollständiges Konfigurations-Backup und -Restore über den Browser (`/config_transfer.html`)
-- **Display Text** — individuelle Textnachricht mit Emojis über die Web-UI an die LED-Matrix senden; statisch oder scrollend, mit Farbwahl und konfigurierbarer Dauer (5–60 s); 33 Emojis per eingebautem Picker wählbar
+- **Display Text** — individuelle Textnachricht mit Emojis über die Web-UI an die LED-Matrix senden; statisch oder scrollend, mit Farbwahl und konfigurierbarer Dauer (5–60 s); 34 Emojis per eingebautem Picker wählbar
 - **Display-Timer** — tägliche Ein-/Ausschaltzeiten für das LED-Display; „Display off / Display on"-Button für sofortiges manuelles Aus-/Einschalten
 - **Tabs im Webinterface** — Hauptseite in Screensaver / Display / Radio gegliedert; SD-Info und Admin immer sichtbar
 - **Stereo-Audio** *(experimentell)* — zwei MAX98357A-Module für echten Stereo-Ausgang; Kanalwahl per SD-Pin-Widerstandsbrücke (nur 5V, Werte verifiziert); Stereo/Mono-Umschalter in der Web-UI
@@ -478,9 +486,9 @@ Erfordert ein **I2S-Verstärkermodul** und einen kleinen Lautsprecher.
 |---------------|----------|---------|
 | VIN           | **5V**       | 5V gibt mehr Headroom; 3,3V funktioniert, aber geringere Lautstärke |
 | GND           | GND          | |
-| BCLK          | **GPIO 39**  | I2S Bit Clock |
-| LRC (WSEL)    | **GPIO 38**  | I2S Word Select (L/R) |
-| DIN           | **GPIO 46**  | I2S Data |
+| BCLK          | **GPIO 9**   | I2S Bit Clock |
+| LRC (WSEL)    | **GPIO 14**  | I2S Word Select (L/R) |
+| DIN           | **GPIO 21**  | I2S Data |
 | GAIN          | **GND**      | GND = 15 dB (max); offen = 12 dB; 3,3V = 9 dB |
 | SD (Shutdown) | 3,3V oder offen | Offen = an; GND = stumm |
 
@@ -558,7 +566,7 @@ Browser → **`http://<IP>/admin.html`** → „Firmware Update (OTA)"
 ## Danksagung
 
 - **[Markus Kalkbrenner / PPUC](https://github.com/PPUC/ZeDMD)** — original ZeDMD project
-- **[elabree](https://github.com/elabree)** — Platinenentwurf: Trägerplatine für DevKit + SD + MAX98357A *(in Vorbereitung)*
+- **[elabree](https://github.com/elabree)** — Platinenentwurf: Trägerplatine für DevKit + SD + MAX98357A ([KiCad-Dateien](https://github.com/elabree/hub75_esp32s3/tree/shield))
 - **Niels (My Son)** — coding assistance & inspiration & moral support
 - **[Claude Sonnet](https://anthropic.com)** — coding assistance
 
@@ -567,7 +575,6 @@ Browser → **`http://<IP>/admin.html`** → „Firmware Update (OTA)"
 ## Kommerzielle Nutzung
 
 Dieses Projekt steht unter der GPL v2 — kommerzielle Nutzung ist unter diesen Bedingungen erlaubt.
-Wenn du diesen Fork für ein Hardware-Produkt verwendest — ob kommerziell oder einfach eine selbst gemachte Platine auf die du stolz bist — würde ich mich über **2 Exemplare** als Dankeschön freuen: eines für mich, eines für meinen Sohn Niels. Keine rechtliche Pflicht, nur eine freundliche Bitte von einem Hobbybastler. 😊
 
 ---
 
