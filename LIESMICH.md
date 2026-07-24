@@ -286,7 +286,7 @@ Zwei Revisionen verfügbar:
 - **Rev1.1** — für das original Espressif ESP32-S3-DevKitC (0,9″ Pin-Reihenabstand)
 - **Rev1.2** — für die meisten Clone-Boards (1″ Pin-Reihenabstand)
 
-KiCad-Quellen und Gerber-Dateien zum Bestellen bei JLCPCB: [elabrees Fork, Branch shield](https://github.com/elabree/ZeDMD-5.1.8-WIFI-128x32/tree/shield/KiCad/ZeDMD_WiFi) — ein Pull Request zur Aufnahme der Dateien direkt in dieses Repository ist ausstehend.
+KiCad-Quellen und Gerber-Dateien zum Bestellen bei JLCPCB: [KiCad/ZeDMD_WiFi/](https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/tree/main/KiCad/ZeDMD_WiFi) (direkt in diesem Repository enthalten).
 
 Ein herzliches Dankeschön an elabree für den Entwurf und die Bereitstellung dieser Platine — ohne seine Arbeit wäre das nicht möglich gewesen.
 
@@ -566,7 +566,7 @@ Browser → **`http://<IP>/admin.html`** → „Firmware Update (OTA)"
 ## Danksagung
 
 - **[Markus Kalkbrenner / PPUC](https://github.com/PPUC/ZeDMD)** — original ZeDMD project
-- **[elabree](https://github.com/elabree)** — Platinenentwurf: Trägerplatine für DevKit + SD + MAX98357A ([KiCad-Dateien](https://github.com/elabree/hub75_esp32s3/tree/shield))
+- **[elabree](https://github.com/elabree)** — Platinenentwurf: Trägerplatine für DevKit + SD + MAX98357A ([KiCad-Dateien](https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/tree/main/KiCad))
 - **Niels (My Son)** — coding assistance & inspiration & moral support
 - **[Claude Sonnet](https://anthropic.com)** — coding assistance
 

@@ -286,7 +286,7 @@ Two revisions are available:
 - **Rev1.1** — for original Espressif ESP32-S3-DevKitC (0.9″ pin row spacing)
 - **Rev1.2** — for most clone boards (1″ pin row spacing)
 
-KiCad sources and Gerber files for ordering at JLCPCB: [elabree's fork, shield branch](https://github.com/elabree/ZeDMD-5.1.8-WIFI-128x32/tree/shield/KiCad/ZeDMD_WiFi) — a pull request to include the files directly in this repository is pending.
+KiCad sources and Gerber files for ordering at JLCPCB: [KiCad/ZeDMD_WiFi/](https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/tree/main/KiCad/ZeDMD_WiFi) (included in this repository).
 
 A big thank-you to elabree for designing and contributing this board to the project — this would not have happened without his work.
 
@@ -565,7 +565,7 @@ Browser → **`http://<IP>/admin.html`** → "Firmware Update (OTA)"
 ## Credits
 
 - **[Markus Kalkbrenner / PPUC](https://github.com/PPUC/ZeDMD)** — original ZeDMD project
-- **[elabree](https://github.com/elabree)** — PCB design: carrier board for DevKit + SD + MAX98357A ([KiCad files](https://github.com/elabree/hub75_esp32s3/tree/shield))
+- **[elabree](https://github.com/elabree)** — PCB design: carrier board for DevKit + SD + MAX98357A ([KiCad files](https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/tree/main/KiCad))
 - **Niels (My Son)** — coding assistance & inspiration & moral support
 - **[Claude Sonnet](https://anthropic.com)** — coding assistance
 
