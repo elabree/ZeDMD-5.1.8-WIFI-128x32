@@ -32,7 +32,7 @@ The required power for the amplifiers depends on the supply voltage (3.3V or 5V)
 
 ### Power supply Recommendations
 1. If USB-C is the preferred way to power everything: Then it is best to use the USB-C breakout power the RGB matrix panel (3W for the LED's); place a jumper at J5 2-3. A second USB-C cable on the DevKit powers the SD card and the amplifier modules; place a jumper at J4 3-4.
-2. The best alternative is a 5V Meanwell (clone) switchmode power supply (SMPS). Connect the RGB matrix panels directly to this supply. If the DevKit is powered with USB-C there must be no jumpers on J5 & J6, the USB-C breakout is not needed, choose a 25V power supply in this case.
+2. The best alternative is a 5V Meanwell (clone) switchmode power supply (SMPS). Connect the RGB matrix panels directly to this supply. If the DevKit is powered with USB-C there must be no jumpers on J5 & J6, the USB-C breakout is not needed, choose a 25W power supply in this case.
 3. It is also an option to use a 5V SMPS for everything in case there is no USB-C connection. Then, J7 is used as the +5V supply input for the DevKit, SD card and amplifier modules. A 40W power supply feeds the RGB matrix panels directly, with an additional cable to J7. Place a jumper at J6, no jumper at J5!
 *Note that options 2 and 3 allow full brighness of the RGB panels*
 
