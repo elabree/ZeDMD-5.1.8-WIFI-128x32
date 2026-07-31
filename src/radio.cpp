@@ -5,6 +5,9 @@
 #include <WiFiClient.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <esp_heap_caps.h>
 #include "sd_interface.h"
 
 extern void radioIconSlugsLoad();
@@ -18,9 +21,9 @@ static constexpr uint32_t RADIO_DISP_MANUAL_MS   = 10000;
 static Audio audio;
 
 volatile bool    radioIsPlaying     = false;
-volatile bool    radioUserActive    = false;   // true solange User Radio wollte (auch nach EOF)
+volatile bool    radioUserActive    = false;   // true as long as user wanted radio (even after EOF)
 volatile bool    radioDisplayActive = false;
-uint32_t         radioDisplayUntil  = 0;   // millis()-Zeitstempel; 0 = kein Auto-Aus
+uint32_t         radioDisplayUntil  = 0;   // millis() timestamp; 0 = no auto-off
 char             radioStationName[64]  = "";
 char             radioTrackTitle[128]  = "";
 SemaphoreHandle_t radioStringMutex    = nullptr;
@@ -43,18 +46,18 @@ static char          gifAudioPath[256]   = "";
 static volatile bool gifAudioPending     = false;
 static volatile bool gifAudioStopPending = false;
 volatile bool        gifAudioPlaying     = false;
-// Grace-Timer: EOF-Callbacks während Verbindungsaufbau ignorieren
-// (Playlist-Auflösung und Redirect feuern EOF bevor der Stream startet)
+// Grace timer: ignore EOF callbacks during connection setup
+// (playlist resolution and redirect fire EOF before the stream starts)
 static volatile uint32_t switchGraceUntil = 0;
 
 extern void logMsg(const char* fmt, ...);
 
-// ── Callbacks von ESP32-audioI2S ──────────────────────────────────────────────
+// ── Callbacks from ESP32-audioI2S ─────────────────────────────────────────────
 
 void audio_info(const char* info) {
   if (!info) return;
   logMsg("[audio] %s", info);
-  // audio_showstationname() feuert nicht für alle Streams — ICY-Name direkt aus audio_info lesen
+  // audio_showstationname() does not fire for all streams — read ICY name directly from audio_info
   if (strncmp(info, "icy-name: ", 10) == 0 && info[10] && radioStringMutex) {
     if (xSemaphoreTake(radioStringMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
       strlcpy(radioStationName, info + 10, sizeof(radioStationName));
@@ -96,7 +99,7 @@ void audio_eof_stream(const char* info) {
   }
 }
 
-// ── Last-Preset-Persistenz (vor Public API — wird von radioInit/radioPlay genutzt) ──
+// ── Last-preset persistence (before public API — used by radioInit/radioPlay) ─────
 
 static void saveLastPreset() {
   File f = LittleFS.open("/radio_last.val", "w");
@@ -162,10 +165,10 @@ static void loadRadioSwap() {
   if (f) { radioSwapChannels = f.readStringUntil('\n').toInt() != 0; f.close(); }
 }
 
-// ── HTTP-Redirect-Auflösung ───────────────────────────────────────────────────
-// Folgt genau einem HTTP 3xx-Redirect und gibt die Location-URL zurück.
-// HTTPS-Redirects werden ignoriert (TLS-OOM auf ESP32 mit laufendem Decoder).
-// Nur für HTTP-URLs — HTTPS-Eingaben werden nicht behandelt.
+// ── HTTP redirect resolution ──────────────────────────────────────────────────
+// Follows exactly one HTTP 3xx redirect and returns the Location URL.
+// HTTPS redirects are ignored (TLS OOM on ESP32 with running decoder).
+// For HTTP URLs only — HTTPS inputs are not handled.
 
 static size_t readHttpLine(WiFiClient& wc, char* buf, size_t maxLen, uint32_t deadline) {
   size_t n = 0;
@@ -186,7 +189,7 @@ static size_t readHttpLine(WiFiClient& wc, char* buf, size_t maxLen, uint32_t de
 static bool resolveOneRedirect(const char* url, char* out, size_t outLen) {
   if (strncmp(url, "http://", 7) != 0) return false;
 
-  // Parse host[:port] und Pfad
+  // Parse host[:port] and path
   const char* hostStart = url + 7;
   const char* slash = strchr(hostStart, '/');
   if (!slash) return false;
@@ -210,7 +213,7 @@ static bool resolveOneRedirect(const char* url, char* out, size_t outLen) {
   char buf[512];
   uint32_t deadline = millis() + 3000;
 
-  // Status-Zeile lesen: "HTTP/1.x NNN ..."
+  // Read status line: "HTTP/1.x NNN ..."
   readHttpLine(wc, buf, sizeof(buf), deadline);
   int code = 0;
   if (strncmp(buf, "HTTP/", 5) == 0) code = atoi(buf + 9);
@@ -219,11 +222,11 @@ static bool resolveOneRedirect(const char* url, char* out, size_t outLen) {
   if (code == 301 || code == 302 || code == 307 || code == 308) {
     while (millis() < deadline) {
       size_t n = readHttpLine(wc, buf, sizeof(buf), deadline);
-      if (n == 0) break; // Leerzeile = Ende der Header
+      if (n == 0) break; // empty line = end of headers
       if (strncasecmp(buf, "Location:", 9) == 0) {
         const char* loc = buf + 9;
         while (*loc == ' ') loc++;
-        if (strncmp(loc, "https://", 8) == 0) break; // HTTPS-Redirect ignorieren
+        if (strncmp(loc, "https://", 8) == 0) break; // ignore HTTPS redirect
         strlcpy(out, loc, outLen);
         found = true;
         break;
@@ -235,7 +238,7 @@ static bool resolveOneRedirect(const char* url, char* out, size_t outLen) {
   return found;
 }
 
-// ── FreeRTOS Task (Core 0) ────────────────────────────────────────────────────
+// ── FreeRTOS task (Core 0) ────────────────────────────────────────────────────
 
 static void radioTask(void* params) {
   for (;;) {
@@ -255,12 +258,12 @@ static void radioTask(void* params) {
       connectPending   = false;
       radioIsPlaying   = false;
       gifAudioPlaying  = false;
-      audio.setVolume(0);       // Mute: PSRAM-Altdaten vom vorherigen Sender unterdrücken
+      audio.setVolume(0);       // Mute: suppress PSRAM residual data from the previous station
       audio.stopSong();
       vTaskDelay(pdMS_TO_TICKS(500));
       switchGraceUntil = millis() + RADIO_SWITCH_GRACE_MS;
-      // Redirect vor-auflösen: manche CDN-Server (z.B. NDR icecast → rndfnk.com)
-      // antworten mit HTTP 302, den die Audio-Library nicht zuverlässig folgt.
+      // Pre-resolve redirect: some CDN servers (e.g. NDR icecast → rndfnk.com)
+      // respond with HTTP 302 which the audio library does not reliably follow.
       char redirectedUrl[256] = {};
       if (resolveOneRedirect(localUrl, redirectedUrl, sizeof(redirectedUrl))) {
         logMsg("[radio] redirect: %s → %s", localUrl, redirectedUrl);
@@ -306,7 +309,7 @@ static void radioTask(void* params) {
   }
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
+// ── Public API ─────────────────────────────────────────────────────────────────
 
 void radioInit() {
   radioStringMutex = xSemaphoreCreateMutex();
@@ -321,11 +324,22 @@ void radioInit() {
   loadRadioSwap();
   audio.swapChannels(radioSwapChannels);
   radioLoadPresets();
-  radioIconSlugsLoad();  // nur Icons für Preset-Sender — kein Directory-Scan aller Dateien
+  radioIconSlugsLoad();  // only icons for preset stations — no directory scan of all files
   loadLastPreset();
 
-  xTaskCreatePinnedToCore(radioTask, "radioTask", 16384, NULL, 11, NULL, 0);
-  logMsg("radioInit: stack=16KB internal Core0");
+  static StaticTask_t radioTaskBuf;
+  static StackType_t* radioStack = nullptr;
+  if (!radioStack) {
+    radioStack = (StackType_t*)heap_caps_malloc(16384, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  }
+  if (radioStack) {
+    xTaskCreateStaticPinnedToCore(radioTask, "radioTask", 16384 / sizeof(StackType_t),
+                                  NULL, 11, radioStack, &radioTaskBuf, 0);
+    logMsg("radioInit: stack=16KB PSRAM Core0");
+  } else {
+    xTaskCreatePinnedToCore(radioTask, "radioTask", 16384, NULL, 11, NULL, 0);
+    logMsg("radioInit: stack=16KB SRAM Core0 (PSRAM alloc failed)");
+  }
 }
 
 void radioPlay(const char* url, int presetIndex) {
@@ -345,7 +359,7 @@ void radioPlay(const char* url, int presetIndex) {
   }
   radioDisplayActive = true;
   radioDisplayUntil  = millis() + RADIO_DISP_PLAY_MS;
-  // TLS-Handshake belegt 30-40 KB internen SRAM — OOM beim laufenden MP3-Codec
+  // TLS handshake occupies 30-40 KB of internal SRAM — OOM with running MP3 codec
   if (strncmp(url, "https://", 8) == 0) {
     snprintf(pendingUrl, sizeof(pendingUrl), "http://%s", url + 8);
     logMsg("[radio] HTTPS → HTTP: \"%s\"", pendingUrl);
@@ -388,7 +402,7 @@ void radioSetSwapChannels(bool swap) {
 }
 
 void radioPlayLocalFile(const char* sdPath) {
-  if (radioIsPlaying) return;  // Stream hat Vorrang
+  if (radioIsPlaying) return;  // stream takes priority
   strlcpy(gifAudioPath, sdPath, sizeof(gifAudioPath));
   __sync_synchronize();
   gifAudioPending = true;
@@ -398,7 +412,7 @@ void radioStopLocalFile() {
   gifAudioStopPending = true;
 }
 
-// ── Preset-Persistenz ─────────────────────────────────────────────────────────
+// ── Preset persistence ────────────────────────────────────────────────────────
 
 void radioLoadPresets() {
   File f = LittleFS.open("/radio_presets.json", "r");
@@ -436,10 +450,10 @@ void radioSavePresets() {
   File f = LittleFS.open("/radio_presets.json", "w");
   if (f) { f.write((uint8_t*)buf, pos); f.close(); }
   heap_caps_free(buf);
-  radioIconSlugsLoad();  // Icon-Cache nach Preset-Änderung aktualisieren
+  radioIconSlugsLoad();  // refresh icon cache after preset change
 }
 
-// ── Webserver-Routen ──────────────────────────────────────────────────────────
+// ── Webserver routes ──────────────────────────────────────────────────────────
 
 extern void sendLittleFSHtml(AsyncWebServerRequest *request, const char* path);
 
@@ -449,7 +463,7 @@ void radioRegisterRoutes(AsyncWebServer* server) {
   });
 
   server->on("/radio_status", HTTP_GET, [](AsyncWebServerRequest *request) {
-    // Snapshots unter Mutex — Core 0 kann radioStationName/radioTrackTitle jederzeit schreiben
+    // Snapshots under mutex — Core 0 may write radioStationName/radioTrackTitle at any time
     char stSnap[64]    = "";
     char titleSnap[128] = "";
     if (radioStringMutex && xSemaphoreTake(radioStringMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
@@ -457,7 +471,7 @@ void radioRegisterRoutes(AsyncWebServer* server) {
       strlcpy(titleSnap, radioTrackTitle,  sizeof(titleSnap));
       xSemaphoreGive(radioStringMutex);
     }
-    // Preset-Index einmal lesen (volatile), dann konsistent verwenden
+    // Read preset index once (volatile), then use consistently
     int preset = radioCurrentPreset;
     if (!stSnap[0] && preset >= 0 && preset < radioPresetCount)
       strlcpy(stSnap, radioPresets[preset].name, sizeof(stSnap));
@@ -525,6 +539,15 @@ void radioRegisterRoutes(AsyncWebServer* server) {
   });
 
   server->on("/radio_eq_save", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (request->hasParam("bass", true) &&
+        request->hasParam("mid",  true) &&
+        request->hasParam("treble", true)) {
+      radioSetEq(
+        (int8_t)request->getParam("bass",   true)->value().toInt(),
+        (int8_t)request->getParam("mid",    true)->value().toInt(),
+        (int8_t)request->getParam("treble", true)->value().toInt()
+      );
+    }
     saveRadioEq();
     request->send(200, "text/plain", "OK");
   });
@@ -578,7 +601,7 @@ void radioRegisterRoutes(AsyncWebServer* server) {
   });
 
   server->on("/radio_display", HTTP_POST, [](AsyncWebServerRequest *request) {
-    // Knopfdruck: Display 10 Sekunden anzeigen, dann automatisch aus
+    // Button press: show display for 10 seconds, then auto-off
     radioDisplayActive = true;
     radioDisplayUntil  = millis() + RADIO_DISP_MANUAL_MS;
     request->send(200, "text/plain", "OK");

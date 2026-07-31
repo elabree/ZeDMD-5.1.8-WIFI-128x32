@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ZeDMD Admin</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🕹%3C/text%3E%3C/svg%3E">
+<title>The Arcade Admin</title>
 <style>
 body { background:#121212; color:#e0e0e0; font-family:Arial,sans-serif; padding:20px; max-width:600px; margin:0 auto; }
 h1 { color:#4a9eff; }
@@ -27,10 +28,11 @@ label { display:block; font-size:0.9em; color:#aaa; margin-bottom:4px; margin-to
 a.back { color:#4a9eff; text-decoration:none; display:block; margin-bottom:15px; }
 pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overflow-x:auto; }
 </style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
 <a class="back" href="/">&#x2190; Back to Main</a>
-<h1>&#x2699; ZeDMD Admin</h1>
+<h1>&#x2699; The Arcade Admin</h1>
 
 <!-- Restart -->
 <div class="section">
@@ -154,6 +156,16 @@ pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overfl
   <input type="text" id="mqtt-server" placeholder="e.g. 192.168.1.100">
   <label>Port</label>
   <input type="number" id="mqtt-port" min="1" max="65535" value="1883">
+  <label>Topic</label>
+  <input type="text" id="mqtt-topic" placeholder="e.g. weather/loop">
+  <label>Field: Temperature</label>
+  <input type="text" id="mqtt-field-temp" placeholder="e.g. outTemp_C">
+  <label>Field: Humidity</label>
+  <input type="text" id="mqtt-field-humidity" placeholder="e.g. outHumidity">
+  <label>Field: Wind Speed</label>
+  <input type="text" id="mqtt-field-wind" placeholder="e.g. windSpeed_kph">
+  <label>Field: Pressure</label>
+  <input type="text" id="mqtt-field-pressure" placeholder="e.g. barometer_mbar">
   <div class="status" id="mqtt-status"></div>
   <button onclick="saveMqttConfig()">Save MQTT Config</button>
 </div>
@@ -161,10 +173,16 @@ pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overfl
 <!-- Wetter Koordinaten -->
 <div class="section">
   <h2>Weather Coordinates (Open-Meteo)</h2>
+  <label>Search City</label>
+  <input type="text" id="weather-city-input" placeholder="e.g. Berlin, Hamburg…"
+    oninput="weatherCitySearch(this.value)">
+  <ul id="weather-city-results" style="display:none; list-style:none; margin:0 0 10px 0; padding:0;
+    background:#111; border:1px solid #444; border-radius:4px; max-height:160px; overflow-y:auto;"></ul>
+  <div id="weather-map" style="height:240px; border-radius:4px; margin-bottom:8px; background:#2c2c2c;"></div>
   <label>Latitude</label>
-  <input type="number" id="weather-lat" step="0.0001" placeholder="52.3202">
+  <input type="text" id="weather-lat" inputmode="decimal" placeholder="52.3202">
   <label>Longitude</label>
-  <input type="number" id="weather-lon" step="0.0001" placeholder="10.4011">
+  <input type="text" id="weather-lon" inputmode="decimal" placeholder="10.4011">
   <div class="status" id="weather-config-status"></div>
   <button onclick="saveWeatherConfig()">Save Weather Config</button>
 </div>
@@ -250,6 +268,7 @@ pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overfl
   </div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 window.onload = function() {
   initFontTest();
@@ -266,10 +285,18 @@ window.onload = function() {
     if (d.panelLatchBlanking !== undefined) document.getElementById('latch').value = d.panelLatchBlanking;
     if (d.panelMinRefreshRate !== undefined) document.getElementById('minrefresh').value = d.panelMinRefreshRate;
     if (d.panelDriver !== undefined) document.getElementById('driver').value = d.panelDriver;
-    if (d.mqttServer !== undefined) document.getElementById('mqtt-server').value = d.mqttServer;
-    if (d.mqttPort   !== undefined) document.getElementById('mqtt-port').value   = d.mqttPort;
+    if (d.mqttServer        !== undefined) document.getElementById('mqtt-server').value        = d.mqttServer;
+    if (d.mqttPort          !== undefined) document.getElementById('mqtt-port').value          = d.mqttPort;
+    if (d.mqttTopic         !== undefined) document.getElementById('mqtt-topic').value         = d.mqttTopic;
+    if (d.mqttFieldTemp     !== undefined) document.getElementById('mqtt-field-temp').value     = d.mqttFieldTemp;
+    if (d.mqttFieldHumidity !== undefined) document.getElementById('mqtt-field-humidity').value = d.mqttFieldHumidity;
+    if (d.mqttFieldWind     !== undefined) document.getElementById('mqtt-field-wind').value     = d.mqttFieldWind;
+    if (d.mqttFieldPressure !== undefined) document.getElementById('mqtt-field-pressure').value = d.mqttFieldPressure;
     if (d.weatherLat !== undefined) document.getElementById('weather-lat').value  = d.weatherLat;
     if (d.weatherLon !== undefined) document.getElementById('weather-lon').value  = d.weatherLon;
+    var _mlat = parseFloat(d.weatherLat) || 52.3202;
+    var _mlon = parseFloat(d.weatherLon) || 10.4011;
+    if (typeof L !== 'undefined') initWeatherMap(_mlat, _mlon);
     if (d.timezone) {
       var sel = document.getElementById('tz-preset');
       var found = false;
@@ -404,8 +431,13 @@ function uploadHtmlFile() {
 
 function saveMqttConfig() {
   var params = new URLSearchParams();
-  params.append('server', document.getElementById('mqtt-server').value.trim());
-  params.append('port',   document.getElementById('mqtt-port').value);
+  params.append('server',        document.getElementById('mqtt-server').value.trim());
+  params.append('port',          document.getElementById('mqtt-port').value);
+  params.append('topic',         document.getElementById('mqtt-topic').value.trim());
+  params.append('fieldTemp',     document.getElementById('mqtt-field-temp').value.trim());
+  params.append('fieldHumidity', document.getElementById('mqtt-field-humidity').value.trim());
+  params.append('fieldWind',     document.getElementById('mqtt-field-wind').value.trim());
+  params.append('fieldPressure', document.getElementById('mqtt-field-pressure').value.trim());
   fetch('/save_mqtt_config', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: params.toString()})
     .then(function(r) {
       var el = document.getElementById('mqtt-status');
@@ -437,6 +469,65 @@ function saveTimezone() {
     })
     .catch(function() { el.innerText = '✗ Connection error'; el.style.color = 'red'; });
 }
+
+var _weatherMap = null;
+var _weatherMarker = null;
+
+function initWeatherMap(lat, lon) {
+  _weatherMap = L.map('weather-map').setView([lat, lon], 10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(_weatherMap);
+  _weatherMarker = L.marker([lat, lon], {draggable: true}).addTo(_weatherMap);
+  _weatherMap.on('click', function(e) {
+    _weatherMarker.setLatLng(e.latlng);
+    document.getElementById('weather-lat').value = e.latlng.lat.toFixed(4);
+    document.getElementById('weather-lon').value = e.latlng.lng.toFixed(4);
+  });
+  _weatherMarker.on('dragend', function() {
+    var p = _weatherMarker.getLatLng();
+    document.getElementById('weather-lat').value = p.lat.toFixed(4);
+    document.getElementById('weather-lon').value = p.lng.toFixed(4);
+  });
+}
+
+var _weatherSearchTimer = null;
+function weatherCitySearch(q) {
+  clearTimeout(_weatherSearchTimer);
+  var list = document.getElementById('weather-city-results');
+  if (!q || q.length < 2) { list.style.display = 'none'; return; }
+  _weatherSearchTimer = setTimeout(function() {
+    fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(q) + '&count=6&language=en&format=json')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        list.innerHTML = '';
+        if (!data.results || data.results.length === 0) { list.style.display = 'none'; return; }
+        data.results.forEach(function(r) {
+          var li = document.createElement('li');
+          var label = r.name + (r.admin1 ? ', ' + r.admin1 : '') + ', ' + r.country;
+          li.textContent = label;
+          li.style.cssText = 'padding:8px 12px; cursor:pointer; font-size:0.9em; border-bottom:1px solid #333;';
+          li.addEventListener('mouseenter', function() { li.style.background = '#2a2a2a'; });
+          li.addEventListener('mouseleave', function() { li.style.background = ''; });
+          li.addEventListener('click', function() {
+            document.getElementById('weather-lat').value = r.latitude.toFixed(4);
+            document.getElementById('weather-lon').value = r.longitude.toFixed(4);
+            document.getElementById('weather-city-input').value = label;
+            list.style.display = 'none';
+            if (_weatherMap && _weatherMarker) {
+              var latlng = [r.latitude, r.longitude];
+              _weatherMarker.setLatLng(latlng);
+              _weatherMap.setView(latlng, 10);
+            }
+          });
+          list.appendChild(li);
+        });
+        list.style.display = 'block';
+      })
+      .catch(function() { list.style.display = 'none'; });
+  }, 350);
+}
+
 
 function saveWeatherConfig() {
   var params = new URLSearchParams();

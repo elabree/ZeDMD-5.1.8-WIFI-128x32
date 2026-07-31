@@ -1,9 +1,11 @@
+<!-- ZeDMD index.html | HTML-Build: 2026-07-30 -->
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🕹%3C/text%3E%3C/svg%3E">
     <title>The Arcade</title>
     <style>
         /* Global styling for dark mode */
@@ -183,6 +185,14 @@
             color: red;
         }
 
+        .collapsible-panel {
+            background: #1e1e1e;
+            border: 1px solid #444;
+            border-top: none;
+            border-radius: 0 0 6px 6px;
+            padding: 8px;
+        }
+
         /* Style for the slider track */
         input[type="range"] {
             -webkit-appearance: none;
@@ -302,7 +312,10 @@
             <div class="section" style="margin-bottom:12px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
                     <h2 class="section-header" style="margin-bottom:0;">&#128190; SD Card &amp; Storage</h2>
-                    <a href="/admin" style="display:inline-flex; align-items:center; gap:4px; background:#555; color:#fff; padding:8px 14px; border-radius:4px; text-decoration:none; font-size:0.85em; white-space:nowrap;">&#x2699; Admin</a>
+                    <div style="text-align:right;">
+                        <a href="/admin" style="display:inline-flex; align-items:center; gap:4px; background:#555; color:#fff; padding:8px 14px; border-radius:4px; text-decoration:none; font-size:0.85em; white-space:nowrap;">&#x2699; Admin</a>
+                        <div id="fw-version" style="font-size:0.7em; color:#666; margin-top:3px;"></div>
+                    </div>
                 </div>
                 <div style="margin-bottom:10px;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
@@ -345,9 +358,9 @@
                         </div>
                         <div id="sd-folder-status" class="status-message"></div>
                         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                            <button onclick="setScreensaverPaths()">Apply Folder Selection</button>
+                            <button onclick="setScreensaverPaths()" style="width:auto; margin:0;">Apply Folder Selection</button>
                             <button onclick="sdFolderRefresh()" style="width:auto; padding:8px 14px; margin:0; background:#555;">&#8635; Refresh Folders</button>
-                            <button onclick="screensaverRescan()" style="width:auto; padding:8px 14px; margin:0; background:#444;">&#8635; Full Rescan</button>
+                            <button onclick="screensaverRescan()" style="width:auto; padding:8px 14px; margin:0; background:#444;" title="Reloads screensaver files from the selected folders and clears the file cache.">&#8635; Reload Files</button>
                             <button id="cancel-scan-btn" onclick="cancelScan()" style="display:none; width:auto; padding:8px 14px; margin:0; background:#c0392b;">&#x2715; Cancel Scan</button>
                         </div>
 
@@ -368,7 +381,7 @@
                                 <span style="font-size:0.85em; color:#aaa;">⭐ Favorites</span>
                                 <span id="fav-list-arrow" style="color:#fff; font-size:1.1em;">▶&#xFE0E;</span>
                             </div>
-                            <div id="fav-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px; max-height:200px; overflow-y:auto;">
+                            <div id="fav-list-panel" class="collapsible-panel" style="display:none; max-height:200px; overflow-y:auto;">
                                 <div id="fav-list-content" style="font-size:0.82em; color:#aaa;">Loading...</div>
                             </div>
                         </div>
@@ -380,7 +393,7 @@
                                 <span style="font-size:0.85em; color:#aaa;">🚫 Ignored Files</span>
                                 <span id="ign-list-arrow" style="color:#fff; font-size:1.1em;">▶&#xFE0E;</span>
                             </div>
-                            <div id="ign-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px; max-height:200px; overflow-y:auto;">
+                            <div id="ign-list-panel" class="collapsible-panel" style="display:none; max-height:200px; overflow-y:auto;">
                                 <div id="ign-list-content" style="font-size:0.82em; color:#aaa;">Loading...</div>
                             </div>
                         </div>
@@ -457,7 +470,7 @@
                                 <span style="font-size:0.85em; color:#aaa;">&#127902; Active Screensaver Files <span id="screensaver-file-count" style="color:#777; font-weight:normal;"></span></span>
                                 <span id="ss-file-list-arrow" style="color:#fff; font-size:1.1em;">▶&#xFE0E;</span>
                             </div>
-                            <div id="ss-file-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px;">
+                            <div id="ss-file-list-panel" class="collapsible-panel" style="display:none;">
                                 <div id="ss-pagination-top" style="display:none; gap:8px; align-items:center; margin-bottom:6px;">
                                     <button id="ss-prev-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(-1)">&#9664; Back</button>
                                     <span id="ss-page-info-top" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
@@ -515,7 +528,7 @@
                                     <span id="gif-audio-list-arrow" style="color:#fff; font-size:1.1em;">▶&#xFE0E;</span>
                                 </div>
                             </div>
-                            <div id="gif-audio-list-panel" style="display:none; background:#1e1e1e; border:1px solid #444; border-top:none; border-radius:0 0 6px 6px; padding:8px;">
+                            <div id="gif-audio-list-panel" class="collapsible-panel" style="display:none;">
                                 <div id="gif-audio-pagination-top" style="display:none; gap:8px; align-items:center; margin-bottom:6px;">
                                     <button id="ga-prev-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="gifAudioPage(-1)">&#9664; Back</button>
                                     <span id="gif-audio-page-info-top" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
@@ -563,8 +576,9 @@
                             </div>
                         </div>
 
+                        <div id="display-text-screensaver-hint" style="display:none; font-size:0.85em; color:#4a9eff; margin-bottom:6px;">&#x2139; Active as screensaver</div>
                         <div style="display:flex; gap:10px;">
-                            <button onclick="sendDisplayText()" style="flex:1; padding:8px 14px;">&#9654; Send</button>
+                            <button id="display-text-send-btn" onclick="sendDisplayText()" style="flex:1; padding:8px 14px;">&#9654; Send</button>
                             <button onclick="stopDisplayText()" style="flex:0 0 auto; width:auto; padding:8px 14px; background:#6c757d;">&#9646;&#9646; Stop</button>
                         </div>
                         <div id="display-text-status" class="status-message"></div>
@@ -608,6 +622,8 @@
                             <option value="2">Clock + Screensaver</option>
                             <option value="3">Clock + Weather</option>
                             <option value="4">Clock + Weather + Screensaver</option>
+                            <option value="5">Text Screensaver</option>
+                            <option value="6">Clock + Text</option>
                         </select>
                         <div id="mode-status" class="status-message"></div>
 
@@ -633,6 +649,7 @@
                         <div id="screensaver-status" class="status-message"></div>
                         <button onclick="applyScreensaverBrightness()">Apply Display Brightness</button>
 
+                        <div id="screensaver-duration-group">
                         <label for="screensaver-duration">Screensaver Duration: <span id="screensaver-duration-value">10</span>s</label>
                         <div class="slider-container">
                             <span>5s</span>
@@ -643,6 +660,7 @@
                         <br>
                         <div id="screensaver-duration-status" class="status-message"></div>
                         <button onclick="applyScreensaverDuration()">Apply Duration</button>
+                        </div>
 
                         <div style="display:flex; align-items:center; gap:24px; margin-top:14px; flex-wrap:wrap;">
                             <div style="display:flex; align-items:center; gap:10px;">
@@ -662,6 +680,7 @@
                             </div>
                         </div>
                         <div id="screensaver-shuffle-status" class="status-message"></div>
+                        <div id="screensaver-strict-timer-status" class="status-message"></div>
                     </div>
                 </div>
             </div>
@@ -697,17 +716,17 @@
                         <div style="font-size:0.75em; color:#888; margin-bottom:4px;">EQ</div>
                         <div class="slider-container" style="margin-bottom:4px;">
                             <span style="font-size:0.75em; color:#aaa; min-width:46px;">Bass</span>
-                            <input type="range" id="eq-bass-slider" min="-6" max="6" value="0" oninput="setRadioEq()" onchange="saveRadioEqPersist()">
+                            <input type="range" id="eq-bass-slider" min="-6" max="6" value="0" oninput="setRadioEq()">
                             <span id="eq-bass-val" style="min-width:28px; text-align:right; font-size:0.85em; color:#aaa; margin-left:4px;">0</span>
                         </div>
                         <div class="slider-container" style="margin-bottom:4px;">
                             <span style="font-size:0.75em; color:#aaa; min-width:46px;">Mid</span>
-                            <input type="range" id="eq-mid-slider" min="-6" max="6" value="0" oninput="setRadioEq()" onchange="saveRadioEqPersist()">
+                            <input type="range" id="eq-mid-slider" min="-6" max="6" value="0" oninput="setRadioEq()">
                             <span id="eq-mid-val" style="min-width:28px; text-align:right; font-size:0.85em; color:#aaa; margin-left:4px;">0</span>
                         </div>
                         <div class="slider-container">
                             <span style="font-size:0.75em; color:#aaa; min-width:46px;">Treble</span>
-                            <input type="range" id="eq-treble-slider" min="-6" max="6" value="0" oninput="setRadioEq()" onchange="saveRadioEqPersist()">
+                            <input type="range" id="eq-treble-slider" min="-6" max="6" value="0" oninput="setRadioEq()">
                             <span id="eq-treble-val" style="min-width:28px; text-align:right; font-size:0.85em; color:#aaa; margin-left:4px;">0</span>
                         </div>
                     </div>
@@ -844,6 +863,8 @@
                     if (xhr.status === 200) {
                         statusElem.innerText = "Displaying (" + duration + "s)";
                         statusElem.style.color = "green";
+                        localStorage.setItem('dtText', text);
+                        localStorage.setItem('dtColor', color);
                     } else {
                         statusElem.innerText = "Error sending.";
                         statusElem.style.color = "red";
@@ -946,22 +967,18 @@
 
         function saveScreensaverStrictTimer() {
             var val = document.getElementById('screensaver-strict-timer').checked ? 1 : 0;
-            var statusElem = document.getElementById('screensaver-shuffle-status');
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", "/save_screensaver_strict_timer", true);
-            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === XMLHttpRequest.DONE) {
-                    if (xhr.status === 200) {
-                        statusElem.innerText = val ? "Strict timer on" : "Strict timer off";
-                        statusElem.style.color = "green";
-                    } else {
-                        statusElem.innerText = "Error saving.";
-                        statusElem.style.color = "red";
-                    }
-                }
-            };
-            xhr.send(`screensaverStrictTimer=${val}`);
+            var statusElem = document.getElementById('screensaver-strict-timer-status');
+            fetch('/save_screensaver_strict_timer', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'screensaverStrictTimer=' + val
+            }).then(function(r) {
+                statusElem.innerText = val ? 'Strict timer on' : 'Strict timer off';
+                statusElem.style.color = 'green';
+            }).catch(function() {
+                statusElem.innerText = 'Error saving.';
+                statusElem.style.color = 'red';
+            });
         }
 
         function saveGifAudioEnabled() {
@@ -1214,19 +1231,46 @@
         function screensaverRescan() {
             if (!confirm('Start full rescan? All caches will be cleared. This may take several minutes.')) return;
             var countEl = document.getElementById('screensaver-file-count');
+            var cancelBtn = document.getElementById('cancel-scan-btn');
             countEl.textContent = ' (rescanning…)';
             countEl.style.color = '#aaa';
+            if (cancelBtn) cancelBtn.style.display = 'inline-block';
             fetch('/screensaver_rescan', {method:'POST'})
                 .then(function() { ssPollReady(0); })
-                .catch(function() { countEl.textContent = ' (error)'; countEl.style.color = '#e74c3c'; });
+                .catch(function() {
+                    countEl.textContent = ' (error)';
+                    countEl.style.color = '#e74c3c';
+                    if (cancelBtn) cancelBtn.style.display = 'none';
+                });
         }
 
         function ssPollReady(attempt) {
-            if (attempt > 20) { sdFileOffset = 0; loadSDScreensaverFiles(); loadSDFolders(); return; }
+            ssPollRunning = true;
+            var cancelBtn = document.getElementById('cancel-scan-btn');
+            if (attempt > 20) {
+                ssPollRunning = false;
+                sdFileOffset = 0;
+                loadSDScreensaverFiles();
+                loadSDFolders();
+                if (cancelBtn) cancelBtn.style.display = 'none';
+                return;
+            }
             setTimeout(function() {
                 fetch('/screensaver_folder_count').then(function(r) { return r.json(); }).then(function(d) {
-                    if (d.total > 0) { sdFileOffset = 0; loadSDScreensaverFiles(); loadSDFolders(); }
-                    else { ssPollReady(attempt + 1); }
+                    // scanning field available in firmware >= 4249d9e
+                    var done = (d.scanning === false) || (d.scanning === undefined && d.total > 0);
+                    if (done) {
+                        ssPollRunning = false;
+                        sdFileOffset = 0;
+                        loadSDScreensaverFiles();
+                        loadSDFolders();
+                        if (cancelBtn) cancelBtn.style.display = 'none';
+                        var statusElem = document.getElementById('sd-folder-status');
+                        if (statusElem) {
+                            statusElem.innerText = d.total > 0 ? 'Rescan complete (' + d.total + ' files)' : 'No files found';
+                            statusElem.style.color = d.total > 0 ? 'green' : '#aaa';
+                        }
+                    } else { ssPollReady(attempt + 1); }
                 }).catch(function() { ssPollReady(attempt + 1); });
             }, 3000);
         }
@@ -1531,8 +1575,25 @@
                          ('0'+b.toString(16)).slice(-2);
         }
 
+        function updateDurationState(mode) {
+            var screensaverTextMode = (mode == 5 || mode == 6);
+            var slider = document.getElementById('display-text-duration');
+            slider.disabled = screensaverTextMode;
+            slider.parentElement.style.opacity = screensaverTextMode ? '0.4' : '1';
+            var btn = document.getElementById('display-text-send-btn');
+            btn.innerHTML = screensaverTextMode ? '&#9654; Apply' : '&#9654; Send';
+            document.getElementById('display-text-screensaver-hint').style.display =
+                screensaverTextMode ? 'block' : 'none';
+            // Mode 5: text scrolls continuously, screensaver duration has no effect
+            var ssGroup = document.getElementById('screensaver-duration-group');
+            var mode5 = (mode == 5);
+            ssGroup.style.opacity = mode5 ? '0.4' : '1';
+            ssGroup.style.pointerEvents = mode5 ? 'none' : '';
+        }
+
         function saveScreensaverMode() {
             var mode = document.getElementById('screensaver-mode').value;
+            updateDurationState(mode);
             var xhr = new XMLHttpRequest();
             xhr.open('POST', '/save_screensaver_mode', true);
             xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
@@ -1608,6 +1669,7 @@
                     document.getElementById("screensaver-duration-value").innerText = duration;
                     if (config.screensaverMode !== undefined) {
                         document.getElementById("screensaver-mode").value = config.screensaverMode;
+                        updateDurationState(config.screensaverMode);
                     }
                     if (config.screensaverShuffle !== undefined) {
                         var az = config.screensaverShuffle == 0;
@@ -1970,6 +2032,7 @@
             }
         }
 
+        var _eqSaveTimer = null;
         function setRadioEq(skipSend) {
             var bass   = parseInt(document.getElementById('eq-bass-slider').value);
             var mid    = parseInt(document.getElementById('eq-mid-slider').value);
@@ -1985,11 +2048,19 @@
                 fd.append('bass', bass); fd.append('mid', mid); fd.append('treble', treble);
                 fetch('/radio_eq', { method: 'POST', body: fd })
                     .catch(function(e) { console.warn('ZeDMD radio_eq:', e); });
+                clearTimeout(_eqSaveTimer);
+                _eqSaveTimer = setTimeout(saveRadioEqPersist, 600);
             }
         }
 
         function saveRadioEqPersist() {
-            fetch('/radio_eq_save', { method: 'POST' })
+            _eqSaveTimer = null;
+            var bass   = parseInt(document.getElementById('eq-bass-slider').value);
+            var mid    = parseInt(document.getElementById('eq-mid-slider').value);
+            var treble = parseInt(document.getElementById('eq-treble-slider').value);
+            var fd = new FormData();
+            fd.append('bass', bass); fd.append('mid', mid); fd.append('treble', treble);
+            fetch('/radio_eq_save', { method: 'POST', body: fd })
                 .catch(function(e) { console.warn('ZeDMD radio_eq_save:', e); });
         }
 
@@ -2244,6 +2315,7 @@
                     defBtn.onclick = function() {
                         defCb.checked = !defCb.checked;
                         defBtn.style.background = defCb.checked ? '#28a745' : '#007bff';
+                        if (defCb.checked) favBtn.style.background = '#007bff';
                     };
                     folderList.appendChild(defCb);
 
@@ -2300,6 +2372,7 @@
                             btn.onclick = function() {
                                 cb.checked = !cb.checked;
                                 btn.style.background = cb.checked ? '#28a745' : '#007bff';
+                                if (cb.checked) favBtn.style.background = '#007bff';
                                 var anyChecked = Array.from(document.querySelectorAll('#sd-folder-list input[type=checkbox]')).some(function(c){ return c.checked; });
                                 defBtn.style.background = anyChecked ? '#007bff' : '#28a745';
                             };
@@ -2434,35 +2507,26 @@
 
         function deleteActiveFile(filepath) {
             if (!confirm("Delete " + filepath + "?")) return;
-            var xhr = new XMLHttpRequest();
+            var params = new URLSearchParams();
             var url;
             if (filepath.startsWith("SD:")) {
-                // SD Datei löschen
                 var parts = filepath.substring(3).split('/');
-                var folder = parts[1];
-                var file = parts[parts.length - 1];
-                url = "/delete_sd_file?folder=" + encodeURIComponent(folder) + "&file=" + encodeURIComponent(file);
+                params.append('folder', parts[1]);
+                params.append('file', parts[parts.length - 1]);
+                url = "/delete_sd_file";
             } else {
-                // LittleFS Datei löschen
-                var name = filepath.replace("FS:/screensaver/", "");
-                url = "/delete_screensaver?file=" + encodeURIComponent(name);
+                params.append('file', filepath.replace("FS:/screensaver/", ""));
+                url = "/delete_screensaver";
             }
-            xhr.open("GET", url, true);
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === XMLHttpRequest.DONE) {
-                    if (xhr.status === 200) {
-                        loadSDScreensaverFiles();
-                    } else {
-                        alert("Error deleting file.");
-                    }
-                }
-            };
-            xhr.send();
+            fetch(url, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: params.toString()})
+                .then(function(r) { if (r.ok) loadSDScreensaverFiles(); else alert("Error deleting file."); })
+                .catch(function() { alert("Error deleting file."); });
         }
 
         var sdFileOffset = 0;
         var sdFileTotal = 0;
         var sdFilePageSize = 20;
+        var ssPollRunning = false;
 
         function sdFilePage(dir) {
             var newOffset = sdFileOffset + dir * sdFilePageSize;
@@ -2622,7 +2686,14 @@
                             var info = JSON.parse(xhr2.responseText);
                             sdFileTotal = info.total;
                             var countEl = document.getElementById('screensaver-file-count');
-                            countEl.textContent = '(' + info.total + ')';
+                            countEl.textContent = info.scanning ? ' (scanning…)' : '(' + info.total + ')';
+                            if (info.scanning && !ssPollRunning) {
+                                var cancelBtn = document.getElementById('cancel-scan-btn');
+                                if (cancelBtn) cancelBtn.style.display = 'inline-block';
+                                var statusElem = document.getElementById('sd-folder-status');
+                                if (statusElem) { statusElem.innerText = 'Scanning…'; statusElem.style.color = '#aaa'; }
+                                ssPollReady(0);
+                            }
                             var pagination    = document.getElementById('ss-pagination');
                             var paginationTop = document.getElementById('ss-pagination-top');
                             var prevBtn = document.getElementById('ss-prev-btn');
@@ -2654,6 +2725,12 @@
 
         window.onload = function () {
             switchTab(localStorage.getItem('activeTab') || 'screensaver');
+
+            // Display Text aus localStorage wiederherstellen
+            var savedText  = localStorage.getItem('dtText');
+            var savedColor = localStorage.getItem('dtColor');
+            if (savedText)  { var inp = document.getElementById('display-text-input');  if (inp)  inp.value  = savedText;  }
+            if (savedColor) { var col = document.getElementById('display-text-color');  if (col)  col.value  = savedColor; }
 
             // Requests gestaffelt statt simultan — reduziert Peak-SRAM-Verbrauch
             // (jede TCP-Verbindung kostet ~3-4 KB internen SRAM; 10 gleichzeitig = ~40 KB Peak)
@@ -2691,13 +2768,17 @@
                 }).catch(function() {});
             }, 100);
 
-            // Gruppe 3 (250ms): Speicher-Info
+            // Gruppe 3 (250ms): Speicher-Info + Firmware-Version
             setTimeout(function() {
                 fetchFsInfo();
                 fetchSDInfo();
+                fetch('/get_version').then(function(r) { return r.text(); }).then(function(v) {
+                    var el = document.getElementById('fw-version');
+                    if (el) el.innerText = 'FW: ' + v.trim();
+                }).catch(function() {});
             }, 250);
 
-            // Gruppe 4 (450ms): SD-Ordner + Favoriten/Ignores (3 Requests)
+            // Gruppe 4 (450ms): SD-Ordner + Favoriten/Ignores
             setTimeout(function() {
                 loadSDFolders();
                 refreshFavIgnCache();
@@ -2710,8 +2791,19 @@
                 loadDisplayTimer();
             }, 700);
 
-            setInterval(fetchCurrentFile, 5000);
-            setInterval(updateRadioBtns, 5000);
+            var _currentFileTimer = setInterval(fetchCurrentFile, 5000);
+            var _radioBtnTimer    = setInterval(updateRadioBtns, 5000);
+
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden) {
+                    clearInterval(_currentFileTimer);
+                    clearInterval(_radioBtnTimer);
+                } else {
+                    _currentFileTimer = setInterval(fetchCurrentFile, 5000);
+                    _radioBtnTimer    = setInterval(updateRadioBtns, 5000);
+                }
+            });
+
 
             // Radio-Status aktualisieren
             function updateRadioBtns() {
@@ -2720,7 +2812,7 @@
                     _radioPreset     = d.preset;
                     _radioLastPreset = (d.lastPreset !== undefined && d.lastPreset >= 0) ? d.lastPreset : _radioLastPreset;
                     if (d.volume !== undefined) setRadioVolume(d.volume, true);
-                    if (d.eqBass !== undefined) loadRadioEq(d.eqBass, d.eqMid, d.eqTreble);
+                    if (d.eqBass !== undefined && !_eqSaveTimer) loadRadioEq(d.eqBass, d.eqMid, d.eqTreble);
                     if (d.mono !== undefined) setRadioMono(d.mono, true);
                     if (d.swapChannels !== undefined) setRadioSwap(d.swapChannels, true);
                     if (d.displayActive !== undefined) {
@@ -2765,6 +2857,22 @@
             // pageshow mit persisted=true = Wiederherstellung aus BFCache → neu abfragen.
             window.addEventListener('pageshow', function(e) {
                 if (e.persisted) { _radioLastPreset = -1; updateRadioBtns(); }
+            });
+
+            // Seite geschlossen/neu geladen bevor 600ms-Timer gefeuert hat → sofort speichern.
+            window.addEventListener('beforeunload', function() {
+                if (_eqSaveTimer) {
+                    clearTimeout(_eqSaveTimer);
+                    _eqSaveTimer = null;
+                    var bass   = parseInt(document.getElementById('eq-bass-slider').value);
+                    var mid    = parseInt(document.getElementById('eq-mid-slider').value);
+                    var treble = parseInt(document.getElementById('eq-treble-slider').value);
+                    var fd = new FormData();
+                    fd.append('bass', String(bass));
+                    fd.append('mid', String(mid));
+                    fd.append('treble', String(treble));
+                    navigator.sendBeacon('/radio_eq_save', fd);
+                }
             });
 
         };

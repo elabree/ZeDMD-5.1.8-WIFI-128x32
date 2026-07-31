@@ -4,8 +4,8 @@
 
 #include <Arduino.h>
 
-// ── Wetter-Zustandsvariablen ─────────────────────────────────────────────────
-// Lesbar von main.cpp (MQTT-Callback, get_config, SaveWeatherConfig)
+// ── Weather state variables ───────────────────────────────────────────────────
+// Readable from main.cpp (MQTT callback, get_config, SaveWeatherConfig)
 
 extern float    weatherTemp;
 extern float    weatherWindSpeed;
@@ -26,14 +26,14 @@ extern float    weatherLon;
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-void weatherInit();             // Platzhalter — bei Bedarf erweitern (z.B. Mutex)
-void weatherTrigger();          // Startet HTTP-Fetch in eigenem Task (PSRAM-Stack)
-void weatherIconTest();          // TEST: alle 16×16 Icons (6+5-Grid)
-void weatherSmallIconTest();     // TEST: alle 8×8 Icons (1 Zeile, Vorhersage-Größe)
-void weatherDisplay();          // Wetter-Vollbild
-void weatherDisplayClock();     // Uhr + Wetter kombiniert
-void weatherDisplayForecast();  // 3-Tages-Vorhersage
-bool weatherIsAvailable();      // true wenn Wetter-Daten vorhanden
+void weatherInit();             // placeholder — extend as needed (e.g. mutex)
+void weatherTrigger();          // starts HTTP fetch in its own task (PSRAM stack)
+void weatherIconTest();          // TEST: all 16×16 icons (6+5 grid)
+void weatherSmallIconTest();     // TEST: all 8×8 icons (1 row, forecast size)
+void weatherDisplay();          // full-screen weather
+void weatherDisplayClock();     // clock + weather combined
+void weatherDisplayForecast();  // 3-day forecast
+bool weatherIsAvailable();      // true if weather data is available
 
 #endif // ZEDMD_WIFI
 #endif // WEATHER_H

@@ -240,6 +240,30 @@ Der `data/`-Ordner wird via `pio run -t buildfs` in `littlefs.bin` gepackt und i
 - Werden **nicht** beim Boot geladen (zu viele, werden nicht genutzt)
 - Dateien bleiben auf LittleFS, können on-demand gelesen werden
 
+### Wetter-Icons — WMO-Code-Mapping
+
+OpenMeteo liefert einen `weather_code` (WMO-Standard, Teilmenge). Das Display wählt daraus ein Icon:
+
+| WMO-Code(s) | Beschreibung | Icon-Nr | Icon-Datei |
+|---|---|---|---|
+| 0, 1 (Tag) | Sonnig / Heiter | 0 | *(gezeichnet)* |
+| 0, 1 (Nacht) | Klar | 6 | *(Mond, gezeichnet)* |
+| 2 (Tag) | Teils bewölkt | 1 | *(gezeichnet)* |
+| 2 (Nacht) | Teils bew. (Nacht) | 7 | *(Mond+Wolke, gezeichnet)* |
+| 3 | Bedeckt | 2 | *(gezeichnet)* |
+| 45, 48 | Nebel | 10 | *(gezeichnet)* |
+| 51–57 | Nieselregen | 3 | *(gezeichnet)* |
+| 61–67 | Regen | 8 | *(gezeichnet)* |
+| 71–77 | Schnee | 4 | *(gezeichnet)* |
+| 80–82 | Schauer | 9 | *(gezeichnet)* |
+| 85–86 | Schneeschauer | 4 | *(gezeichnet)* |
+| 95+ | Gewitter | 5 | *(gezeichnet)* |
+| alle anderen | Unbekannt | 255 | `icons/question.rgba` |
+
+Der aktuelle `weather_code` erscheint im Log als `Wetter: Code=<n> isDay=<0/1>` bei jedem OpenMeteo-Fetch (~alle 15 Min.).
+
+**Priorität:** MQTT liefert Temperatur, Luftfeuchtigkeit, Wind, Druck mit höchster Priorität. OpenMeteo liefert immer: `weather_code` (Icon) + Forecast. OpenMeteo liefert Messwerte nur wenn MQTT >10 Min. still war (grau auf Display) oder nicht konfiguriert ist.
+
 ### Radio-Icons (on-demand)
 
 - Pfad auf **LittleFS**: `/icons_radio/<slug>.rgba`

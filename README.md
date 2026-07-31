@@ -1,8 +1,13 @@
-# ZeDMD 5.1.8 — WiFi Fork (128×32, ESP32-S3-N16R8)
-
----
+# The Arcade — powered by ZeDMD (WiFi Fork, 128×32, ESP32-S3-N16R8)
 
 > 🇩🇪 **Deutschsprachige Anleitung:** [LIESMICH.md](LIESMICH.md)
+
+**The Arcade** is an ESP32-S3 firmware for a 128×32 HUB75 LED matrix. It turns a pinball DMD panel into a standalone smart display with:
+
+- **Clock + weather** — live data from your own weather station via MQTT (WeeWx), with Open-Meteo as automatic fallback; configurable field names, visual fallback indicator
+- **GIF screensaver** — animated GIFs from SD card, sorted alphabetically or shuffled, with optional synchronised MP3 audio per GIF
+- **Webradio** — internet radio via I2S amplifier (MAX98357A); station logos, track title, equaliser, L/R swap
+- **Web UI** — full configuration and control from any browser on your local network; no app, no account, no cloud
 
 ---
 
@@ -10,10 +15,31 @@
 
 ---
 
-> **This is a personal hobby fork of [PPUC/ZeDMD](https://github.com/PPUC/ZeDMD) v5.1.8.**
+> **This started as a personal hobby fork of [PPUC/ZeDMD](https://github.com/PPUC/ZeDMD) v5.1.8**
+> and has since grown well beyond it — the clock, weather, and webradio features are original
+> work built on top, not part of upstream ZeDMD. What *is* inherited from upstream is the core
+> DMD protocol handling and the HUB75 display driver — that foundation is why this project
+> stays under the same GPLv2-or-later license as ZeDMD itself, and why it remains listed as a
+> GitHub fork of it rather than a standalone repo.
 > It is shared with the community in the hope that it might be useful — but it comes with **absolutely no support, no warranty, and no guarantee of any kind**.
 > Issues and pull requests may not be responded to. Emails and messages regarding this project will likely go unanswered — not out of disrespect, but simply because this is a spare-time project maintained by one person.
 > **Use entirely at your own risk.**
+
+---
+
+> ⚠️ **Panel size: only tested with 128×32 (2× chained 64×32 tiles).** The codebase already
+> has build environments for larger panels (`256x64` / `S3-N16R8_256x64`, via `ZEDMD_HD`) and
+> the core DMD rendering scales automatically with `TOTAL_WIDTH`/`TOTAL_HEIGHT` — but this has
+> **not been built or tested**. The weather overlay and GIF screensaver have hardcoded pixel
+> positions sized for 128×32 that would need adapting first.
+>
+> If you do try a larger panel: pay **significantly more attention to power supply sizing**
+> than you would for 128×32. A single 64×32 HUB75 tile can draw up to ~25W (5V/5A) at full
+> white; going to 256×64 roughly **quadruples the pixel count** versus this project's default
+> 128×32 setup, and current draw scales accordingly. Undersized power supplies on large HUB75
+> chains cause voltage drop, ghosting/dimming artifacts, and in the worst case connector or
+> wiring damage — plan for adequate power injection points along the chain, not just a single
+> feed at one corner.
 
 ---
 
@@ -41,7 +67,20 @@ https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/raw/main/docs/images/ZeDMD_WiF
 
 ## 🆕 What's new in this release
 
-### v1.5.2 *(this release)*
+### v1.5.3 *(this release)*
+
+#### Configurable MQTT field names
+The JSON field names used to read weather data from your MQTT broker are now configurable in the admin panel — no reflash required. This matters if your WeeWx (or other weather station) uses non-standard field names. Default values match the standard WeeWx LOOP output: `outTemp_C`, `outHumidity`, `windSpeed_kph`, `barometer_mbar`. Settings are saved to LittleFS and survive reboots.
+
+#### Visual fallback indicator for OpenMeteo data
+When MQTT has been silent for more than 10 minutes, the weather display switches to Open-Meteo data as a fallback. All four weather values (temperature, humidity, wind, pressure) are now shown in **grey** instead of white during this fallback period — an immediate visual cue that the data is not coming from your local weather station. After 30 minutes without MQTT, the existing orange **"MQTT fehlt"** text appears as before.
+
+#### Unknown weather code fallback icon
+If Open-Meteo returns a WMO weather code that has no matching icon, the display now shows the **question mark icon** (`question.rgba` from the icon set) instead of the misleading cloudy icon that was used before. In practice this should never appear — all codes used by Open-Meteo are handled — but it makes the system more robust.
+
+---
+
+### v1.5.2
 
 #### Tabbed Web UI
 The main page has been reorganised into three tabs — **Screensaver**, **Display** and **Radio** — making it much easier to navigate on both desktop and mobile. SD card & storage info plus the Admin button remain always visible above the tabs.

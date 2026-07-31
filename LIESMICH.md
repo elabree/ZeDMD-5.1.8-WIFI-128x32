@@ -1,8 +1,13 @@
-# ZeDMD 5.1.8 — WiFi Fork (128×32, ESP32-S3-N16R8)
-
----
+# The Arcade — powered by ZeDMD (WiFi Fork, 128×32, ESP32-S3-N16R8)
 
 > 🇬🇧 **English documentation:** [README.md](README.md)
+
+**The Arcade** ist eine ESP32-S3-Firmware für eine 128×32 HUB75-LED-Matrix. Sie verwandelt ein Pinball-DMD-Panel in ein eigenständiges Smart-Display mit:
+
+- **Uhr + Wetter** — Live-Daten von der eigenen Wetterstation per MQTT (WeeWx), mit Open-Meteo als automatischem Fallback; konfigurierbare Feldnamen, visueller Fallback-Indikator
+- **GIF-Screensaver** — animierte GIFs von der SD-Karte, alphabetisch oder zufällig, optional mit synchronem MP3-Audio pro GIF
+- **Webradio** — Internetradio per I2S-Verstärker (MAX98357A); Senderlogos, Titelinfo, Equalizer, L/R-Tausch
+- **Web-UI** — vollständige Konfiguration und Steuerung über jeden Browser im lokalen Netzwerk; keine App, kein Account, keine Cloud
 
 ---
 
@@ -10,10 +15,33 @@
 
 ---
 
-> **Dies ist ein persönlicher Hobby-Fork von [PPUC/ZeDMD](https://github.com/PPUC/ZeDMD) v5.1.8.**
+> **Das hier begann als persönlicher Hobby-Fork von [PPUC/ZeDMD](https://github.com/PPUC/ZeDMD) v5.1.8**
+> und ist seitdem weit darüber hinausgewachsen — Uhr, Wetter und Webradio sind eigene
+> Erweiterungen, kein Teil des ursprünglichen ZeDMD. Was tatsächlich vom Original stammt, ist
+> das DMD-Protokoll und der HUB75-Display-Treiber — genau diese Basis ist der Grund, warum das
+> Projekt weiterhin unter derselben GPLv2-or-later-Lizenz wie ZeDMD steht und auch auf GitHub
+> bewusst als Fork davon gelistet bleibt, statt als eigenständiges Repo.
 > Er wird mit der Community geteilt in der Hoffnung, dass er nützlich sein könnte — aber er kommt **ohne jeglichen Support, ohne Garantie und ohne Gewährleistung**.
 > Issues und Pull Requests werden möglicherweise nicht beantwortet — nicht aus Unhöflichkeit, sondern weil dies ein Freizeitprojekt ist, das von einer einzelnen Person betreut wird.
 > **Nutzung vollständig auf eigene Gefahr.**
+
+---
+
+> ⚠️ **Panelgröße: bisher nur mit 128×32 getestet (2× gechainte 64×32-Panels).** Die Codebasis
+> hat bereits Build-Umgebungen für größere Panels (`256x64` / `S3-N16R8_256x64`, über
+> `ZEDMD_HD`), und das DMD-Kern-Rendering skaliert automatisch über `TOTAL_WIDTH`/
+> `TOTAL_HEIGHT` — das wurde aber **noch nicht gebaut oder getestet**. Wetter-Overlay und
+> GIF-Screensaver haben hardcodierte Pixel-Positionen für 128×32, die vorher angepasst werden
+> müssten.
+>
+> Falls du ein größeres Panel ausprobierst: der Stromversorgung deutlich mehr Aufmerksamkeit
+> schenken als bei 128×32. Ein einzelnes 64×32-HUB75-Panel kann bei Vollweiß bis zu ~25W
+> ziehen (5V/5A); bei 256×64 vervierfacht sich die Pixelzahl gegenüber dem hier
+> standardmäßigen 128×32-Aufbau ungefähr, und der Strombedarf steigt entsprechend mit.
+> Unterdimensionierte Netzteile bei großen HUB75-Ketten verursachen Spannungsabfall,
+> Geisterbilder/Dimm-Artefakte und im schlimmsten Fall Schäden an Steckverbindern oder
+> Verkabelung — mehrere Einspeisepunkte entlang der Kette einplanen, nicht nur eine
+> Einspeisung an einer Ecke.
 
 ---
 
@@ -41,7 +69,20 @@ https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/raw/main/docs/images/ZeDMD_WiF
 
 ## 🆕 Neu in dieser Version
 
-### v1.5.2 *(diese Version)*
+### v1.5.3 *(diese Version)*
+
+#### Konfigurierbare MQTT-Feldnamen
+Die JSON-Feldnamen, mit denen Wetterdaten vom MQTT-Broker gelesen werden, sind jetzt im Admin-Panel konfigurierbar — kein Neuflashen nötig. Das ist wichtig, wenn die eigene Wetterstation (z. B. WeeWx) andere Feldnamen verwendet. Standardwerte entsprechen dem WeeWx-LOOP-Standardformat: `outTemp_C`, `outHumidity`, `windSpeed_kph`, `barometer_mbar`. Die Einstellung wird in LittleFS gespeichert.
+
+#### Visueller Fallback-Indikator für Open-Meteo-Daten
+Wenn MQTT länger als 10 Minuten keine Daten liefert, wechselt die Wetteranzeige auf Open-Meteo als Fallback. Alle vier Wetterwerte (Temperatur, Luftfeuchtigkeit, Wind, Luftdruck) werden in dieser Zeit in **Grau** statt Weiß angezeigt — ein sofort sichtbares Signal, dass die Daten nicht von der eigenen Wetterstation kommen. Nach 30 Minuten ohne MQTT erscheint wie bisher der orange Text **„MQTT fehlt"**.
+
+#### Fragezeichen-Icon für unbekannte Wettercodes
+Liefert Open-Meteo einen WMO-Wettercode ohne passendes Icon, zeigt das Display jetzt das **Fragezeichen-Icon** (`question.rgba` aus dem Icon-Set) statt des bisherigen, irreführenden Wolken-Icons. Im Normalbetrieb sollte das nie auftreten — alle von Open-Meteo verwendeten Codes sind abgedeckt — aber das System ist damit robuster.
+
+---
+
+### v1.5.2
 
 #### Tabs im Webinterface
 Die Hauptseite ist jetzt in drei Tabs unterteilt — **Screensaver**, **Display** und **Radio** — was die Navigation deutlich übersichtlicher macht, besonders auf dem Smartphone. SD-Karten-Info und der Admin-Button bleiben immer sichtbar über den Tabs.

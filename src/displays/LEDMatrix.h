@@ -13,10 +13,10 @@
 #define C_PIN 3
 #define D_PIN 42
 #define E_PIN 1  // required for 1/32 scan panels, like 64x64.
-// ⚠️ SDMMC-Board: GPIO 40 = SDMMC DATA, GPIO 41 = SDMMC CLK
-//    → HUB75 LAT/CLK müssen auf freie Pins umgeklemmt werden!
-//    SPI-SD-Board:   LAT=40, CLK=41  (Standard-Kabel)
-//    SDMMC-Board:    LAT=46, CLK=17  (Kabel umklemmen!)
+// ⚠️ SDMMC board: GPIO 40 = SDMMC DATA, GPIO 41 = SDMMC CLK
+//    → HUB75 LAT/CLK must be rewired to free pins!
+//    SPI-SD board:   LAT=40, CLK=41  (standard cable)
+//    SDMMC board:    LAT=46, CLK=17  (rewire cable!)
 #ifdef SD_MMC_BUILD
 #define LAT_PIN 46
 #define CLK_PIN 17

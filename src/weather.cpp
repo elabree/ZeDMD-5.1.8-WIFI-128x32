@@ -13,7 +13,7 @@
 #include <esp_task_wdt.h>
 #include <time.h>
 
-// ── Aus main.cpp (extern) ─────────────────────────────────────────────────────
+// ── Externals from main.cpp ───────────────────────────────────────────────────
 
 extern DisplayDriver*    display;
 extern uint8_t           screensaverBrightness;
@@ -22,6 +22,7 @@ extern bool              wifiActive;
 extern void Render();
 extern void logMsg(const char* fmt, ...);
 extern void ApplyBrightness(uint8_t base);
+extern const uint8_t* GetIcon(const char* name);
 
 #include "clock.h"  // clockR/G/B, dateR/G/B, clockColorChanged, DrawSegDigit, DrawColon
 
@@ -45,7 +46,7 @@ volatile bool weatherFetchRunning = false;
 float weatherLat = 52.3202f;
 float weatherLon = 10.4011f;
 
-// ── Interne Hilfstypen und Funktionen ─────────────────────────────────────────
+// ── Internal types and helpers ────────────────────────────────────────────────
 
 struct WeatherInfo { const char* text; uint8_t icon; };
 
@@ -63,77 +64,91 @@ static WeatherInfo GetWeatherInfo(uint16_t code, bool isDay = true) {
   if (code >= 80 && code <= 82)        return {"Schauer",       9};
   if (code >= 85 && code <= 86)        return {"Schneeschr.",   4};
   if (code >= 95)                      return {"Gewitter",      5};
-  return {"Unbekannt", 2};
+  return {"?", 255};
 }
 
-// 8×8 Wetter-Icons, zwei Layer, scale=Pixelgröße (1=8px, 2=16px)
+static void getTempColor(int temp, uint8_t &r, uint8_t &g, uint8_t &b) {
+  if      (temp < -10) { r=0;   g=0;   b=120; }
+  else if (temp <=  0) { r=0;   g=0;   b=220; }
+  else if (temp <= 10) { r=0;   g=180; b=255; }
+  else if (temp <= 15) { r=255; g=210; b=0;   }
+  else if (temp <= 25) { r=255; g=120; b=0;   }
+  else if (temp <= 30) { r=255; g=0;   b=0;   }
+  else                 { r=180; g=0;   b=0;   }
+}
+
+// 8x8 weather icons, two layers, scale = pixel size (1=8px, 2=16px)
 static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
+  if (idx == 255) {
+    display->DisplayText("?", x + scale, y + scale, 128, 128, 128, scale);
+    return;
+  }
   if (idx >= 11) idx = 2;
 
-  // Layer 1 — Hauptform
+  // Layer 1 — main shape
   static const uint8_t L1[8][8] = {
-    // 0 Sonne: kompakter Kern + Strahlen in alle 8 Richtungen
+    // 0 Sun: compact core + rays in all 8 directions
     {0b00011000, 0b01000010, 0b00111100, 0b10111101,
      0b10111101, 0b00111100, 0b01000010, 0b00011000},
-    // 1 Teils bew.: kleines Sonnen-Icon (symmetrisch um col 1.5)
+    // 1 Partly cloudy: small sun icon (symmetric around col 1.5)
     {0b01100000, 0b11110000, 0b01100000, 0b00000000,
      0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    // 2 Bedeckt: Wolke (Original 9301b21)
+    // 2 Overcast: cloud (original 9301b21)
     {0b00000000, 0b00111000, 0b01111110, 0b11111111,
      0b11111111, 0b01111110, 0b00000000, 0b00000000},
-    // 3 Regen (unverändert)
+    // 3 Rain (unchanged)
     {0b00111100, 0b01111110, 0b11111111, 0b11111111,
      0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    // 4 Schnee: 8px breit, symmetrisch um col 3.5 und row 3.5
+    // 4 Snow: 8px wide, symmetric around col 3.5 and row 3.5
     {0b00011000, 0b01000010, 0b00111100, 0b11100111,
      0b11100111, 0b00111100, 0b01000010, 0b00011000},
-    // 5 Gewitter (unverändert)
+    // 5 Thunderstorm (unchanged)
     {0b00111100, 0b01111110, 0b11111111, 0b11111111,
      0b00000000, 0b00000000, 0b00000000, 0b00000000},
-    // 6 Mond (unverändert)
+    // 6 Moon (unchanged)
     {0b00111100, 0b01110000, 0b11100000, 0b11100000,
      0b11100000, 0b11100000, 0b01110000, 0b00111100},
-    // 7 Teils bewölkt (unverändert)
+    // 7 Partly cloudy (unchanged)
     {0b00000000, 0b00000000, 0b00000000, 0b00000000,
      0b00011100, 0b00111110, 0b01111111, 0b00000000},
   };
 
-  // Layer 1 Farben
+  // Layer 1 colors
   static const uint8_t C1[8][3] = {
-    {255, 210,   0},  // 0 Sonne — gelb
-    {255, 210,   0},  // 1 Mond
-    {155, 155, 165},  // 2 Bedeckt — grau
-    {155, 155, 165},  // 3 Regen
-    {200, 230, 255},  // 4 Schnee
-    {155, 155, 165},  // 5 Gewitter
-    {200, 220, 255},  // 6 Mond — blaugrau
-    {155, 155, 165},  // 7 Bewölkt
+    {255, 210,   0},  // 0 Sun — yellow
+    {255, 210,   0},  // 1 Moon
+    {155, 155, 165},  // 2 Overcast — grey
+    {155, 155, 165},  // 3 Rain
+    {200, 230, 255},  // 4 Snow
+    {155, 155, 165},  // 5 Thunderstorm
+    {200, 220, 255},  // 6 Moon — blue-grey
+    {155, 155, 165},  // 7 Cloudy
   };
 
-  // Layer 2 — Details (Regen, Blitz, Mondschatten …)
+  // Layer 2 — details (rain, lightning, moon shadow …)
   static const uint8_t L2[8][8] = {
-    {0, 0, 0, 0, 0, 0, 0, 0},  // 0 Sonne — kein zweiter Layer
+    {0, 0, 0, 0, 0, 0, 0, 0},  // 0 Sun — no second layer
     {0b00000000, 0b00000000, 0b00001100, 0b00111110,
-     0b01111111, 0b01111111, 0b00111110, 0b00000000},  // 1 Mond
-    {0, 0, 0, 0, 0, 0, 0, 0},  // 2 Bedeckt — kein zweiter Layer
+     0b01111111, 0b01111111, 0b00111110, 0b00000000},  // 1 Moon
+    {0, 0, 0, 0, 0, 0, 0, 0},  // 2 Overcast — no second layer
     {0b00000000, 0b00000000, 0b00000000, 0b00000000,
-     0b01000100, 0b00100010, 0b01000100, 0b00100010},  // 3 Regen — Tropfen
-    {0, 0, 0, 0, 0, 0, 0, 0},  // 4 Schnee
+     0b01000100, 0b00100010, 0b01000100, 0b00100010},  // 3 Rain — drops
+    {0, 0, 0, 0, 0, 0, 0, 0},  // 4 Snow
     {0b00001000, 0b00010000, 0b00111100, 0b00001000,
-     0b00010000, 0b00100000, 0b01000000, 0b00000000},  // 5 Gewitter — Blitz nach Vorlage
-    {0, 0, 0, 0, 0, 0, 0, 0},  // 6 Mond
+     0b00010000, 0b00100000, 0b01000000, 0b00000000},  // 5 Thunderstorm — lightning bolt
+    {0, 0, 0, 0, 0, 0, 0, 0},  // 6 Moon
     {0b01110000, 0b11000000, 0b11000000, 0b01110000,
-     0b00000000, 0b00000000, 0b00000000, 0b00000000},  // 7 Bewölkt
+     0b00000000, 0b00000000, 0b00000000, 0b00000000},  // 7 Cloudy
   };
 
-  // Layer 2 Farben
+  // Layer 2 colors
   static const uint8_t C2[8][3] = {
     {  0,   0,   0},  // 0
-    {170, 170, 175},  // 1 Mond
+    {170, 170, 175},  // 1 Moon
     {  0,   0,   0},  // 2
-    {100, 160, 255},  // 3 Regen — blau
+    {100, 160, 255},  // 3 Rain — blue
     {  0,   0,   0},  // 4
-    {255, 210,   0},  // 5 Gewitter — gelber Blitz
+    {255, 210,   0},  // 5 Thunderstorm — yellow lightning
     {  0,   0,   0},  // 6
     {200, 220, 255},  // 7
   };
@@ -152,13 +167,13 @@ static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
       }
     }
   };
-  // Sonne: per-Pixel-Gradient (weißer Kern → Gelb → Orange an den Strahlenspitzen)
+  // Sun: per-pixel gradient (white core → yellow → orange at ray tips)
   if (idx == 0) {
-    #define _O {  0,  0,  0}   // aus
-    #define _T {255,150,  0}   // Strahlenspitzen — Orange
-    #define _R {255,190,  0}   // Diagonalstrahlen — Goldgelb
-    #define _I {255,230, 60}   // innerer Ring — Gelb
-    #define KK {255,255,160}   // Kern — weißlich-gelb
+    #define _O {  0,  0,  0}   // off
+    #define _T {255,150,  0}   // ray tips — orange
+    #define _R {255,190,  0}   // diagonal rays — gold yellow
+    #define _I {255,230, 60}   // inner ring — yellow
+    #define KK {255,255,160}   // core — whitish yellow
     static const uint8_t SUN[8][8][3] = {
       {_O, _O, _O, _T, _T, _O, _O, _O},
       {_O, _R, _O, _O, _O, _O, _R, _O},
@@ -187,7 +202,7 @@ static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
     return;
   }
 
-  // Helfer: Layer mit per-Zeile unterschiedlicher Farbe zeichnen
+  // helper: draw layer with per-row color gradient
   auto drawLayerGrad = [&](const uint8_t bmp[8], const uint8_t rc[8][3]) {
     for (int row = 0; row < 8; row++) {
       uint8_t mask = bmp[row];
@@ -205,7 +220,7 @@ static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
     }
   };
 
-  if (idx == 1) {  // Teils bewölkt: kleine Sonne + Wolke
+  if (idx == 1) {  // partly cloudy: small sun + cloud
     static const uint8_t G1[8][3] = {
       {255,200, 40},{255,180, 10},{255,200, 40},
       {  0,  0,  0},{  0,  0,  0},{  0,  0,  0},{  0,  0,  0},{  0,  0,  0}};
@@ -216,7 +231,7 @@ static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
     drawLayerGrad(L2[1], G2);
     return;
   }
-  if (idx == 2) {  // Wolke
+  if (idx == 2) {  // cloud
     static const uint8_t G1[8][3] = {
       {  0,  0,  0},
       {212,217,227},{192,197,208},{172,177,188},{160,165,177},{148,153,165},
@@ -224,7 +239,7 @@ static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
     drawLayerGrad(L1[2], G1);
     return;
   }
-  if (idx == 3) {  // Nieselregen — 2 senkrechte Tropfen (Spalten 3+6, Zeilen 5–6)
+  if (idx == 3) {  // drizzle — 2 vertical drops (cols 3+6, rows 5–6)
     static const uint8_t G1[8][3] = {
       {120,125,138},{108,113,126},{ 96,101,114},{ 86, 91,104},
       {  0,  0,  0},{  0,  0,  0},{  0,  0,  0},{  0,  0,  0}};
@@ -234,21 +249,21 @@ static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
     drawLayer(DRIZZLE, 90, 175, 255);
     return;
   }
-  if (idx == 4) {  // Schnee: blauweißer Eiskristall, Mitte heller
+  if (idx == 4) {  // snow: blue-white ice crystal, brighter centre
     static const uint8_t G1[8][3] = {
       {170,200,255},{155,188,255},{180,212,255},{200,228,255},
       {200,228,255},{180,212,255},{155,188,255},{170,200,255}};
     drawLayerGrad(L1[4], G1);
     return;
   }
-  if (idx == 5) {  // Gewitter: sehr dunkle Wolke + heller Blitz
+  if (idx == 5) {  // thunderstorm: very dark cloud + bright lightning
     static const uint8_t G1[8][3] = {
       {  0,  0,  0},{ 96,101,114},{ 86, 91,104},{ 76, 81, 94},
       { 68, 73, 86},{  0,  0,  0},{  0,  0,  0},{  0,  0,  0}};
     static const uint8_t G2[8][3] = {
       {255,230,  0},{255,230,  0},{255,230,  0},{255,230,  0},
       {255,230,  0},{255,230,  0},{255,230,  0},{  0,  0,  0}};
-    // Wolke 1 Zeile tiefer (Zeilen 1–4), Blitz-Pixel ausgespart
+    // cloud shifted 1 row down (rows 1–4), lightning pixels cut out
     static const uint8_t CLOUD5[8] = {
       0, 0b00101100, 0b01000010, 0b11110111,
       0b11101111,0,0,0};
@@ -256,7 +271,7 @@ static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
     drawLayerGrad(L2[5], G2);
     return;
   }
-  if (idx == 6) {  // Mond: warm-cremefarbige Sichel, Innenkante heller
+  if (idx == 6) {  // moon: warm cream crescent, brighter inner edge
     #define _OO {  0,  0,  0}
     #define _DI {220,215,182}
     #define _MD {242,237,202}
@@ -286,35 +301,35 @@ static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
       }
     return;
   }
-  if (idx == 7) {  // Teils bewölkt Nacht: Mondsichel (cremeweiß) + Wolke wie Icon 1
-    static const uint8_t GC[8][3] = {  // Wolke (L2[1]-Form)
+  if (idx == 7) {  // partly cloudy night: crescent moon (cream white) + cloud like icon 1
+    static const uint8_t GC[8][3] = {  // cloud (L2[1] shape)
       {  0,  0,  0},{  0,  0,  0},
       {200,205,215},{182,187,198},{165,170,182},{150,155,167},{140,145,157},{  0,  0,  0}};
-    static const uint8_t GM[8][3] = {  // Mondsichel — cremeweiß statt gelb
+    static const uint8_t GM[8][3] = {  // crescent moon — cream white instead of yellow
       {242,237,202},{220,215,182},{220,215,182},{242,237,202},
       {  0,  0,  0},{  0,  0,  0},{  0,  0,  0},{  0,  0,  0}};
     drawLayerGrad(L2[1], GC);
     drawLayerGrad(L2[7], GM);
     return;
   }
-  if (idx == 8) {  // Regen — senkrechte Tropfen
+  if (idx == 8) {  // rain — vertical drops
     static const uint8_t G1[8][3] = {
       {108,113,126},{ 96,101,114},{ 86, 91,104},{ 78, 83, 96},
       {  0,  0,  0},{  0,  0,  0},{  0,  0,  0},{  0,  0,  0}};
-    static const uint8_t DROPS[8] = {  // diagonal \ über 4 Zeilen
+    static const uint8_t DROPS[8] = {  // diagonal \ over 4 rows
       0,0,0,0, 0b00100100,0b00010010,0b00100100,0b00010010};
     drawLayerGrad(L1[3], G1);
     drawLayer(DROPS, 90, 175, 255);
     return;
   }
-  if (idx == 9) {  // Schauer — Sonne oben links + Wolke (1px höher) + diagonale Tropfen
-    static const uint8_t GS[8][3] = {  // Sonne (wie Icon 1)
+  if (idx == 9) {  // showers — sun top-left + cloud (1px higher) + diagonal drops
+    static const uint8_t GS[8][3] = {  // sun (same as icon 1)
       {255,200, 40},{255,180, 10},{255,200, 40},
       {  0,  0,  0},{  0,  0,  0},{  0,  0,  0},{  0,  0,  0},{  0,  0,  0}};
-    static const uint8_t CLOUD9[8] = {  // Wolke 1px höher als L2[1], links erweitert
+    static const uint8_t CLOUD9[8] = {  // cloud 1px higher than L2[1], extended left
       0b00000000, 0b00001100, 0b00111110, 0b11111111,
       0b11111111, 0b01111110, 0b00000000, 0b00000000};
-    static const uint8_t GC[8][3] = {  // Wolken-Gradient wie Icon 8 (dunkler)
+    static const uint8_t GC[8][3] = {  // cloud gradient like icon 8 (darker)
       {  0,  0,  0},{108,113,126},{ 96,101,114},{ 86, 91,104},
       { 78, 83, 96},{ 68, 73, 86},{  0,  0,  0},{  0,  0,  0}};
     static const uint8_t DRPS[8] = {  // diagonale Tropfen Zeilen 6–7
@@ -324,7 +339,7 @@ static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
     drawLayer(DRPS, 90, 175, 255);
     return;
   }
-  if (idx == 10) {  // Nebel — horizontale Streifen, kein Wolken-Block
+  if (idx == 10) {  // fog — horizontal stripes, no cloud block
     static const uint8_t FOG[8] = {
       0b00000000, 0b11111100, 0b00000000, 0b00111111,
       0b00000000, 0b11111100, 0b00000000, 0b00000000};
@@ -342,19 +357,19 @@ static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
 static void fetchWeather() {
   if (!wifiActive || WiFi.status() != WL_CONNECTED) return;
   lastWeatherFetch = millis();
-  logMsg("Wetter: Fetch-Start, Heap frei=%u intern-max=%u",
+  logMsg("Weather: fetch start, heap free=%u internal-max=%u",
          esp_get_free_heap_size(),
          heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
 
-  // Response-Body in PSRAM — verhindert 20-30 KB Allokation im internen SRAM-Heap
+  // response body in PSRAM — prevents 20-30 KB allocation in internal SRAM heap
   const size_t WX_BUF = 32768;
   char* body = (char*)heap_caps_malloc(WX_BUF, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-  if (!body) { logMsg("Wetter: PSRAM-Puffer fehlgeschlagen"); return; }
+  if (!body) { logMsg("Weather: PSRAM buffer alloc failed"); return; }
 
   WiFiClient client;
   HTTPClient http;
-  // HTTP (kein TLS) — Open-Meteo unterstuetzt plain HTTP fuer Embedded-Geraete;
-  // interner RAM reicht nicht fuer mbedTLS-Handshake wenn Audio-Codec aktiv ist
+  // HTTP (no TLS) — Open-Meteo supports plain HTTP for embedded devices;
+  // internal RAM is insufficient for mbedTLS handshake when audio codec is active
   char urlBuf[320];
   snprintf(urlBuf, sizeof(urlBuf),
     "http://api.open-meteo.com/v1/forecast"
@@ -400,6 +415,7 @@ static void fetchWeather() {
         weatherCode      = (uint16_t)code;
         lastWeatherFetch = millis();
         weatherAvailable = true;
+        logMsg("Weather: code=%d isDay=%d (1=day)", weatherCode, extractInt("\"is_day\"", curStart));
         if (millis() - lastMqttWeather > 10UL * 60UL * 1000UL) {
           float temp = extractFloat("\"temperature_2m\"", curStart);
           if (temp > -900.0f) {
@@ -446,15 +462,15 @@ static void fetchWeather() {
       if (ok) {
         __sync_synchronize();
         forecastAvailable = true;
-        logMsg("Wetter: Vorhersage OK (%d/%d/%d)", forecastCode[0], forecastCode[1], forecastCode[2]);
+        logMsg("Weather: forecast OK (codes %d/%d/%d)", forecastCode[0], forecastCode[1], forecastCode[2]);
       } else {
-        logMsg("Wetter: Vorhersage Parsing fehlgeschlagen");
+        logMsg("Weather: forecast parsing failed");
       }
     } else {
-      logMsg("Wetter: Kein hourly/daily-Block in Antwort");
+      logMsg("Weather: no hourly/daily block in response");
     }
   } else {
-    logMsg("Wetter: HTTP Fehler %d", httpCode);
+    logMsg("Weather: HTTP error %d", httpCode);
   }
   http.end();
   free(body);
@@ -462,8 +478,8 @@ static void fetchWeather() {
 
 static TaskHandle_t wxTaskHandle = NULL;
 
-// Läuft einmal, suspendiert sich danach — wird per vTaskResume reaktiviert statt neu erzeugt,
-// damit wxTaskBuf (StaticTask_t) nie wiederverwendet wird bevor der Idle-Task ihn aufgeräumt hat.
+// Runs once, then suspends — reactivated via vTaskResume instead of being recreated,
+// so wxTaskBuf (StaticTask_t) is never reused before the idle task has cleaned it up.
 static void weatherFetchTask(void* pvParams) {
   while (true) {
     fetchWeather();
@@ -475,14 +491,14 @@ static void weatherFetchTask(void* pvParams) {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 void weatherInit() {
-  // Platzhalter — zukünftige Initialisierung (z.B. Mutex für Wetterdaten) hier
+  // placeholder — future initialization (e.g. mutex for weather data) goes here
 }
 
 void weatherTrigger() {
   if (weatherFetchRunning) return;
   weatherFetchRunning = true;
   if (!wxTaskHandle) {
-    // Erster Aufruf: Task einmalig erzeugen (Stack bleibt für die gesamte Laufzeit)
+    // first call: create task once (stack persists for the entire runtime)
     static StaticTask_t wxTaskBuf;
     static StackType_t* wxStack = nullptr;
     if (!wxStack) {
@@ -490,14 +506,14 @@ void weatherTrigger() {
     }
     if (!wxStack) {
       weatherFetchRunning = false;
-      logMsg("Wetter: Stack-Allokierung fehlgeschlagen");
+      logMsg("Weather: stack alloc failed");
       return;
     }
     wxTaskHandle = xTaskCreateStatic(weatherFetchTask, "wxFetch", 20480 / sizeof(StackType_t),
                                      NULL, 1, wxStack, &wxTaskBuf);
     if (!wxTaskHandle) {
       weatherFetchRunning = false;
-      logMsg("Wetter: Task-Start fehlgeschlagen");
+      logMsg("Weather: task start failed");
     }
   } else {
     vTaskResume(wxTaskHandle);
@@ -508,8 +524,24 @@ bool weatherIsAvailable() {
   return weatherAvailable;
 }
 
-// ── 16×16 Wetter-Icons (direkt gezeichnet, keine Skalierung) ─────────────────
+// ── 16×16 weather icons (drawn directly, no scaling) ─────────────────────────
 static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
+  if (idx == 255) {
+    const uint8_t* q = GetIcon("question");
+    if (q) {
+      // question.rgba is 20x20 — draw 16x16 centered crop (offset 2,2)
+      for (int dy = 0; dy < 16; dy++) {
+        for (int dx = 0; dx < 16; dx++) {
+          const uint8_t* p = q + ((dy + 2) * 20 + (dx + 2)) * 4;
+          if (p[3] < 32) continue;
+          display->DrawPixel(x + dx, y + dy, p[0], p[1], p[2]);
+        }
+      }
+    } else {
+      display->DisplayText("?", x + 4, y + 4, 128, 128, 128, 2);
+    }
+    return;
+  }
   if (idx >= 11) idx = 2;
 
   auto px = [&](int dx, int dy, uint8_t r, uint8_t g, uint8_t b) {
@@ -517,9 +549,9 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
     display->DrawPixel(x + dx, y + dy, r, g, b);
   };
 
-  // Wolken-Bitmap: 16 Spalten × 9 Zeilen, bit15=col0, bit0=col15
+  // cloud bitmap: 16 cols x 9 rows, bit15=col0, bit0=col15
   static const uint16_t CLD[9] = {
-    0x0F00, // row 0: cols 4-7 (linker Buckel, höher)
+    0x0F00, // row 0: cols 4-7 (left bump, higher)
     0x1FB8, // row 1: cols 3-8 + cols 10-12 (Spalt bei col 9)
     0x3FFC, // row 2: cols 2-13
     0x7FFE, // row 3: cols 1-14
@@ -529,24 +561,24 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
     0x7FFE, // row 7: cols 1-14
     0x3FFC, // row 8: cols 2-13
   };
-  // Farbverlauf: oben hell (Highlight) → unten dunkel (Schatten)
-  static const uint8_t LC[9][3] = {  // normale Wolke (+20 heller)
+  // gradient: bright top (highlight) → dark bottom (shadow)
+  static const uint8_t LC[9][3] = {  // normal cloud (+20 brighter)
     {235,240,252},{220,225,238},{205,210,225},
     {192,197,212},{180,185,200},{170,175,190},
     {160,165,180},{150,155,170},{138,143,158}
   };
-  static const uint8_t DC[9][3] = {  // Gewitterwolke (-20 dunkler)
+  static const uint8_t DC[9][3] = {  // storm cloud (-20 darker)
     {108,111,125},{ 95, 98,112},{ 83, 86,100},
     { 73, 76, 90},{ 64, 67, 81},{ 56, 59, 73},
     { 48, 51, 65},{ 40, 43, 57},{ 32, 35, 49}
   };
-  static const uint8_t RC[9][3] = {  // Regenwolke (65% Richtung DC)
+  static const uint8_t RC[9][3] = {  // rain cloud (65% toward DC)
     {152,156,169},{139,142,156},{126,129,144},
     {115,118,133},{105,108,123},{ 96,100,114},
     { 87, 91,105},{ 79, 82, 97},{ 69, 73, 87}
   };
 
-  // style: 0=normal (LC), 1=Regen (RC), 2=Gewitter (DC)
+  // style: 0=normal (LC), 1=rain (RC), 2=storm (DC)
   auto drawCloud = [&](int dy0, uint8_t style) {
     const uint8_t (*c)[3] = (style == 2) ? DC : (style == 1) ? RC : LC;
     for (int r = 0; r < 9; r++) {
@@ -559,7 +591,7 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
 
   switch (idx) {
 
-  case 0: { // ☀️ Sonne — Kreis mit 8 Strahlen
+  case 0: { // ☀️ sun — circle with 8 rays
     for (int dy = 0; dy < 16; dy++) {
       for (int dx = 0; dx < 16; dx++) {
         float fx = dx - 7.5f, fy = dy - 7.5f;
@@ -570,17 +602,17 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
         else if (d <= 4.5f) px(dx, dy, 255, 188,   5);
       }
     }
-    // N/S-Strahlen (2px breit, 2px lang)
+    // N/S rays (2px wide, 2px long)
     for (int i = 0; i < 2; i++) {
       px(7+i, 0, 255, 155, 0); px(7+i, 1, 255, 170, 0);
       px(7+i,14, 255, 155, 0); px(7+i,15, 255, 155, 0);
     }
-    // W/E-Strahlen
+    // W/E rays
     for (int i = 0; i < 2; i++) {
       px( 0, 7+i, 255, 155, 0); px( 1, 7+i, 255, 170, 0);
       px(14, 7+i, 255, 155, 0); px(15, 7+i, 255, 155, 0);
     }
-    // Diagonale Strahlen (1px pro Ecke)
+    // diagonal rays (1px per corner)
     px( 2,  2, 255, 162, 0); px( 1,  1, 255, 148, 0);
     px(13,  2, 255, 162, 0); px(14,  1, 255, 148, 0);
     px( 2, 13, 255, 162, 0); px( 1, 14, 255, 148, 0);
@@ -588,8 +620,8 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
     break;
   }
 
-  case 1: { // ⛅ Teils bewölkt: kleine Sonne oben-links + große Wolke darunter
-    // Kleine Sonne (r=3) zentriert bei (3,3)
+  case 1: { // ⛅ partly cloudy: small sun top-left + large cloud below
+    // small sun (r=3) centered at (3,3)
     for (int dy = 0; dy < 8; dy++) {
       for (int dx = 0; dx < 8; dx++) {
         float fx = dx - 3.0f, fy = dy - 3.0f;
@@ -607,12 +639,12 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
     break;
   }
 
-  case 2: { // ☁️ Wolke — vertikal zentriert
+  case 2: { // ☁️ cloud — vertically centered
     drawCloud(3, 0);
     break;
   }
 
-  case 3: { // 🌦️ Nieselregen — Wolke + 6 einzelne Tropfenpunkte
+  case 3: { // 🌦️ drizzle — cloud + 6 individual drop dots
     drawCloud(0, 1);
     static const int8_t DX[] = {4, 8, 12};
     for (int d = 0; d < 3; d++) {
@@ -622,7 +654,7 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
     break;
   }
 
-  case 4: { // ❄️ Schnee — zwei 5×5 Schneeflocken (Kreuz + Diagonalspitzen)
+  case 4: { // ❄️ snow — two 5×5 snowflakes (cross + diagonal tips)
     drawCloud(0, 0);
     auto flake = [&](int cx, int cy) {
       px(cx-2,cy-2,255,255,255); px(cx,cy-2,255,255,255); px(cx+2,cy-2,255,255,255);
@@ -636,17 +668,17 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
     break;
   }
 
-  case 5: { // ⛈️ Gewitter — dunkle Wolke + Blitz (3px breit, Z-Form)
+  case 5: { // ⛈️ thunderstorm — dark cloud + lightning (3px wide, Z-shape)
     drawCloud(0, 2);
     static const uint8_t TC[3][3] = {{255,255,195},{255,248,165},{255,238,125}};
     static const uint8_t BC[3][3] = {{255,205, 45},{255,178, 10},{240,148,  0}};
-    // Oberer Arm: diagonal links-unten, 3px breit
+    // upper arm: diagonal down-left, 3px wide
     for (int i = 0; i < 3; i++)
       for (int dx = 0; dx < 3; dx++)
         px(7-i+dx, 9+i, TC[i][0], TC[i][1], TC[i][2]);
-    // Horizontaler Kink (6px)
+    // horizontal kink (6px)
     for (int c = 4; c <= 9; c++) px(c, 12, 255, 225, 85);
-    // Unterer Arm: diagonal links-unten, 3px breit
+    // lower arm: diagonal down-left, 3px wide
     for (int i = 0; i < 3; i++)
       for (int dx = 0; dx < 3; dx++)
         px(6-i+dx, 13+i, BC[i][0], BC[i][1], BC[i][2]);
@@ -671,7 +703,7 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
     break;
   }
 
-  case 7: { // 🌥️ Teils bewölkt Nacht: Mondsichel oben-links + Wolke darunter
+  case 7: { // 🌥️ partly cloudy night: crescent moon top-left + cloud below
     for (int dy = 0; dy < 8; dy++) {
       for (int dx = 0; dx < 8; dx++) {
         float dOut = sqrtf((dx-3.0f)*(dx-3.0f) + (dy-3.0f)*(dy-3.0f));
@@ -689,7 +721,7 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
     break;
   }
 
-  case 8: { // 🌧️ Regen — Wolke + 3 diagonale \ Streifen, je 3px, 2 Gruppen
+  case 8: { // 🌧️ rain — cloud + 3 diagonal \ stripes, 3px each, 2 groups
     drawCloud(0, 1);
     static const int8_t SX8[] = {12, 8, 4};
     for (int d = 0; d < 3; d++) {
@@ -703,8 +735,8 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
     break;
   }
 
-  case 9: { // 🌦️ Regenschauer — Sonne oben links + Wolke tiefer + diagonale Tropfen
-    // Sonne (gleiche Form wie Icon 1)
+  case 9: { // 🌦️ rain showers — sun top-left + cloud lower + diagonal drops
+    // sun (same shape as icon 1)
     for (int dy = 0; dy < 8; dy++) {
       for (int dx = 0; dx < 8; dx++) {
         float fx = dx - 3.0f, fy = dy - 3.0f;
@@ -718,9 +750,9 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
     px(6, 3, 255, 148, 0); px(3, 6, 255, 148, 0);
     px(1, 1, 255, 152, 0); px(5, 1, 255, 152, 0);
     px(1, 5, 255, 152, 0); px(5, 5, 255, 152, 0);
-    // Wolke ab Zeile 3 (überdeckt Sonnen-Unterhälfte)
+    // cloud from row 3 (covers sun lower half)
     drawCloud(3, 1);
-    // Diagonale Tropfen unterhalb der Wolke
+    // diagonal drops below the cloud
     static const int8_t SX9[] = {12, 8, 4};
     for (int d = 0; d < 3; d++) {
       px(SX9[d]-0, 12, 90, 175, 255);
@@ -846,8 +878,10 @@ void weatherDisplayClock() {
   for (int y = 0; y < TOTAL_HEIGHT; y++)
     display->DrawPixel(53, y, 100, 100, 100);
 
-  bool mqttStale = (lastMqttWeather > 0 &&
-                    millis() - lastMqttWeather > 30UL * 60UL * 1000UL);
+  bool mqttFallback = (lastMqttWeather > 0 &&
+                       millis() - lastMqttWeather > 10UL * 60UL * 1000UL);
+  bool mqttStale    = (lastMqttWeather > 0 &&
+                       millis() - lastMqttWeather > 30UL * 60UL * 1000UL);
   if (weatherAvailable && !mqttStale) {
     WeatherInfo wi = GetWeatherInfo(weatherCode, weatherIsDay);
 
@@ -855,22 +889,20 @@ void weatherDisplayClock() {
 
     int tempInt = (int)roundf(weatherTemp);
     uint8_t tR, tG, tB;
-    if      (tempInt < -10) { tR=0;   tG=0;   tB=120; }
-    else if (tempInt <= 0)  { tR=0;   tG=0;   tB=220; }
-    else if (tempInt <= 10) { tR=0;   tG=180; tB=255; }
-    else if (tempInt <= 15) { tR=255; tG=210; tB=0;   }
-    else if (tempInt <= 25) { tR=255; tG=120; tB=0;   }
-    else if (tempInt <= 30) { tR=255; tG=0;   tB=0;   }
-    else                    { tR=180; tG=0;   tB=0;   }
+    getTempColor(tempInt, tR, tG, tB);
+    // gray out all values when falling back to OpenMeteo (MQTT silent >10 min)
+    uint8_t wR, wG, wB;
+    if (mqttFallback) { tR = tG = tB = wR = wG = wB = 100; }
+    else              { wR = dateR; wG = dateG; wB = dateB; }
 
-    // Zentriert in Zone x=72..96 (zwischen Icon-Ende und Nebendaten)
+    // centered in zone x=72..96 (between icon end and side data)
     bool negative = (weatherTemp < -0.5f);
     int absTemp = negative ? -tempInt : tempInt;
     int w = 0;
     if (negative)      w += 6;   // Minuszeichen
     if (absTemp >= 10) w += 11;  // Zehner
     w += 10;                     // Einer
-    w += 5;                      // Lücke + "C"
+    w += 5;                      // gap + "C"
     int tx = 72 + (25 - w) / 2;
     if (tx < 72) tx = 72;
     if (negative) {
@@ -884,17 +916,17 @@ void weatherDisplayClock() {
     tx += 10;
     display->DisplayText("C", tx + 1, 5, tR, tG, tB, 1);
 
-    display->DisplayText(wi.text, 55, 25, dateR, dateG, dateB, 1);
+    display->DisplayText(wi.text, 55, 25, wR, wG, wB, 1);
 
     char humStr[8];
     snprintf(humStr, sizeof(humStr), "H:%u%%", weatherHumidity);
-    display->DisplayText(humStr, 101, 2, dateR, dateG, dateB, 1);
+    display->DisplayText(humStr, 101, 2, wR, wG, wB, 1);
     char windStr[9];
     snprintf(windStr, sizeof(windStr), "W:%dkm", (int)roundf(weatherWindSpeed));
-    display->DisplayText(windStr, 101, 11, dateR, dateG, dateB, 1);
+    display->DisplayText(windStr, 101, 11, wR, wG, wB, 1);
     char presStr[10];
     snprintf(presStr, sizeof(presStr), "P:%u", weatherPressure);
-    display->DisplayText(presStr, 101, 20, dateR, dateG, dateB, 1);
+    display->DisplayText(presStr, 101, 20, wR, wG, wB, 1);
   } else if (mqttStale) {
     display->DisplayText("MQTT", 66, 10, 255, 80, 0, 1);
     display->DisplayText("fehlt", 64, 18, 255, 80, 0, 1);
@@ -944,13 +976,7 @@ void weatherDisplayForecast() {
     int tempInt = (int)forecastTempMax[i];
 
     uint8_t tR, tG, tB;
-    if      (tempInt < -10) { tR=0;   tG=0;   tB=120; }
-    else if (tempInt <= 0)  { tR=0;   tG=0;   tB=220; }
-    else if (tempInt <= 10) { tR=0;   tG=180; tB=255; }
-    else if (tempInt <= 15) { tR=255; tG=210; tB=0;   }
-    else if (tempInt <= 25) { tR=255; tG=120; tB=0;   }
-    else if (tempInt <= 30) { tR=255; tG=0;   tB=0;   }
-    else                    { tR=180; tG=0;   tB=0;   }
+    getTempColor(tempInt, tR, tG, tB);
 
     const char* dn = dayNames[dayOfWeek];
     display->DisplayText(dn, cx + (42 - (int)strlen(dn) * 4) / 2, 0, dateR, dateG, dateB, 1);

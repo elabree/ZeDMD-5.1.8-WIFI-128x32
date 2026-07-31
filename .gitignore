@@ -9,6 +9,7 @@ CLAUDE.md
 /reference/
 
 PROJECT_STATUS.md
+DIAGNOSTICS.md
 REVIEW_*.md
 scripts/merge_firmware.py
 scripts/copy_firmware.py

@@ -343,6 +343,12 @@
     setTimeout(fetchStatus, 600);
   }
 
+  function cleanUrl(u) {
+    if (!u) return '';
+    // Doppelte Slashes im Pfad bereinigen (radio-browser.info liefert manchmal "ndr.de//foo.png")
+    return u.replace(/([^:])\/\/+/g, '$1/');
+  }
+
   async function savePreset(name, url, icon) {
     if (presets.length >= 20) {
       alert('Maximum 20 presets saved. Please delete one first.');
@@ -350,8 +356,8 @@
     }
     const fd = new FormData();
     fd.append('name', name);
-    fd.append('url', url);
-    fd.append('icon', icon || '');
+    fd.append('url', cleanUrl(url));
+    fd.append('icon', cleanUrl(icon));
     let r;
     try { r = await fetch('/radio_save_preset', { method: 'POST', body: fd }); } catch(e) { console.warn('ZeDMD radio_save_preset:', e); return false; }
     if (r.ok) await loadPresets();
@@ -488,7 +494,15 @@
 
   loadPresets();
   fetchStatus();
-  setInterval(fetchStatus, 3000);
+  var _statusTimer = setInterval(fetchStatus, 3000);
+
+  document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+      clearInterval(_statusTimer);
+    } else {
+      _statusTimer = setInterval(fetchStatus, 3000);
+    }
+  });
 </script>
 </body>
 </html>

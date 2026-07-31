@@ -81,18 +81,18 @@ void LedMatrix::RenderFontTestToBuffer(uint8_t *buf, const char *text,
   textCanvas->setFont(f);
   textCanvas->setTextWrap(false);
 
-  // Cursor y=0: y1 ist dann ein relativer Offset (negativ für Aszender)
+  // Cursor y=0: y1 is then a relative offset (negative for ascenders)
   int16_t x1, y1; uint16_t tw, th;
   textCanvas->getTextBounds(text, 0, 0, &x1, &y1, &tw, &th);
 
   int16_t lineH  = f ? (int16_t)f->yAdvance : (int16_t)th + 1;
-  // Gesamthöhe des Textblocks (visuelle Pixel)
+  // Total height of the text block (visual pixels)
   int16_t blockH = (int16_t)(lines - 1) * lineH + (int16_t)th;
-  // Oberkante des Blocks zentriert, dann Baseline der ersten Zeile ableiten
+  // Top edge of the block centered, then derive baseline of the first line
   int16_t topY      = ((int16_t)TOTAL_HEIGHT - blockH) / 2;
-  int16_t baseline0 = topY - y1;  // y1 ist negativ → baseline0 > topY
+  int16_t baseline0 = topY - y1;  // y1 is negative → baseline0 > topY
 
-  // Horizontale Zentrierung (gleich für alle Zeilen, gleicher Text)
+  // Horizontal centering (same for all lines, same text)
   int16_t cx = ((int16_t)TOTAL_WIDTH - (int16_t)tw) / 2 - x1;
   if (cx < 0) cx = 0;
 
@@ -130,17 +130,17 @@ const char* LedMatrix::GetFontListJSON() {
 #endif  // FONT_TEST_ENABLED
 
 // ---------------------------------------------------------------------------
-// Emoji-System — RGBA-Icons aus LittleFS /icons/ (via main.cpp GetIcon()).
-// Icons werden beim Boot in PSRAM geladen (LoadIcons).
-// Zum Hinzufügen: PNG konvertieren (scripts/convert_icons.py), .rgba hochladen,
-// dann neuen Eintrag in EMOJI_TABLE ergänzen.
+// Emoji system — RGBA icons from LittleFS /icons/ (via main.cpp GetIcon()).
+// Icons are loaded into PSRAM at boot (LoadIcons).
+// To add: convert PNG (scripts/convert_icons.py), upload .rgba,
+// then add a new entry to EMOJI_TABLE.
 // ---------------------------------------------------------------------------
-static const uint8_t  ICON_W       = 20;   // Quellgröße = Zielgröße (2x_groesser GIFs)
+static const uint8_t  ICON_W       = 20;   // Source size = target size (2x_larger GIFs)
 static const uint8_t  ICON_H       = 20;
 static const uint8_t  EMOJI_DRAW_W = 20;
 static const uint8_t  EMOJI_DRAW_H = 20;
-static const int16_t  EMOJI_Y0     = 5;    // Top-Y: Unterkante auf Textbaseline (y=24)
-static const uint8_t  EMOJI_GAP    = 21;   // Vorschubbreite (EMOJI_DRAW_W + 1px)
+static const int16_t  EMOJI_Y0     = 5;    // Top-Y: bottom edge at text baseline (y=24)
+static const uint8_t  EMOJI_GAP    = 21;   // Advance width (EMOJI_DRAW_W + 1px)
 
 extern const uint8_t* GetIcon(const char* name);       // 20×20 RGBA
 extern const uint8_t* GetSmallIcon(const char* name);  // 10×10 RGBA
@@ -148,7 +148,7 @@ extern const uint8_t* GetRadioIcon(const char* name);  // 32×32 RGBA
 
 struct EmojiDef {
   const char *utf8;
-  const char *iconName;  // Dateiname in /icons/ ohne .rgba
+  const char *iconName;  // filename in /icons/ without .rgba
 };
 
 static const EmojiDef EMOJI_TABLE[] = {
@@ -204,9 +204,9 @@ static int8_t matchEmoji(const char **p) {
   return -1;
 }
 
-// Rendert ein 16×16 RGBA-Icon (aus GetIcon) skaliert auf EMOJI_DRAW_W×EMOJI_DRAW_H
-// in den RGB888-Buffer. Transparente Pixel (alpha < 32) werden übersprungen.
-// shadow=true: RGB wird auf 1/4 gedunkelt (Drop-Shadow-Pass).
+// Renders a 16×16 RGBA icon (from GetIcon) scaled to EMOJI_DRAW_W×EMOJI_DRAW_H
+// into the RGB888 buffer. Transparent pixels (alpha < 32) are skipped.
+// shadow=true: RGB is darkened to 1/4 (drop-shadow pass).
 static void drawIconRGBAToBuffer(uint8_t *buf, const uint8_t *rgba,
                                   int16_t x, int16_t y0, bool shadow = false) {
   for (uint8_t oy = 0; oy < EMOJI_DRAW_H; oy++) {
@@ -412,20 +412,20 @@ void LedMatrix::EraseVLine(int16_t x) {
     dma_display->drawFastVLine(x, 0, dma_display->height(), 0);
 }
 
-// Konvertiert UTF-8- und Latin-1-Umlaute in ASCII-Ersetzungen (ä→ae, ö→oe, …).
-// Unbekannte High-Bytes werden übersprungen. Alle anderen Bytes werden 1:1 kopiert.
+// Converts UTF-8 and Latin-1 umlauts to ASCII substitutions (ä→ae, ö→oe, …).
+// Unknown high bytes are skipped. All other bytes are copied 1:1.
 static void latinToAscii(const char *src, char *dst, size_t dstLen) {
   size_t d = 0;
   for (size_t i = 0; src[i] && d + 4 < dstLen; i++) {
     uint8_t c = (uint8_t)src[i];
     if      (c < 0x80) { dst[d++] = (char)c; }      // ASCII 1:1
-    else if (c == 0xC3 && src[i + 1]) {              // UTF-8 C3xx: deutsche Umlaute
+    else if (c == 0xC3 && src[i + 1]) {              // UTF-8 C3xx: German umlauts
       uint8_t n = (uint8_t)src[++i];
       const char *s = n==0x84?"Ae": n==0x96?"Oe": n==0x9C?"Ue":
                       n==0xA4?"ae": n==0xB6?"oe": n==0xBC?"ue":
                       n==0x9F?"ss": nullptr;
       if (s) { while (*s && d < dstLen - 1) dst[d++] = *s++; }
-      else   { dst[d++] = 0xC3; dst[d++] = (char)n; } // unbekannte C3-Seq: unverändert
+      else   { dst[d++] = 0xC3; dst[d++] = (char)n; } // unknown C3 sequence: pass through unchanged
     }
     else if (c == 0xC4) { dst[d++] = 'A'; dst[d++] = 'e'; } // Latin-1 Ä
     else if (c == 0xD6) { dst[d++] = 'O'; dst[d++] = 'e'; } // Latin-1 Ö
@@ -435,7 +435,7 @@ static void latinToAscii(const char *src, char *dst, size_t dstLen) {
     else if (c == 0xFC) { dst[d++] = 'u'; dst[d++] = 'e'; } // Latin-1 ü
     else if (c == 0xDF) { dst[d++] = 's'; dst[d++] = 's'; } // Latin-1 ß
     else if (c >= 0xE0) {
-      // 3- oder 4-Byte-UTF-8-Sequenz (Emoji etc.): alle Bytes unverändert durchreichen
+      // 3- or 4-byte UTF-8 sequence (Emoji etc.): pass all bytes through unchanged
       uint8_t seqLen = (c >= 0xF0) ? 4 : 3;
       if (d + seqLen < dstLen) {
         dst[d++] = (char)c;
@@ -443,7 +443,7 @@ static void latinToAscii(const char *src, char *dst, size_t dstLen) {
         i += seqLen - 1;
       }
     }
-    // 0x80-0xDF: verwaiste Continuation-Bytes oder unbekannte 2-Byte-Leads → überspringen
+    // 0x80-0xDF: orphaned continuation bytes or unknown 2-byte leads → skip
   }
   dst[d] = '\0';
 }
@@ -482,10 +482,10 @@ uint16_t LedMatrix::GetTextGFXWidth(const char *text) {
   uint16_t textW = 0;
   if (*plain) {
     textCanvas->setFont(&FreeSansBold12pt7b);
-    int16_t x1, y1; uint16_t w, h;
-    textCanvas->getTextBounds(plain, 0, 24, &x1, &y1, &w, &h);
+    textCanvas->setCursor(0, 24);
+    textCanvas->print(plain);
+    textW = (uint16_t)textCanvas->getCursorX();
     textCanvas->setFont(nullptr);
-    textW = w;
   }
   return textW + (uint16_t)emojiCount * EMOJI_GAP;
 }
@@ -521,9 +521,7 @@ void LedMatrix::RenderTextGFXToBuffer(uint8_t *buf, const char *text, int16_t x,
         *dst = '\0';
         textCanvas->setCursor(curX, 24);
         textCanvas->print(seg);
-        int16_t x1, y1; uint16_t w, h;
-        textCanvas->getTextBounds(seg, 0, 24, &x1, &y1, &w, &h);
-        curX += (int16_t)w;
+        curX = textCanvas->getCursorX();
         dst = seg;
       }
       if (numPlacements < 16)
@@ -553,23 +551,23 @@ void LedMatrix::RenderTextGFXToBuffer(uint8_t *buf, const char *text, int16_t x,
     buf[i * 3 + 2] = (c << 3) & 0xF8;
   }
 
-  // Composite RGBA-Icons in buf — Shadow (+1/+1 gedunkelt), dann Icon obendrauf
+  // Composite RGBA icons into buf — shadow (+1/+1 darkened), then icon on top
   for (uint8_t i = 0; i < numPlacements; i++) {
     const uint8_t *rgba = GetIcon(EMOJI_TABLE[placements[i].idx].iconName);
-    if (!rgba) continue;  // Icon nicht geladen — überspringen
+    if (!rgba) continue;  // icon not loaded — skip
     drawIconRGBAToBuffer(buf, rgba, placements[i].x + 1, EMOJI_Y0 + 1, true);
     drawIconRGBAToBuffer(buf, rgba, placements[i].x,     EMOJI_Y0,      false);
   }
 }
 
 // Two-row radio display:
-//   Icon: 32×32 (Senderlogo /icons_radio/ oder Fallback-Note), x=0..31
-//   Top:  FreeSans9pt7b, gelb, baseline y=13, x=32..127, zentriert
+//   Icon: 32×32 (station logo /icons_radio/ or fallback note), x=0..31
+//   Top:  FreeSans9pt7b, yellow, baseline y=13, x=32..127, centered
 //   Sep:  y=15, x=32..127
-//   Bot:  FreeSans9pt7b, scrollend ab titleX, baseline y=29, x=32..127
+//   Bot:  FreeSans9pt7b, scrolling from titleX, baseline y=29, x=32..127
 static const uint8_t RADIO_ICON_W = 32;
 
-// 32×32 RGBA Fallback-Icon (Achtelnote ♫), steel blue 3D, navy-blauer Outline
+// 32×32 RGBA fallback icon (eighth note ♫), steel blue 3D, navy-blue outline
 static const uint8_t RADIO_FALLBACK_ICON[4096] PROGMEM = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -856,12 +854,12 @@ void LedMatrix::RenderRadioToBuffer(uint8_t *buf, const char *station,
   station = stationA;
   title   = titleA;
 
-  // --- Canvas: alles auf einmal (Sendername + Separator + Titel) ---
+  // --- Canvas: all at once (station name + separator + title) ---
   textCanvas->fillScreen(0);
   textCanvas->setFont(&FreeSans9pt7b);
   textCanvas->setTextWrap(false);
 
-  // Sendername: Uhrzeitfarbe, Position vom Aufrufer (zentriert oder scrollend)
+  // Station name: clock color, position from caller (centered or scrolling)
   {
     uint16_t stColor = ((uint16_t)(stR & 0xF8) << 8) | ((uint16_t)(stG & 0xFC) << 3) | (stB >> 3);
     textCanvas->setTextColor(stColor);
@@ -873,7 +871,7 @@ void LedMatrix::RenderRadioToBuffer(uint8_t *buf, const char *station,
   uint16_t grey = ((uint16_t)(60 & 0xF8) << 8) | ((uint16_t)(60 & 0xFC) << 3) | (60 >> 3);
   textCanvas->drawFastHLine(RADIO_ICON_W, 15, TOTAL_WIDTH - RADIO_ICON_W, grey);
 
-  // Titel: scrollend, baseline y=29
+  // Title: scrolling, baseline y=29
   {
     uint16_t col = ((uint16_t)(r & 0xF8) << 8) | ((uint16_t)(g & 0xFC) << 3) | (b >> 3);
     textCanvas->setTextColor(col);
@@ -893,17 +891,17 @@ void LedMatrix::RenderRadioToBuffer(uint8_t *buf, const char *station,
     buf[i * 3 + 2] = (c << 3) & 0xF8;
   }
 
-  // Icon-Bereich auf Schwarz
+  // Icon area to black
   for (uint8_t cy = 0; cy < TOTAL_HEIGHT; cy++)
     for (uint8_t cx = 0; cx < RADIO_ICON_W; cx++) {
       uint32_t pos = ((uint32_t)cy * TOTAL_WIDTH + cx) * 3;
       buf[pos] = buf[pos + 1] = buf[pos + 2] = 0;
     }
 
-  // --- Icon 32×32: LittleFS-Logo oder Fallback-Note ---
+  // --- Icon 32×32: LittleFS logo or fallback note ---
   char slug[32];
   stationToSlug(station, slug, sizeof(slug));
-  const uint8_t *icon = GetRadioIcon(slug);  // inkl. Fuzzy-Match in GetRadioIcon()
+  const uint8_t *icon = GetRadioIcon(slug);  // incl. fuzzy match in GetRadioIcon()
   if (!icon) icon = RADIO_FALLBACK_ICON;
 
   for (uint8_t iy = 0; iy < 32; iy++) {

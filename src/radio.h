@@ -5,9 +5,9 @@
 #include <Arduino.h>
 #include <ESPAsyncWebServer.h>
 
-// I2S-Pins: per Build-Flag überschreibbar
-// Defaults = tatsächlich verwendete Pins (beide Webradio-Builds: 9/14/21)
-// Nicht 12/13/11 — das sind die SPI-SD-Karten-Pins (SCK/MISO/MOSI)!
+// I2S pins: overridable via build flag
+// Defaults = actually used pins (both webradio builds: 9/14/21)
+// Not 12/13/11 — those are the SPI SD card pins (SCK/MISO/MOSI)!
 #ifndef RADIO_I2S_BCLK
 #define RADIO_I2S_BCLK 9
 #endif
@@ -49,7 +49,7 @@ void radioSetSwapChannels(bool swap);
 void radioLoadPresets();
 void radioSavePresets();
 void radioRegisterRoutes(AsyncWebServer* server);
-// GIF-Begleitung: spielt eine lokale SD-MP3 ab (nur wenn kein Stream aktiv)
+// GIF companion audio: plays a local SD MP3 (only when no stream is active)
 void radioPlayLocalFile(const char* sdPath);
 void radioStopLocalFile();
 

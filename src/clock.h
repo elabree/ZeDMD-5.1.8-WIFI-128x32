@@ -4,23 +4,23 @@
 
 #include <Arduino.h>
 
-// ── Uhr-Zustandsvariablen ─────────────────────────────────────────────────────
-// Lesbar von main.cpp (SaveClockColors, LoadClockColors, get_config, Endpoints)
-// und von weather.cpp (weatherDisplayClock, weatherDisplayForecast)
+// ── Clock State Variables ─────────────────────────────────────────────────────
+// Readable from main.cpp (SaveClockColors, LoadClockColors, get_config, Endpoints)
+// and from weather.cpp (weatherDisplayClock, weatherDisplayForecast)
 
-extern uint8_t       clockR, clockG, clockB;   // Uhrzeitfarbe  (Default: Cyan)
-extern uint8_t       dateR,  dateG,  dateB;    // Datumfarbe    (Default: Grau)
-extern volatile bool clockColorChanged;        // Erzwingt Neuzeichnung bei Farbänderung
+extern uint8_t       clockR, clockG, clockB;   // Clock color   (Default: Cyan)
+extern uint8_t       dateR,  dateG,  dateB;    // Date color    (Default: Gray)
+extern volatile bool clockColorChanged;        // Forces redraw on color change
 extern bool          ntpSynced;
 extern String        ntpServer;
 extern String        clockTimezone;
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-void clockInit();     // NTP initialisieren (nach WiFi-Connect aufrufen)
-void clockDisplay();  // Uhr auf DMD zeichnen (= ehem. DisplayClock)
+void clockInit();     // Initialize NTP (call after WiFi connect)
+void clockDisplay();  // Draw clock on DMD (formerly DisplayClock)
 
-// Zeichenhilfsfunktionen — auch von weather.cpp genutzt
+// Drawing helpers — also used by weather.cpp
 void DrawSegDigit(int x, int y, int digit, uint8_t r, uint8_t g, uint8_t b);
 void DrawColon(int x, int y, uint8_t r, uint8_t g, uint8_t b);
 
