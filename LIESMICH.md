@@ -78,7 +78,7 @@ Die JSON-Feldnamen, mit denen Wetterdaten vom MQTT-Broker gelesen werden, sind j
 Wenn MQTT länger als 10 Minuten keine Daten liefert, wechselt die Wetteranzeige auf Open-Meteo als Fallback. Alle vier Wetterwerte (Temperatur, Luftfeuchtigkeit, Wind, Luftdruck) werden in dieser Zeit in **Grau** statt Weiß angezeigt — ein sofort sichtbares Signal, dass die Daten nicht von der eigenen Wetterstation kommen. Nach 30 Minuten ohne MQTT erscheint wie bisher der orange Text **„MQTT fehlt"**.
 
 #### Fragezeichen-Icon für unbekannte Wettercodes
-Liefert Open-Meteo einen WMO-Wettercode ohne passendes Icon, zeigt das Display jetzt das **Fragezeichen-Icon** (`question.rgba` aus dem Icon-Set) statt des bisherigen, irreführenden Wolken-Icons. Im Normalbetrieb sollte das nie auftreten — alle von Open-Meteo verwendeten Codes sind abgedeckt — aber das System ist damit robuster.
+Liefert Open-Meteo einen WMO-Wettercode ohne passendes Icon, zeigt das Display jetzt das **Fragezeichen-Icon** (`question.rgba` aus dem Icon-Set) statt des bisherigen, irreführenden Wolken-Icons. Im Normalbetrieb sollte das nie auftreten — alle von Open-Meteo verwendeten Codes sind abgedeckt.
 
 ---
 
@@ -91,7 +91,7 @@ Die Hauptseite ist jetzt in drei Tabs unterteilt — **Screensaver**, **Display*
 Tägliche Ein-/Ausschaltzeiten für das LED-Display lassen sich direkt im **Display**-Tab konfigurieren — z.B. ab 23:00 Uhr aus, ab 07:00 Uhr wieder an. Zusätzlich gibt es einen **„Display off / Display on"**-Button zum sofortigen manuellen Aus- und Einschalten ohne die Timer-Einstellung zu ändern.
 
 #### Stereo / Mono umschalten
-Im **Radio**-Tab gibt es jetzt separate **Stereo**- und **Mono**-Buttons. Der Ausgabekanal lässt sich so umschalten ohne Firmware-Neuflash — praktisch wenn nur ein Lautsprecher angeschlossen ist.
+Im **Radio**-Tab gibt es jetzt separate **Stereo**- und **Mono**-Buttons.
 
 #### Sender-Logos auf dem LED-Display
 Beim Senderwechsel wird das passende Sender-Logo (wenn hochgeladen) zusammen mit Sendername und Titelinfo auf dem LED-Display angezeigt.
@@ -148,7 +148,6 @@ Erfordert ein **MAX98357A I2S-Verstärkermodul** — Verkabelung siehe unten.
 - Presets überleben Firmware-Updates (gespeichert in LittleFS)
 - Stabiler Senderwechsel — kein Audio-Aussetzer beim Umschalten mehr
 - Stream-URLs von radio-browser.info werden automatisch normalisiert (`?ti=`-Playlist-Hinweise werden entfernt, die die Audio-Bibliothek zum Hängen brachten)
-- **L/R-Kanaltausch** — wer linken und rechten Lautsprecher versehentlich vertauscht angeschlossen hat, kann die Kanäle per Knopfdruck im **Radio**-Tab in Software tauschen — ohne Neuverkabelung
 
 > **Technische Anmerkung — Audio-Bibliotheks-Patch:** Der L/R-Kanaltausch erforderte einen Eingriff in die `ESP32-audioI2S`-Bibliothek, da diese Funktion dort nicht vorhanden ist. Statt die Bibliotheksdateien von Hand zu ändern (was bei jedem Library-Update verloren gehen würde), injiziert ein Build-Script (`scripts/patch_audio_lib.py`) die Änderung automatisch bei jedem Kompiliervorgang. Dieses Script entstand mit Unterstützung von **[Claude Code](https://claude.ai/code)** (KI-Coding-Assistent von Anthropic) — das die genaue Stelle in der Audio-Pipeline gefunden hat, an der die Samples sicher getauscht werden können, und das Script so gebaut hat, dass es auch bei mehrfacher Ausführung keine Doppeleinträge erzeugt. Ich hätte das alleine nicht angefasst.
 
