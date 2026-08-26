@@ -298,6 +298,14 @@
         .tab-btn.active { background: #1a2e1a; color: #ffffff; border-bottom: 3px solid #27ae60; font-weight: 600; }
         .tab-panel { display: none; }
         .tab-panel.active { display: block; }
+        .btn-small {
+            background: #2c2c2c; color: #888; border: 1px solid #444;
+            border-radius: 5px; padding: 4px 10px; cursor: pointer;
+            font-size: 0.85em; transition: background 0.15s; white-space: nowrap;
+            margin: 0;
+        }
+        .btn-small:hover { background: #333; color: #e0e0e0; }
+        .btn-seg-style.active { background: #1a2e1a; color: #27ae60; border-color: #27ae60; font-weight: 600; }
     </style>
 </head>
 
@@ -305,7 +313,7 @@
     <div class="scroll-container">
         <div class="container">
             <h1 style="margin: 0 0 20px 0;">The Arcade</h1>
-            <img src="ppuc.png" alt="The Arcade"
+            <img src="The_Arcade.png" alt="The Arcade"
                 style="max-width: 100%; margin-bottom: 20px; display: block; margin: 0 auto;">
             <br>
             <!-- SD Card & Storage + Admin (always visible) -->
@@ -611,9 +619,9 @@
                         <span id="display-blank-status" class="status-message" style="margin-left:8px;"></span>
                     </div>
 
-                    <!-- Screensaver Settings Section -->
+                    <!-- Display Settings Section -->
                     <div class="section">
-                        <h2 class="section-header">Screensaver Settings</h2>
+                        <h2 class="section-header">Display Settings</h2>
 
                         <label for="screensaver-mode">Display Mode:</label>
                         <select id="screensaver-mode" onchange="saveScreensaverMode()">
@@ -636,6 +644,17 @@
                                 style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin-bottom:8px;">
                             <button onclick="saveClockColors()">Apply Clock Colors</button>
                             <div id="clock-color-status" class="status-message"></div>
+                            <div style="display:flex; align-items:center; gap:8px; margin-bottom:15px; flex-wrap:wrap;">
+                                <span style="font-size:0.9em; color:var(--text-muted, #888); white-space:nowrap;">Segment Style:</span>
+                                <button id="seg-btn-0" class="btn-small btn-seg-style active" onclick="saveClockSegStyle(0)">Default</button>
+                                <button id="seg-btn-1" class="btn-small btn-seg-style" onclick="saveClockSegStyle(1)">Classic</button>
+                                <button id="seg-btn-3" class="btn-small btn-seg-style" onclick="saveClockSegStyle(3)">Classic 2</button>
+                                <button id="seg-btn-2" class="btn-small btn-seg-style" onclick="saveClockSegStyle(2)">Modern</button>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:8px; margin-bottom:15px; flex-wrap:wrap;">
+                                <span style="font-size:0.9em; color:var(--text-muted, #888); white-space:nowrap;">Glow Effect:</span>
+                                <button id="glow-btn" class="btn-small btn-seg-style" onclick="toggleClockGlow()">Glow &#946;</button>
+                            </div>
                         </div>
 
                         <label for="screensaver-brightness">Display Brightness: <span id="screensaver-brightness-value">–</span></label>
@@ -716,17 +735,17 @@
                         <div style="font-size:0.75em; color:#888; margin-bottom:4px;">EQ</div>
                         <div class="slider-container" style="margin-bottom:4px;">
                             <span style="font-size:0.75em; color:#aaa; min-width:46px;">Bass</span>
-                            <input type="range" id="eq-bass-slider" min="-6" max="6" value="0" oninput="setRadioEq()">
+                            <input type="range" id="eq-bass-slider" min="-12" max="12" value="0" oninput="setRadioEq()">
                             <span id="eq-bass-val" style="min-width:28px; text-align:right; font-size:0.85em; color:#aaa; margin-left:4px;">0</span>
                         </div>
                         <div class="slider-container" style="margin-bottom:4px;">
                             <span style="font-size:0.75em; color:#aaa; min-width:46px;">Mid</span>
-                            <input type="range" id="eq-mid-slider" min="-6" max="6" value="0" oninput="setRadioEq()">
+                            <input type="range" id="eq-mid-slider" min="-12" max="12" value="0" oninput="setRadioEq()">
                             <span id="eq-mid-val" style="min-width:28px; text-align:right; font-size:0.85em; color:#aaa; margin-left:4px;">0</span>
                         </div>
                         <div class="slider-container">
                             <span style="font-size:0.75em; color:#aaa; min-width:46px;">Treble</span>
-                            <input type="range" id="eq-treble-slider" min="-6" max="6" value="0" oninput="setRadioEq()">
+                            <input type="range" id="eq-treble-slider" min="-12" max="12" value="0" oninput="setRadioEq()">
                             <span id="eq-treble-val" style="min-width:28px; text-align:right; font-size:0.85em; color:#aaa; margin-left:4px;">0</span>
                         </div>
                     </div>
@@ -984,21 +1003,19 @@
         function saveGifAudioEnabled() {
             var val = document.getElementById('gif-audio-enabled').checked ? 1 : 0;
             var statusElem = document.getElementById('gif-audio-enabled-status');
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", "/save_gif_audio_enabled", true);
-            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === XMLHttpRequest.DONE) {
-                    if (xhr.status === 200) {
-                        statusElem.innerText = val ? "GIF Audio enabled" : "GIF Audio disabled";
-                        statusElem.style.color = val ? "green" : "#aaa";
-                    } else {
-                        statusElem.innerText = "Error saving.";
-                        statusElem.style.color = "red";
-                    }
+            fetch('/save_gif_audio_enabled', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `gifAudioEnabled=${val}`
+            }).then(function(r) {
+                if (r.ok) {
+                    statusElem.innerText = val ? "GIF Audio enabled" : "GIF Audio disabled";
+                    statusElem.style.color = val ? "green" : "#aaa";
+                } else {
+                    statusElem.innerText = "Error saving.";
+                    statusElem.style.color = "red";
                 }
-            };
-            xhr.send(`gifAudioEnabled=${val}`);
+            });
         }
 
         var currentFilePath  = '';
@@ -1545,6 +1562,26 @@
             });
         }
 
+        function toggleClockGlow() {
+            fetch('/clock_glow_toggle', { method: 'POST' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var btn = document.getElementById('glow-btn');
+                    if (data.glow) { btn.classList.add('active'); }
+                    else            { btn.classList.remove('active'); }
+                });
+        }
+
+        function saveClockSegStyle(val) {
+            document.querySelectorAll('.btn-seg-style').forEach(function(b) { b.classList.remove('active'); });
+            var btn = document.getElementById('seg-btn-' + val);
+            if (btn) btn.classList.add('active');
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/save_clock_seg_style', true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.send('val=' + val);
+        }
+
         function saveClockColors() {
             var clockHex = document.getElementById('clock-color').value;
             var dateHex  = document.getElementById('date-color').value;
@@ -1687,6 +1724,11 @@
                     if (config.clockR !== undefined) {
                         document.getElementById('clock-color').value = toHex(config.clockR, config.clockG, config.clockB);
                         document.getElementById('date-color').value  = toHex(config.dateR,  config.dateG,  config.dateB);
+                    }
+                    if (config.clockSegStyle !== undefined) {
+                        document.querySelectorAll('.btn-seg-style').forEach(function(b) { b.classList.remove('active'); });
+                        var btn = document.getElementById('seg-btn-' + config.clockSegStyle);
+                        if (btn) btn.classList.add('active');
                     }
                 }
             };

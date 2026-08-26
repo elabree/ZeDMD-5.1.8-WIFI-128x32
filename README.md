@@ -67,7 +67,83 @@ https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/raw/main/docs/images/ZeDMD_WiF
 
 ## 🆕 What's new in this release
 
-### v1.5.3 *(this release)*
+### v1.7.0 *(this release)*
+
+#### Critical stability fixes — watchdog now actively monitors the main task
+A fundamental issue was present since the first WiFi firmware build: `enableLoopWDT()` was never called, meaning the Task Watchdog Timer (TWDT) never actually monitored the main loop task. All `esp_task_wdt_reset()` calls across the codebase were silent no-ops — the device relied only on the secondary IDLE-task starvation mechanism to detect hangs.
+
+With `enableLoopWDT()` now correctly placed at the start of `setup()`, the TWDT actively monitors the loop task against the 5-second budget. This exposed three real hang points that are now fixed:
+
+- **Large screensaver cache** — `TryLoadFolderCache()` reading 3 700+ lines without any watchdog reset caused a reboot loop on devices with many files. Fixed with a reset every 50 lines.
+- **SoftAP countdown** — the 19-second WiFi-failure countdown ran without a single reset. Fixed.
+- **NTP sync** — `clockInit()` calls `getLocalTime()` with a 5-second timeout, landing exactly on the WDT boundary. A reset is now issued before the call.
+
+Devices that were showing repeated `TASK_WDT` reboot entries in `/diag` after upgrading from a previous firmware version should recover immediately with this release.
+
+#### "The Arcade" startup logo
+The boot logo has been updated from the generic PPUC logo to **The Arcade** branding. The crash-screen overlay was also corrected (it previously overwrote the logo during a first-boot crash sequence).
+
+#### Radio icon reload fix
+The **Reload Icons** action (`/icons_reload`) now also refreshes the radio icon slug cache. Previously, a newly uploaded station logo only appeared after a full reboot.
+
+#### `/upload_asset` endpoint
+A new endpoint accepts any PNG or RAW file and stores it directly in the LittleFS root. Useful for uploading custom boot logos or background assets without a full LittleFS flash.
+
+#### Brightness save respects the display blank timer
+Saving brightness via `/save_brightness` previously called `SetBrightness()` directly, which deactivated an active display-blank interval. It now goes through `ApplyBrightness()` and leaves the blank state untouched.
+
+---
+
+### v1.6.0
+
+#### Weather icons — 17×17 pixel art, stored in LittleFS
+The main weather icon (top-right of the clock/weather view) has been redrawn at **17×17** instead of 16×16. The odd size places the center on an exact pixel (8, 8) rather than between pixels — sun rays, moon crescent tips and fog lines are now perfectly symmetrical. Specific improvements per icon:
+
+- **Sun** — cardinal rays narrowed to 1 px, lengthened to 3 px; diagonal rays extended toward the body for a more connected look
+- **Moon** — wider crescent tips at top and bottom (3 px); crescent ends look rounded rather than pointed
+- **Cloud bitmap** — extended from `uint16_t` (16 cols) to `uint32_t` (17 cols); all cloud-based icons benefit
+- **Fog** — sixth stripe added at the bottom to fill the extra row
+- **Rain / Drizzle / Showers** — drop positions adjusted for equal horizontal spacing
+
+The 11 weather icons are now stored as **RGBA files in LittleFS** (`/icons_weather/`) instead of being hardcoded in the firmware. This means:
+- Icons can be **replaced without reflashing** — upload new ones via `/upload_icon_weather`
+- The icon set is consistent with the existing system (`/icons/` for emoji, `/icons_radio/` for station logos)
+- First-time setup: upload the 11 `weather_*.rgba` files from `data/icons_weather/` after the initial flash
+
+#### Temperature display — tighter minus sign
+The minus sign for negative temperatures now **kerns closer to the digit**: for single-digit negatives (`−1` to `−9`) the minus is positioned where the tens digit would be; for two-digit negatives (`−10` to `−19`) it moves 2 px closer to the leading `1`. The result is a more natural, compact look on the 128×32 display.
+
+#### Interactive weather location map
+The **Weather (Open-Meteo)** section in `admin.html` now shows a **Leaflet / OpenStreetMap** map. Click anywhere on the map or drag the marker to set your coordinates — no manual lat/lon entry needed. City search is also available. The map initialises at the currently saved coordinates.
+
+#### HUB75 library 3.0.14 + Line Decoder parameter
+The ESP32-HUB75-MatrixPanel-DMA library has been updated from **3.0.12 to 3.0.14**. A new **Line Decoder** parameter is now exposed in the Panel section of the admin page — required for panels that use a shift-register-based row decoder instead of direct addressing (rare, but necessary for certain panel types). Default value is 0 (no effect on standard panels). Setting is saved to LittleFS and survives reboots.
+
+#### Removed unused SDMMC build environment
+The `S3-N16R8_128x32_wifi_sdmmc_webradio` PlatformIO environment has been removed from `platformio.ini`. It was not actively maintained and only added noise to the build configuration. The standard SPI SD build (`wifi_sd_webradio`) remains the only supported target.
+
+#### 7-segment display styles
+Four segment style presets are available under the **Display Settings** section of the web UI:
+
+- **Default** — chamfered corners with junction clearing (original look)
+- **Classic** — inner notch at segment junctions; chamfered inner corners
+- **Classic 2** — early-build look: L-junction inner pixel + inner chamfer, "0" exempt
+- **Modern** — plain rectangular segments, no chamfering
+
+The active style is saved to LittleFS and survives reboots.
+
+#### Glow effect *(beta)*
+A **Glow β** button in Display Settings toggles a drop-shadow effect on the clock digits (2 px offset, 30 % brightness). Experimental — not persisted across reboots.
+
+#### Equalizer range extended to ±12 dB
+The Bass / Mid / Treble sliders now go from **−12 dB to +12 dB** (previously ±6 dB). Useful for speakers like the FRS8 where cutting bass and boosting treble significantly improves perceived audio clarity.
+
+#### SD card firmware update
+Place a `firmware.bin` in the `/UPDATE/` folder on the SD card — on the next boot it is flashed automatically and the file is deleted. A manual trigger button is also available on the **Admin** page for updating without a reboot.
+
+---
+
+### v1.5.3
 
 #### Configurable MQTT field names
 The JSON field names used to read weather data from your MQTT broker are now configurable in the admin panel — no reflash required. This matters if your WeeWx (or other weather station) uses non-standard field names. Default values match the standard WeeWx LOOP output: `outTemp_C`, `outHumidity`, `windSpeed_kph`, `barometer_mbar`. Settings are saved to LittleFS and survive reboots.
@@ -350,6 +426,7 @@ This fork is **WiFi-only** and targets the **ESP32-S3-N16R8** with a **128×32 L
 - **Webradio** — internet radio via I2S amplifier (MAX98357A); station search via [radio-browser.info](https://www.radio-browser.info); preset management with logo icons; LED matrix shows station info for 5 s on start, "DMD 10s" button for on-demand display
 - **Config Export/Import** — full configuration backup and restore via browser (`/config_transfer.html`)
 - **Display Text** — send custom text with emojis to the LED matrix via the web UI; static or scrolling with color selection and configurable duration (5–60 s); 34 emojis available via built-in picker
+- **LittleFS icon system** — three icon folders: `/icons/` (20×20 emoji/question), `/icons_weather/` (17×17 weather icons, uploadable via `/upload_icon_weather`), `/icons_radio/` (32×32 station logos); splash assets via `/upload_asset`
 - **Display Timer** — schedule daily on/off times for the LED matrix (e.g. off at 23:00, on at 07:00); "Display off / Display on" button for instant manual control
 - **Tabbed web UI** — main page organised into Screensaver / Display / Radio tabs; SD card & admin always visible
 - **Stereo Audio** *(experimental)* — two MAX98357A modules for true stereo output; channel selection via SD-pin resistor strapping (5V only, values verified); Stereo/Mono toggle in the web UI
@@ -455,6 +532,8 @@ Access via `http://<IP>/` (main page) and `http://<IP>/admin.html` (admin page).
 | **MQTT** | Server IP and port for weather integration |
 | **Weather (Open-Meteo)** | Latitude/longitude for local weather display |
 | **Update Web Files** | Upload index.html / admin.html without full filesystem flash |
+| **Upload Weather Icons** | Upload 17×17 RGBA icons to LittleFS `/icons_weather/` via `/upload_icon_weather` |
+| **Upload Assets** | Upload PNG/RAW splash images to LittleFS root via `/upload_asset` |
 | **Config Export/Import** | Full config backup/restore via `/config_transfer.html` |
 | **Information** | Firmware version, build date and git hash, debug info |
 
@@ -537,7 +616,6 @@ Requires an **I2S amplifier module** and a small speaker.
 | Setup | Environment | Extra hardware |
 |-------|-------------|----------------|
 | Existing board + SPI SD module | `S3-N16R8_128x32_wifi_sd_webradio` | Connect MAX98357A |
-| SDMMC board (onboard SD) | `S3-N16R8_128x32_wifi_sdmmc_webradio` | Connect MAX98357A + rewire HUB75 LAT/CLK |
 
 ### Webradio — Configuration
 

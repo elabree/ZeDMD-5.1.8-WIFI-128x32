@@ -22,7 +22,18 @@ void clockDisplay();  // Draw clock on DMD (formerly DisplayClock)
 
 // Drawing helpers — also used by weather.cpp
 void DrawSegDigit(int x, int y, int digit, uint8_t r, uint8_t g, uint8_t b);
+void DrawSegDigitClassic(int x, int y, int digit, uint8_t r, uint8_t g, uint8_t b);
+void DrawSegDigitClassic2(int x, int y, int digit, uint8_t r, uint8_t g, uint8_t b);
+void DrawSegDigitModern(int x, int y, int digit, uint8_t r, uint8_t g, uint8_t b);
+void DrawDigit(int x, int y, int digit, uint8_t r, uint8_t g, uint8_t b);
+void DrawDigitAuto(int x, int y, int digit, uint8_t r, uint8_t g, uint8_t b);  // glow-aware
 void DrawColon(int x, int y, uint8_t r, uint8_t g, uint8_t b);
+void DrawColonAuto(int x, int y, uint8_t r, uint8_t g, uint8_t b);             // glow-aware
+void DrawSegDigitShadow(int x, int y, int digit, uint8_t r, uint8_t g, uint8_t b);
+void DrawColonShadow(int x, int y, uint8_t r, uint8_t g, uint8_t b);
+
+extern volatile bool clockGlowEnabled;
+extern volatile int  clockSegStyle;   // 0=Default 1=Classic 2=Modern 3=Classic2
 
 #endif // ZEDMD_WIFI
 #endif // CLOCK_H

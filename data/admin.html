@@ -223,6 +223,14 @@ pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overfl
   <button class="green" onclick="uploadOTA()">&#x2191; Flash Firmware</button>
 </div>
 
+<!-- SD Card Firmware Update -->
+<div class="section">
+  <h2>Firmware Update from SD Card</h2>
+  <p style="color:#aaa; font-size:0.85em;">Place <code>firmware.bin</code> in the <code>/UPDATE/</code> folder on the SD card, then click the button. The device will flash and reboot automatically. The file is deleted after a successful update.</p>
+  <div class="status" id="sd-update-status"></div>
+  <button onclick="triggerSdUpdate()">&#x1F4BE; Flash from SD</button>
+</div>
+
 <!-- Web File Update -->
 <div class="section">
   <h2>Update Web Files</h2>
@@ -695,9 +703,29 @@ function toggleDebug() {
 
 
 
-
-
-
+function triggerSdUpdate() {
+  var status = document.getElementById('sd-update-status');
+  status.innerText = 'Checking /UPDATE/firmware.bin...';
+  status.style.color = '#aaa';
+  fetch('/trigger_sd_update', { method: 'POST' })
+    .then(function(r) {
+      return r.text().then(function(t) { return { ok: r.ok, text: t }; });
+    })
+    .then(function(res) {
+      if (res.ok) {
+        status.innerText = 'Flashing… device will reboot. Page reloads in 30s.';
+        status.style.color = '#ffc107';
+        setTimeout(function() { location.reload(); }, 30000);
+      } else {
+        status.innerText = '✗ ' + res.text;
+        status.style.color = 'red';
+      }
+    })
+    .catch(function() {
+      status.innerText = '✗ Request failed';
+      status.style.color = 'red';
+    });
+}
 
 </script>
 </body>

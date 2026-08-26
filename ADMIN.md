@@ -10,7 +10,7 @@ Entwickler-Dokumentation für das ZeDMD-5.1.8 WiFi 128×32 Projekt.
 |---|---|
 | SoC | ESP32-S3-N16R8 (16 MB Flash, 8 MB PSRAM) |
 | Display | 128×32 HUB75 LED-Matrix (RGB888, 3 Byte/Pixel = 12.288 Byte/Frame) |
-| SD-Karte | SPI-Bus: SCK=12, MISO=14, MOSI=13, CS=11 |
+| SD-Karte | SPI-Bus: SCK=12, MISO=13, MOSI=11, CS=10 |
 | Audio (I2S) | **2× MAX98357A (Stereo)**, Pins: BCK=9, WS=14, DATA=21 — Kanalwahl per SD-Pin-Widerstand gegen 5V: L=100 kΩ, R=390 kΩ (Breakout-Boards haben 1 MΩ onboard SD→Vin) |
 | Display-Bus | ESP32-S3 LCD-Peripheral mit DMA (kein Software-Bitbanging) |
 

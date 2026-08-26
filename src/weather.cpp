@@ -23,6 +23,7 @@ extern void Render();
 extern void logMsg(const char* fmt, ...);
 extern void ApplyBrightness(uint8_t base);
 extern const uint8_t* GetIcon(const char* name);
+extern const uint8_t* GetWeatherIcon(const char* name);
 
 #include "clock.h"  // clockR/G/B, dateR/G/B, clockColorChanged, DrawSegDigit, DrawColon
 
@@ -524,257 +525,27 @@ bool weatherIsAvailable() {
   return weatherAvailable;
 }
 
-// ── 16×16 weather icons (drawn directly, no scaling) ─────────────────────────
+// ── 17×17 weather icons — aus LittleFS RGBA-Dateien ─────────────────────────
 static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
+  static const char* kNames[] = {
+    "weather_0","weather_1","weather_2","weather_3","weather_4",
+    "weather_5","weather_6","weather_7","weather_8","weather_9","weather_10"
+  };
+  const uint8_t* rgba;
+  int sz, off;
   if (idx == 255) {
-    const uint8_t* q = GetIcon("question");
-    if (q) {
-      // question.rgba is 20x20 — draw 16x16 centered crop (offset 2,2)
-      for (int dy = 0; dy < 16; dy++) {
-        for (int dx = 0; dx < 16; dx++) {
-          const uint8_t* p = q + ((dy + 2) * 20 + (dx + 2)) * 4;
-          if (p[3] < 32) continue;
-          display->DrawPixel(x + dx, y + dy, p[0], p[1], p[2]);
-        }
-      }
-    } else {
-      display->DisplayText("?", x + 4, y + 4, 128, 128, 128, 2);
-    }
-    return;
+    rgba = GetIcon("question"); sz = 20; off = 2;  // 20×20, crop 17×17 ab (2,2)
+  } else {
+    if (idx >= 11) idx = 2;
+    rgba = GetWeatherIcon(kNames[idx]); sz = 17; off = 0;
   }
-  if (idx >= 11) idx = 2;
-
-  auto px = [&](int dx, int dy, uint8_t r, uint8_t g, uint8_t b) {
-    if (dx < 0 || dx > 15 || dy < 0 || dy > 15) return;
-    display->DrawPixel(x + dx, y + dy, r, g, b);
-  };
-
-  // cloud bitmap: 16 cols x 9 rows, bit15=col0, bit0=col15
-  static const uint16_t CLD[9] = {
-    0x0F00, // row 0: cols 4-7 (left bump, higher)
-    0x1FB8, // row 1: cols 3-8 + cols 10-12 (Spalt bei col 9)
-    0x3FFC, // row 2: cols 2-13
-    0x7FFE, // row 3: cols 1-14
-    0xFFFF, // row 4: alle 16
-    0xFFFF, // row 5: alle 16
-    0xFFFF, // row 6: alle 16
-    0x7FFE, // row 7: cols 1-14
-    0x3FFC, // row 8: cols 2-13
-  };
-  // gradient: bright top (highlight) → dark bottom (shadow)
-  static const uint8_t LC[9][3] = {  // normal cloud (+20 brighter)
-    {235,240,252},{220,225,238},{205,210,225},
-    {192,197,212},{180,185,200},{170,175,190},
-    {160,165,180},{150,155,170},{138,143,158}
-  };
-  static const uint8_t DC[9][3] = {  // storm cloud (-20 darker)
-    {108,111,125},{ 95, 98,112},{ 83, 86,100},
-    { 73, 76, 90},{ 64, 67, 81},{ 56, 59, 73},
-    { 48, 51, 65},{ 40, 43, 57},{ 32, 35, 49}
-  };
-  static const uint8_t RC[9][3] = {  // rain cloud (65% toward DC)
-    {152,156,169},{139,142,156},{126,129,144},
-    {115,118,133},{105,108,123},{ 96,100,114},
-    { 87, 91,105},{ 79, 82, 97},{ 69, 73, 87}
-  };
-
-  // style: 0=normal (LC), 1=rain (RC), 2=storm (DC)
-  auto drawCloud = [&](int dy0, uint8_t style) {
-    const uint8_t (*c)[3] = (style == 2) ? DC : (style == 1) ? RC : LC;
-    for (int r = 0; r < 9; r++) {
-      uint16_t m = CLD[r];
-      for (int col = 0; col < 16; col++)
-        if (m & (0x8000 >> col))
-          px(col, dy0 + r, c[r][0], c[r][1], c[r][2]);
+  if (!rgba) { display->DisplayText("?", x + 4, y + 4, 128, 128, 128, 2); return; }
+  for (int dy = 0; dy < 17; dy++)
+    for (int dx = 0; dx < 17; dx++) {
+      const uint8_t* p = rgba + ((dy + off) * sz + (dx + off)) * 4;
+      if (p[3] < 32) continue;
+      display->DrawPixel(x + dx, y + dy, p[0], p[1], p[2]);
     }
-  };
-
-  switch (idx) {
-
-  case 0: { // ☀️ sun — circle with 8 rays
-    for (int dy = 0; dy < 16; dy++) {
-      for (int dx = 0; dx < 16; dx++) {
-        float fx = dx - 7.5f, fy = dy - 7.5f;
-        float d = sqrtf(fx * fx + fy * fy);
-        if      (d <= 2.0f) px(dx, dy, 255, 255, 200);
-        else if (d <= 3.0f) px(dx, dy, 255, 245, 140);
-        else if (d <= 4.0f) px(dx, dy, 255, 220,  55);
-        else if (d <= 4.5f) px(dx, dy, 255, 188,   5);
-      }
-    }
-    // N/S rays (2px wide, 2px long)
-    for (int i = 0; i < 2; i++) {
-      px(7+i, 0, 255, 155, 0); px(7+i, 1, 255, 170, 0);
-      px(7+i,14, 255, 155, 0); px(7+i,15, 255, 155, 0);
-    }
-    // W/E rays
-    for (int i = 0; i < 2; i++) {
-      px( 0, 7+i, 255, 155, 0); px( 1, 7+i, 255, 170, 0);
-      px(14, 7+i, 255, 155, 0); px(15, 7+i, 255, 155, 0);
-    }
-    // diagonal rays (1px per corner)
-    px( 2,  2, 255, 162, 0); px( 1,  1, 255, 148, 0);
-    px(13,  2, 255, 162, 0); px(14,  1, 255, 148, 0);
-    px( 2, 13, 255, 162, 0); px( 1, 14, 255, 148, 0);
-    px(13, 13, 255, 162, 0); px(14, 14, 255, 148, 0);
-    break;
-  }
-
-  case 1: { // ⛅ partly cloudy: small sun top-left + large cloud below
-    // small sun (r=3) centered at (3,3)
-    for (int dy = 0; dy < 8; dy++) {
-      for (int dx = 0; dx < 8; dx++) {
-        float fx = dx - 3.0f, fy = dy - 3.0f;
-        float d  = sqrtf(fx * fx + fy * fy);
-        if      (d <= 1.2f) px(dx, dy, 255, 255, 185);
-        else if (d <= 2.2f) px(dx, dy, 255, 225,  55);
-        else if (d <= 3.0f) px(dx, dy, 255, 178,   5);
-      }
-    }
-    px(3,0,255,148,0); px(0,3,255,148,0);
-    px(6,3,255,148,0); px(3,6,255,148,0);
-    px(1,1,255,152,0); px(5,1,255,152,0);
-    px(1,5,255,152,0); px(5,5,255,152,0);
-    drawCloud(4, 0);
-    break;
-  }
-
-  case 2: { // ☁️ cloud — vertically centered
-    drawCloud(3, 0);
-    break;
-  }
-
-  case 3: { // 🌦️ drizzle — cloud + 6 individual drop dots
-    drawCloud(0, 1);
-    static const int8_t DX[] = {4, 8, 12};
-    for (int d = 0; d < 3; d++) {
-      px(DX[d], 10, 90, 175, 255);
-      px(DX[d], 13, 90, 175, 255);
-    }
-    break;
-  }
-
-  case 4: { // ❄️ snow — two 5×5 snowflakes (cross + diagonal tips)
-    drawCloud(0, 0);
-    auto flake = [&](int cx, int cy) {
-      px(cx-2,cy-2,255,255,255); px(cx,cy-2,255,255,255); px(cx+2,cy-2,255,255,255);
-      px(cx-1,cy-1,255,255,255); px(cx,cy-1,255,255,255); px(cx+1,cy-1,255,255,255);
-      for (int dx = -2; dx <= 2; dx++) px(cx+dx, cy, 255,255,255);
-      px(cx-1,cy+1,255,255,255); px(cx,cy+1,255,255,255); px(cx+1,cy+1,255,255,255);
-      px(cx-2,cy+2,255,255,255); px(cx,cy+2,255,255,255); px(cx+2,cy+2,255,255,255);
-    };
-    flake( 3, 10);
-    flake(11, 13);
-    break;
-  }
-
-  case 5: { // ⛈️ thunderstorm — dark cloud + lightning (3px wide, Z-shape)
-    drawCloud(0, 2);
-    static const uint8_t TC[3][3] = {{255,255,195},{255,248,165},{255,238,125}};
-    static const uint8_t BC[3][3] = {{255,205, 45},{255,178, 10},{240,148,  0}};
-    // upper arm: diagonal down-left, 3px wide
-    for (int i = 0; i < 3; i++)
-      for (int dx = 0; dx < 3; dx++)
-        px(7-i+dx, 9+i, TC[i][0], TC[i][1], TC[i][2]);
-    // horizontal kink (6px)
-    for (int c = 4; c <= 9; c++) px(c, 12, 255, 225, 85);
-    // lower arm: diagonal down-left, 3px wide
-    for (int i = 0; i < 3; i++)
-      for (int dx = 0; dx < 3; dx++)
-        px(6-i+dx, 13+i, BC[i][0], BC[i][1], BC[i][2]);
-    break;
-  }
-
-  case 6: { // 🌙 Mond — Sichel per Kreis-Subtraktion
-    for (int dy = 0; dy < 16; dy++) {
-      for (int dx = 0; dx < 16; dx++) {
-        float fx   = dx - 7.5f, fy = dy - 7.5f;
-        float dOut = sqrtf(fx * fx + fy * fy);
-        float dIn  = sqrtf((dx - 10.5f) * (dx - 10.5f) + fy * fy);
-        if (dOut <= 7.0f && dIn > 6.0f) {
-          float t = dOut / 7.0f;
-          px(dx, dy,
-             (uint8_t)(255 - t * 30),
-             (uint8_t)(250 - t * 38),
-             (uint8_t)(205 - t * 50));
-        }
-      }
-    }
-    break;
-  }
-
-  case 7: { // 🌥️ partly cloudy night: crescent moon top-left + cloud below
-    for (int dy = 0; dy < 8; dy++) {
-      for (int dx = 0; dx < 8; dx++) {
-        float dOut = sqrtf((dx-3.0f)*(dx-3.0f) + (dy-3.0f)*(dy-3.0f));
-        float dIn  = sqrtf((dx-5.5f)*(dx-5.5f) + (dy-3.0f)*(dy-3.0f));
-        if (dOut <= 3.5f && dIn > 3.0f) {
-          float t = dOut / 3.5f;
-          px(dx, dy,
-            (uint8_t)(255 - t * 20),
-            (uint8_t)(250 - t * 30),
-            (uint8_t)(200 - t * 40));
-        }
-      }
-    }
-    drawCloud(4, 0);
-    break;
-  }
-
-  case 8: { // 🌧️ rain — cloud + 3 diagonal \ stripes, 3px each, 2 groups
-    drawCloud(0, 1);
-    static const int8_t SX8[] = {12, 8, 4};
-    for (int d = 0; d < 3; d++) {
-      px(SX8[d]-0,  9, 90, 175, 255);
-      px(SX8[d]-1, 10, 90, 175, 255);
-      px(SX8[d]-2, 11, 55, 130, 225);
-      px(SX8[d]-0, 12, 90, 175, 255);
-      px(SX8[d]-1, 13, 90, 175, 255);
-      px(SX8[d]-2, 14, 55, 130, 225);
-    }
-    break;
-  }
-
-  case 9: { // 🌦️ rain showers — sun top-left + cloud lower + diagonal drops
-    // sun (same shape as icon 1)
-    for (int dy = 0; dy < 8; dy++) {
-      for (int dx = 0; dx < 8; dx++) {
-        float fx = dx - 3.0f, fy = dy - 3.0f;
-        float d = sqrtf(fx*fx + fy*fy);
-        if      (d <= 1.2f) px(dx, dy, 255, 255, 185);
-        else if (d <= 2.2f) px(dx, dy, 255, 225,  55);
-        else if (d <= 3.0f) px(dx, dy, 255, 178,   5);
-      }
-    }
-    px(3, 0, 255, 148, 0); px(0, 3, 255, 148, 0);
-    px(6, 3, 255, 148, 0); px(3, 6, 255, 148, 0);
-    px(1, 1, 255, 152, 0); px(5, 1, 255, 152, 0);
-    px(1, 5, 255, 152, 0); px(5, 5, 255, 152, 0);
-    // cloud from row 3 (covers sun lower half)
-    drawCloud(3, 1);
-    // diagonal drops below the cloud
-    static const int8_t SX9[] = {12, 8, 4};
-    for (int d = 0; d < 3; d++) {
-      px(SX9[d]-0, 12, 90, 175, 255);
-      px(SX9[d]-1, 13, 90, 175, 255);
-      px(SX9[d]-2, 14, 55, 130, 225);
-    }
-    break;
-  }
-
-  case 10: { // 🌫️ Nebel — 5 horizontale Streifen, alternierend versetzt
-    auto fogLine = [&](int dy, int x0, int x1, uint8_t v) {
-      for (int c = x0; c <= x1; c++) px(c, dy, v, (uint8_t)(v + 8), (uint8_t)(v + 18));
-    };
-    fogLine( 3,  2, 11, 200);
-    fogLine( 5,  4, 13, 185);
-    fogLine( 7,  2, 11, 170);
-    fogLine( 9,  4, 13, 155);
-    fogLine(11,  2, 11, 140);
-    break;
-  }
-
-  } // switch
 }
 
 void weatherIconTest() {
@@ -785,7 +556,7 @@ void weatherIconTest() {
     DrawWeatherIcon16(i, i * 21 + 2, 0);
   }
   for (uint8_t i = 6; i < 11; i++) {
-    DrawWeatherIcon16(i, (i - 6) * 24 + 4, 16);
+    DrawWeatherIcon16(i, (i - 6) * 24 + 4, 15);
   }
   Render();
 }
@@ -866,12 +637,12 @@ void weatherDisplayClock() {
   int m1 = timeinfo.tm_min  / 10;
   int m2 = timeinfo.tm_min  % 10;
 
-  int startX = 0, startY = 3;
-  if (h1 > 0) DrawSegDigit(startX,      startY, h1, clockR, clockG, clockB);
-  DrawSegDigit(startX + 11, startY, h2, clockR, clockG, clockB);
-  DrawColon(   startX + 23, startY,     clockR, clockG, clockB);
-  DrawSegDigit(startX + 27, startY, m1, clockR, clockG, clockB);
-  DrawSegDigit(startX + 38, startY, m2, clockR, clockG, clockB);
+  int startX = 0, startY = clockGlowEnabled ? 2 : 3;
+  if (h1 > 0) DrawDigitAuto(startX,      startY, h1, clockR, clockG, clockB);
+  DrawDigitAuto(startX + 11, startY, h2, clockR, clockG, clockB);
+  DrawColonAuto(startX + 23, startY,     clockR, clockG, clockB);
+  DrawDigitAuto(startX + 27, startY, m1, clockR, clockG, clockB);
+  DrawDigitAuto(startX + 38, startY, m2, clockR, clockG, clockB);
 
   display->DisplayText(dateStr, 2, 25, dateR, dateG, dateB, 1);
 
@@ -895,38 +666,43 @@ void weatherDisplayClock() {
     if (mqttFallback) { tR = tG = tB = wR = wG = wB = 100; }
     else              { wR = dateR; wG = dateG; wB = dateB; }
 
-    // centered in zone x=72..96 (between icon end and side data)
+    // Fixed-slot layout, zone x=72..103:
+    // [Minus:4px@72] [Zehner:10px@77] [Einer:10px@88] [C:4px@99]
     bool negative = (weatherTemp < -0.5f);
     int absTemp = negative ? -tempInt : tempInt;
-    int w = 0;
-    if (negative)      w += 6;   // Minuszeichen
-    if (absTemp >= 10) w += 11;  // Zehner
-    w += 10;                     // Einer
-    w += 5;                      // gap + "C"
-    int tx = 72 + (25 - w) / 2;
-    if (tx < 72) tx = 72;
+
     if (negative) {
-      for (int dx = 0; dx < 5; dx++)
-        for (int dy = 0; dy < 2; dy++)
-          display->DrawPixel(tx + dx, 12 + dy, tR, tG, tB);
-      tx += 6;
+      if (absTemp >= 10) {
+        // Kerning: "1" hat ersten Pixel bei Slot+8 statt Slot+0 — Minus folgt nach
+        static const int8_t kLeftPad[10] = {0,6,0,0,0,0,0,0,0,0};
+        int minusX = 72 + kLeftPad[absTemp / 10];
+        for (int dx = 0; dx < 4; dx++)
+          for (int dy = 0; dy < 2; dy++)
+            display->DrawPixel(minusX + dx, 12 + dy, tR, tG, tB);
+        DrawDigitAuto(77, 3, absTemp / 10, tR, tG, tB);
+      } else {
+        // Minus rechtsbündig im Zehner-Slot (x=81), 1px vor dem Einer
+        for (int dx = 0; dx < 4; dx++)
+          for (int dy = 0; dy < 2; dy++)
+            display->DrawPixel(81 + dx, 12 + dy, tR, tG, tB);
+      }
+    } else if (absTemp >= 10) {
+      DrawDigitAuto(77, 3, absTemp / 10, tR, tG, tB);
     }
-    if (absTemp >= 10) { DrawSegDigit(tx, 3, absTemp / 10, tR, tG, tB); tx += 11; }
-    DrawSegDigit(tx, 3, absTemp % 10, tR, tG, tB);
-    tx += 10;
-    display->DisplayText("C", tx + 1, 5, tR, tG, tB, 1);
+    DrawDigitAuto(88, 3, absTemp % 10, tR, tG, tB);
+    display->DisplayText("C", 99, 5, tR, tG, tB, 1);
 
     display->DisplayText(wi.text, 55, 25, wR, wG, wB, 1);
 
     char humStr[8];
     snprintf(humStr, sizeof(humStr), "H:%u%%", weatherHumidity);
-    display->DisplayText(humStr, 101, 2, wR, wG, wB, 1);
+    display->DisplayText(humStr, 104, 2, wR, wG, wB, 1);
     char windStr[9];
     snprintf(windStr, sizeof(windStr), "W:%dkm", (int)roundf(weatherWindSpeed));
-    display->DisplayText(windStr, 101, 11, wR, wG, wB, 1);
+    display->DisplayText(windStr, 104, 11, wR, wG, wB, 1);
     char presStr[10];
     snprintf(presStr, sizeof(presStr), "P:%u", weatherPressure);
-    display->DisplayText(presStr, 101, 20, wR, wG, wB, 1);
+    display->DisplayText(presStr, 104, 20, wR, wG, wB, 1);
   } else if (mqttStale) {
     display->DisplayText("MQTT", 66, 10, 255, 80, 0, 1);
     display->DisplayText("fehlt", 64, 18, 255, 80, 0, 1);
@@ -990,8 +766,8 @@ void weatherDisplayForecast() {
       tx += 5;
       tempInt = -tempInt;
     }
-    if (tempInt >= 10) { DrawSegDigit(tx, 5, tempInt / 10, tR, tG, tB); tx += 11; }
-    DrawSegDigit(tx, 5, tempInt % 10, tR, tG, tB);
+    if (tempInt >= 10) { DrawDigitAuto(tx, 5, tempInt / 10, tR, tG, tB); tx += 11; }
+    DrawDigitAuto(tx, 5, tempInt % 10, tR, tG, tB);
     tx += 10;
     display->DisplayText("C", tx + 1, 7, tR, tG, tB, 1);
 

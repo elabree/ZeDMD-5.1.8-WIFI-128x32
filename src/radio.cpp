@@ -138,9 +138,9 @@ static void saveRadioEq() {
 static void loadRadioEq() {
   File f = LittleFS.open("/radio_eq.val", "r");
   if (f) {
-    radioEqBass   = (int8_t)constrain(f.readStringUntil('\n').toInt(), -40, 6);
-    radioEqMid    = (int8_t)constrain(f.readStringUntil('\n').toInt(), -40, 6);
-    radioEqTreble = (int8_t)constrain(f.readStringUntil('\n').toInt(), -40, 6);
+    radioEqBass   = (int8_t)constrain(f.readStringUntil('\n').toInt(), -40, 12);
+    radioEqMid    = (int8_t)constrain(f.readStringUntil('\n').toInt(), -40, 12);
+    radioEqTreble = (int8_t)constrain(f.readStringUntil('\n').toInt(), -40, 12);
     f.close();
   }
 }
@@ -389,9 +389,9 @@ void radioSetVolume(uint8_t vol) {
 }
 
 void radioSetEq(int8_t bass, int8_t mid, int8_t treble) {
-  radioEqBass   = (int8_t)constrain(bass,   -40, 6);
-  radioEqMid    = (int8_t)constrain(mid,    -40, 6);
-  radioEqTreble = (int8_t)constrain(treble, -40, 6);
+  radioEqBass   = (int8_t)constrain(bass,   -40, 12);
+  radioEqMid    = (int8_t)constrain(mid,    -40, 12);
+  radioEqTreble = (int8_t)constrain(treble, -40, 12);
   audio.setTone(radioEqBass, radioEqMid, radioEqTreble);
 }
 

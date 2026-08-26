@@ -1,17 +1,1 @@
-.DS_Store
 /.pio/
-/.vscode/
-/.claude/
-*.bak
-*.tmp
-*.old
-CLAUDE.md
-/reference/
-
-PROJECT_STATUS.md
-DIAGNOSTICS.md
-REVIEW_*.md
-scripts/merge_firmware.py
-scripts/copy_firmware.py
-scripts/upload_icons.sh
-platformio_override.ini

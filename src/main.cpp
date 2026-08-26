@@ -180,6 +180,7 @@ int8_t yOffset = 0;
 #ifdef DISPLAY_LED_MATRIX
 uint8_t panelClkphase = 0;
 uint8_t panelDriver = 0;
+uint8_t panelLineDecoder = 0;
 uint8_t panelI2sspeed = 8;
 uint8_t panelLatchBlanking = 2;
 uint8_t panelMinRefreshRate = 30;
@@ -414,6 +415,7 @@ bool screensaverShuffle = false;
 bool screensaverStrictTimer = true;
 volatile bool sdCardAvailable = false;
 bool sdCardWarningPending = false;
+volatile bool sdUpdatePending = false;
 uint64_t sdTotalBytes = 0;
 uint32_t lfsTotal = 0;
 uint32_t lfsUsed  = 0;
@@ -564,6 +566,7 @@ void CleanupTmpFiles();
 void LoadIcons();
 void radioIconSlugsLoad();
 const uint8_t* GetSmallIcon(const char* name);
+const uint8_t* GetWeatherIcon(const char* name);
 const uint8_t* GetRadioIcon(const char* name);
 void LoadScreensaverFiles();
 void InitSDCard();
@@ -613,8 +616,11 @@ void LoadMqttConfig();
 void LoadScreensaverMode();
 void SaveDisplayText();
 void LoadDisplayText();
-void SaveClockColors();   // stays in main.cpp
-void LoadClockColors();   // stays in main.cpp
+void SaveClockColors();    // stays in main.cpp
+void LoadClockColors();    // stays in main.cpp
+void SaveClockSegStyle();   // stays in main.cpp
+void LoadClockSegStyle();   // stays in main.cpp
+void checkSdFirmwareUpdate();  // stays in main.cpp
 void SaveDisplayTimer();
 void LoadDisplayTimer();
 void CheckDisplayTimer();
@@ -761,6 +767,8 @@ void SavePanelSettings() {
   if (f) { f.write(panelClkphase); f.close(); }
   f = LittleFS.open("/panel_driver.val", "w");
   if (f) { f.write(panelDriver); f.close(); }
+  f = LittleFS.open("/panel_line_decoder.val", "w");
+  if (f) { f.write(panelLineDecoder); f.close(); }
   f = LittleFS.open("/panel_i2sspeed.val", "w");
   if (f) { f.write(panelI2sspeed); f.close(); }
   f = LittleFS.open("/panel_latch_blanking.val", "w");
@@ -781,6 +789,8 @@ void LoadPanelSettings() {
   if (!f) { return; }
   panelDriver = f.read();
   f.close();
+  f = LittleFS.open("/panel_line_decoder.val", "r");
+  if (f) { panelLineDecoder = f.read(); f.close(); }
   f = LittleFS.open("/panel_i2sspeed.val", "r");
   if (!f) { return; }
   panelI2sspeed = f.read();
@@ -1071,9 +1081,9 @@ void DisplayUpdate() {
   File f;
 
   if (TOTAL_HEIGHT == 64) {
-    f = LittleFS.open("/ppucHD.raw", "r");
+    f = LittleFS.open("/The_ArcadeHD.raw", "r");
   } else {
-    f = LittleFS.open("/ppuc.raw", "r");
+    f = LittleFS.open("/The_Arcade.raw", "r");
   }
 
   if (!f) {
@@ -2255,7 +2265,7 @@ void StartServer() {
     if (request->hasParam("brightness", true)) {
       String brightnessValue = request->getParam("brightness", true)->value();
       brightness = (uint8_t)constrain(brightnessValue.toInt(), 0, 15);
-      GetDisplayObject()->SetBrightness(brightness);
+      ApplyBrightness(brightness);
       SaveLum();
       request->send(200, "text/plain", "Brightness updated successfully");
     } else {
@@ -2391,8 +2401,8 @@ void StartServer() {
             + "|" + String(shortId));
   });
 
-  server->on("/ppuc.png", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(LittleFS, "/ppuc.png", "image/png");
+  server->on("/The_Arcade.png", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(LittleFS, "/The_Arcade.png", "image/png");
   });
 
   server->on("/reset_wifi", HTTP_POST, [](AsyncWebServerRequest *request) {
@@ -2632,8 +2642,10 @@ void StartServer() {
 #endif
 
     n += snprintf(json + n, sizeof(json) - n,
-      ",\"weatherLat\":%.4f,\"weatherLon\":%.4f,\"timezone\":\"%s\"",
-      weatherLat, weatherLon, clockTimezone.c_str());
+      ",\"weatherLat\":%.4f,\"weatherLon\":%.4f,\"timezone\":\"%s\""
+      ",\"clockSegStyle\":%d",
+      weatherLat, weatherLon, clockTimezone.c_str(),
+      clockSegStyle);
 
 #ifdef DISPLAY_LED_MATRIX
     n += snprintf(json + n, sizeof(json) - n,
@@ -2845,6 +2857,52 @@ void StartServer() {
     if (request->hasParam("dateB",  true)) dateB  = (uint8_t)constrain(request->getParam("dateB",  true)->value().toInt(), 0, 255);
     SaveClockColors();
     clockColorChanged = true;
+    request->send(200, "text/plain", "OK");
+  });
+
+  // POST /clock_glow_toggle — enable/disable 7-segment drop-shadow (test, not persisted)
+  server->on("/clock_glow_toggle", HTTP_POST, [](AsyncWebServerRequest *request) {
+    clockGlowEnabled = !clockGlowEnabled;
+    clockColorChanged = true;
+    char buf[32];
+    snprintf(buf, sizeof(buf), "{\"glow\":%s}", clockGlowEnabled ? "true" : "false");
+    request->send(200, "application/json", buf);
+  });
+
+  // POST /save_clock_seg_style?val=0|1|2 — 0=Default 1=Classic 2=Modern
+  server->on("/save_clock_seg_style", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (request->hasParam("val", true)) {
+      int v = request->getParam("val", true)->value().toInt();
+      clockSegStyle = (v >= 0 && v <= 3) ? v : 0;
+    }
+    SaveClockSegStyle();
+    clockColorChanged = true;
+    request->send(200, "text/plain", "OK");
+  });
+
+
+  // POST /trigger_sd_update — flash /UPDATE/firmware.bin from SD card (runs in next loop())
+  server->on("/trigger_sd_update", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!sdCardAvailable) {
+      request->send(503, "text/plain", "SD not available");
+      return;
+    }
+    File f = SD.open("/UPDATE/firmware.bin");
+    if (!f || f.isDirectory()) {
+      if (f) f.close();
+      logMsg("SD OTA: /UPDATE/firmware.bin not found");
+      request->send(404, "text/plain", "/UPDATE/firmware.bin not found on SD card");
+      return;
+    }
+    size_t sz = f.size();
+    f.close();
+    if (sz < 4096) {
+      logMsg("SD OTA: file too small (%u bytes)", sz);
+      request->send(400, "text/plain", "File too small — not a valid firmware");
+      return;
+    }
+    logMsg("SD OTA: /UPDATE/firmware.bin found (%u bytes), triggering flash", sz);
+    sdUpdatePending = true;
     request->send(200, "text/plain", "OK");
   });
 
@@ -3445,6 +3503,33 @@ void StartServer() {
   });
 #endif  // DISPLAY_LED_MATRIX
 
+  // POST /upload_asset — Upload PNG/RAW assets to LittleFS root (admin only)
+  server->on("/upload_asset", HTTP_POST,
+    [](AsyncWebServerRequest *request) {
+      if (!request->authenticate("admin", "zedmd1234")) return request->requestAuthentication();
+      request->send(200, "text/plain", "OK");
+    },
+    [](AsyncWebServerRequest *request, String filename, size_t index,
+       uint8_t *data, size_t len, bool final) {
+      if (!request->authenticate("admin", "zedmd1234")) return;
+      bool isPng = filename.endsWith(".png");
+      bool isRaw = filename.endsWith(".raw");
+      if (!isPng && !isRaw) return;
+      static File uploadFile;
+      if (index == 0) {
+        if (uploadFile) { uploadFile.close(); LittleFS.remove("/" + filename + ".tmp"); }
+        uploadFile = LittleFS.open("/" + filename + ".tmp", "w");
+      }
+      if (uploadFile) uploadFile.write(data, len);
+      if (final && uploadFile) {
+        uploadFile.close();
+        LittleFS.remove("/" + filename);
+        LittleFS.rename("/" + filename + ".tmp", "/" + filename);
+        logMsg("Asset hochgeladen: /%s", filename.c_str());
+      }
+    }
+  );
+
   // POST /upload_file — Upload HTML files to LittleFS root (admin only)
   server->on("/upload_file", HTTP_POST,
     [](AsyncWebServerRequest *request) {
@@ -3494,6 +3579,34 @@ void StartServer() {
         LittleFS.remove(dst);
         LittleFS.rename("/icons/" + filename + ".tmp", dst);
         logMsg("Icon hochgeladen: %s", dst.c_str());
+        iconsReloadNeeded = true;
+      }
+    }
+  );
+
+  // POST /upload_icon_weather — upload 17×17 RGBA weather icons to LittleFS /icons_weather/
+  server->on("/upload_icon_weather", HTTP_POST,
+    [](AsyncWebServerRequest *request) {
+      if (!request->authenticate("admin", "zedmd1234")) return request->requestAuthentication();
+      request->send(200, "text/plain", "OK");
+    },
+    [](AsyncWebServerRequest *request, String filename, size_t index,
+       uint8_t *data, size_t len, bool final) {
+      if (!request->authenticate("admin", "zedmd1234")) return;
+      if (!filename.endsWith(".rgba")) return;
+      static File uploadFile;
+      if (index == 0) {
+        if (!LittleFS.exists("/icons_weather")) LittleFS.mkdir("/icons_weather");
+        if (uploadFile) { uploadFile.close(); LittleFS.remove(("/icons_weather/" + filename + ".tmp").c_str()); }
+        uploadFile = LittleFS.open("/icons_weather/" + filename + ".tmp", "w");
+      }
+      if (uploadFile) uploadFile.write(data, len);
+      if (final && uploadFile) {
+        uploadFile.close();
+        String dst = "/icons_weather/" + filename;
+        LittleFS.remove(dst);
+        LittleFS.rename("/icons_weather/" + filename + ".tmp", dst);
+        logMsg("Weather-Icon hochgeladen: %s", dst.c_str());
         iconsReloadNeeded = true;
       }
     }
@@ -3732,6 +3845,7 @@ void StartWiFi() {
     display->DisplayText("Start AP in 20 seconds ...", 10, TOTAL_HEIGHT / 2 + 3,
                          255, 0, 0);
     for (uint8_t i = 19; i > 0; i--) {
+      esp_task_wdt_reset();
       CheckMenuButton();
       vTaskDelay(pdMS_TO_TICKS(1000));
       DisplayNumber(i, 2, 58, TOTAL_HEIGHT / 2 + 3, 255, 0, 0);
@@ -3965,6 +4079,69 @@ void LoadClockColors() {
     dateR  = f.read(); dateG  = f.read(); dateB  = f.read();
     f.close();
   }
+}
+
+void SaveClockSegStyle() {
+  File f = LittleFS.open("/clock_seg.val", "w");
+  if (f) { f.write((uint8_t)clockSegStyle); f.close(); }
+}
+
+void LoadClockSegStyle() {
+  File f = LittleFS.open("/clock_seg.val", "r");
+  if (f && f.size() >= 1) {
+    int v = f.read();
+    clockSegStyle = (v >= 0 && v <= 3) ? v : 0;
+    f.close();
+  }
+}
+
+void checkSdFirmwareUpdate() {
+  if (!sdCardAvailable) return;
+  File f = SD.open("/UPDATE/firmware.bin");
+  if (!f || f.isDirectory()) { if (f) f.close(); return; }
+  size_t fileSize = f.size();
+  if (fileSize < 4096) { f.close(); return; }  // sanity: skip suspiciously small files
+
+  logMsg("SD OTA: /UPDATE/firmware.bin found (%u bytes), flashing", fileSize);
+  display->ClearScreen();
+  display->DisplayText("SD Update...", 0, 13, 255, 200, 0, 1);
+  display->DisplayText("DO NOT POWER OFF", 0, 20, 255, 100, 0, 1);
+  Render();
+
+  if (!Update.begin(fileSize, U_FLASH)) {
+    logMsg("SD OTA: begin() failed: %s", Update.errorString());
+    f.close();
+    return;
+  }
+
+  static uint8_t buf[4096];
+  size_t written = 0;
+  int chunk = 0;
+  bool error = false;
+  while (written < fileSize) {
+    size_t toRead = min(sizeof(buf), fileSize - written);
+    size_t n = f.read(buf, toRead);
+    if (n == 0) { error = true; break; }
+    if (Update.write(buf, n) != n) { error = true; break; }
+    written += n;
+    if (++chunk % 32 == 0) esp_task_wdt_reset();
+  }
+  f.close();
+
+  if (error || !Update.end(true)) {
+    Update.abort();
+    logMsg("SD OTA: failed after %u bytes: %s", written, Update.errorString());
+    return;
+  }
+
+  SD.remove("/UPDATE/firmware.bin");
+  logMsg("SD OTA: success (%u bytes), rebooting", written);
+  display->ClearScreen();
+  display->DisplayText("Update OK!", 14, 13, 0, 255, 0, 1);
+  display->DisplayText("Rebooting...", 7, 20, 180, 180, 180, 1);
+  Render();
+  delay(1500);
+  esp_restart();
 }
 
 // ── MQTT + Wetter Konfiguration ───────────────────────────────────────────────
@@ -4201,8 +4378,9 @@ uint16_t nextScreensaverIndex() {
 
 // ── Icon-System ───────────────────────────────────────────────────────────────
 // Icon system: RGBA pixel-art icons from LittleFS in PSRAM.
-// /icons/      → 20×20 px (emoji ticker + large weather icon)
-// /icons_small/→ 10×10 px (small weather forecast icons)
+// /icons/         → 20×20 px (emoji ticker + question fallback)
+// /icons_small/   → 10×10 px (small weather forecast icons)
+// /icons_weather/ → 17×17 px (large weather icons, 11 WMO-mapped)
 
 #define ICON_RGBA_CH  4
 #define ICON_W        20
@@ -4214,7 +4392,11 @@ uint16_t nextScreensaverIndex() {
 #define ICON_W_R      32
 #define ICON_H_R      32
 #define ICON_BYTES_R  (ICON_W_R * ICON_H_R * ICON_RGBA_CH)
+#define ICON_W_W      17
+#define ICON_H_W      17
+#define ICON_BYTES_W  (ICON_W_W * ICON_H_W * ICON_RGBA_CH)
 #define MAX_ICONS     48
+#define MAX_WEATHER_ICONS 12
 
 struct IconEntry {
   char     name[32];
@@ -4225,6 +4407,8 @@ static IconEntry iconTable[MAX_ICONS];
 static uint8_t   iconCount = 0;
 static IconEntry iconTableSmall[MAX_ICONS];
 static uint8_t   iconCountSmall = 0;
+static IconEntry iconTableWeather[MAX_WEATHER_ICONS];
+static uint8_t   iconCountWeather = 0;
 
 // Radio-Icons: Single-Slot-Cache + Fuzzy-Name-Liste.
 // Nur das aktuell gespielte Logo im RAM (4 KB), kein Massenload.
@@ -4244,6 +4428,12 @@ const uint8_t* GetIcon(const char* name) {
 const uint8_t* GetSmallIcon(const char* name) {
   for (uint8_t i = 0; i < iconCountSmall; i++)
     if (strcmp(iconTableSmall[i].name, name) == 0) return iconTableSmall[i].data;
+  return nullptr;
+}
+
+const uint8_t* GetWeatherIcon(const char* name) {
+  for (uint8_t i = 0; i < iconCountWeather; i++)
+    if (strcmp(iconTableWeather[i].name, name) == 0) return iconTableWeather[i].data;
   return nullptr;
 }
 
@@ -4404,7 +4594,7 @@ static void loadIconSet(const char* dir_path, IconEntry* table, uint8_t& count,
     bool isDir = f.isDirectory();
     f.close();
     if (!isDir && isRgba && sz == expected_bytes) {
-      char path[64];
+      char path[96];
       snprintf(path, sizeof(path), "%s/%s", dir_path, fname);
       File rf = LittleFS.open(path, "r");
       if (rf) {
@@ -4429,7 +4619,7 @@ static void loadIconSet(const char* dir_path, IconEntry* table, uint8_t& count,
 }
 
 void CleanupTmpFiles() {
-  static const char* scanDirs[] = { "/", "/icons", "/icons_small", nullptr };
+  static const char* scanDirs[] = { "/", "/icons", "/icons_small", "/icons_weather", nullptr };
   uint8_t count = 0;
   for (int d = 0; scanDirs[d]; d++) {
     File dir = LittleFS.open(scanDirs[d]);
@@ -4457,6 +4647,9 @@ void LoadIcons() {
   loadIconSet("/icons", iconTable, iconCount, MAX_ICONS, ICON_BYTES);
   esp_task_wdt_reset();
   logMsg("Icons: %d gross geladen", iconCount);
+  loadIconSet("/icons_weather", iconTableWeather, iconCountWeather, MAX_WEATHER_ICONS, ICON_BYTES_W);
+  esp_task_wdt_reset();
+  logMsg("Icons: %d Wetter geladen", iconCountWeather);
   // radioIconSlugsLoad() wird nach radioLoadPresets() in radioInit() aufgerufen
 }
 
@@ -4657,8 +4850,10 @@ uint16_t TryLoadFolderCache(const String& sdPath) {
   File f = LittleFS.open(cacheFile, "r");
   if (!f) return 0;
   uint16_t countBefore = screensaverCount;
+  uint16_t lineCount = 0;
   char lineBuf[128];
   while (f.available()) {
+    if (++lineCount % 50 == 0) esp_task_wdt_reset();
     int len = f.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
     lineBuf[len] = '\0';
     while (len > 0 && (lineBuf[len-1] == '\r' || lineBuf[len-1] == ' ')) lineBuf[--len] = '\0';
@@ -5093,6 +5288,7 @@ void GetSDFolders() {
 }
 
 void setup() {
+  enableLoopWDT();       // Register loopTask with TWDT — must be first so all esp_task_wdt_reset() calls below are effective
   Serial.begin(115200);
   esp_task_wdt_reset();  // WDT budget may be partially consumed after USB flash — reset before delay()
   delay(2000);
@@ -5209,6 +5405,7 @@ void setup() {
     LoadScreensaverMode();
     LoadDisplayText();
     LoadClockColors();
+    LoadClockSegStyle();
 #ifdef ZEDMD_WIFI
     LoadMqttConfig();
 #endif
@@ -5226,6 +5423,7 @@ void setup() {
     if (!sdCardAvailable) sdCardWarningPending = true;
     checkSDCardIdentity();  // known card? otherwise invalidate caches
     esp_task_wdt_reset();   // checkSDCardIdentity may write SD+LittleFS
+    checkSdFirmwareUpdate();  // flash /UPDATE/firmware.bin if present, then reboot
     GetSDFolders();  // populate cache at boot — writes directly into cachedSDFolders
     logMsg("[HEAP] nach SD-Init: free=%u", (uint32_t)ESP.getFreeHeap());
     esp_task_wdt_reset();  // InitSDCard + GetSDFolders can take >1s on slow cards
@@ -5259,14 +5457,15 @@ void setup() {
     case ESP_RST_TASK_WDT:
     case ESP_RST_WDT:
     case ESP_RST_CPU_LOCKUP: {
-      display->DisplayText("An unrecoverable error happend!", 0, 0, 255, 0, 0);
-      display->DisplayText("Coredump has been written. See", 0, 6, 255, 0, 0);
-      display->DisplayText("ppuc.org/ZeDMD how to download", 0, 12, 255, 0, 0);
-      display->DisplayText("it. Error code: ", 0, 18, 255, 0, 0);
-      DisplayNumber(esp_reset_reason(), 2, 16 * 4, 18, 255, 0, 0);
+      display->DisplayText("An unrecoverable error happened!", 0, 0, 255, 0, 0);
+      display->DisplayText("Coredump written. Download at:", 0, 6, 255, 0, 0);
+      display->DisplayText("/coredump", 0, 12, 255, 0, 0);
+      display->DisplayText("Error code:", 0, 18, 255, 0, 0);
+      DisplayNumber(esp_reset_reason(), 2, 12 * 4, 18, 255, 0, 0);
       if (debug) {
         display->DisplayText("Reboot in 30 seconds ...", 0, 24, 255, 0, 0);
         for (uint8_t i = 29; i > 0; i--) {
+          esp_task_wdt_reset();
           vTaskDelay(pdMS_TO_TICKS(1000));
           DisplayNumber(i, 2, 40, 24, 255, 0, 0);
         }
@@ -5281,6 +5480,7 @@ void setup() {
       display->DisplayText("hardware.", 0, 12, 255, 0, 0);
       display->DisplayText("Reboot in 30 seconds ...", 0, 24, 255, 0, 0);
       for (uint8_t i = 29; i > 0; i--) {
+        esp_task_wdt_reset();
         vTaskDelay(pdMS_TO_TICKS(1000));
         DisplayNumber(i, 2, 40, 24, 255, 0, 0);
       }
@@ -5318,6 +5518,7 @@ void setup() {
     else
       display->DisplayText("Check SD card and restart.", 0, 8, 255, 80, 0);
     Render();
+    esp_task_wdt_reset();  // delay(4000) below is within 5s WDT budget, but reset for margin
     delay(4000);
     display->ClearScreen();
     Render();
@@ -5590,7 +5791,8 @@ void setup() {
       logMsg("[HEAP] vor StartWiFi: free=%u", (uint32_t)ESP.getFreeHeap());
       StartWiFi();
       logMsg("[HEAP] nach StartWiFi: free=%u", (uint32_t)ESP.getFreeHeap());
-      clockInit();  // NTP nach WiFi Start
+      esp_task_wdt_reset();
+      clockInit();  // NTP nach WiFi Start — getLocalTime kann bis 5s blockieren
 #ifdef WEBRADIO_ENABLED
       radioInit();
       logMsg("[HEAP] nach radioInit: free=%u", (uint32_t)ESP.getFreeHeap());
@@ -5660,6 +5862,11 @@ void loop() {
   }
 
   CheckMenuButton();
+
+  if (sdUpdatePending) {
+    sdUpdatePending = false;
+    checkSdFirmwareUpdate();
+  }
 
   // Reload screensaver files when path changed
   // screensaverLoadRunning prevents re-entrant calls on rapid path changes
@@ -5780,6 +5987,7 @@ void loop() {
     iconsReloadNeeded = false;
     esp_task_wdt_reset();
     LoadIcons();
+    radioIconSlugsLoad();  // Negative-Cache leeren — neues Logo sonst erst nach Reboot sichtbar
   }
 
   // Cache SD file list for the selected folder
@@ -6012,8 +6220,10 @@ void loop() {
 
       // Modus 1: Clock only
       if (screensaverMode == 1) {
+        uint32_t t0 = millis();
         clockDisplay();
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        uint32_t el = millis() - t0;
+        vTaskDelay(pdMS_TO_TICKS(el < 1000u ? 1000u - el : 1u));
         return;
       }
 
@@ -6027,8 +6237,10 @@ void loop() {
           if (showingClock) clockColorChanged = true;
         }
         if (showingClock) {
+          uint32_t t0 = millis();
           clockDisplay();
-          vTaskDelay(pdMS_TO_TICKS(1000));
+          uint32_t el = millis() - t0;
+          vTaskDelay(pdMS_TO_TICKS(el < 1000u ? 1000u - el : 1u));
           return;
         }
       }
@@ -6048,12 +6260,14 @@ void loop() {
             clockColorChanged = true;
           }
         }
+        uint32_t t0 = millis();
         if (weatherPage == 1) {
           weatherDisplayForecast();
         } else {
           weatherDisplayClock();
         }
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        uint32_t el = millis() - t0;
+        vTaskDelay(pdMS_TO_TICKS(el < 1000u ? 1000u - el : 1u));
         return;
       }
 
@@ -6121,8 +6335,10 @@ void loop() {
           }
         }
         if (showingClock) {
+          uint32_t t0 = millis();
           clockDisplay();
-          vTaskDelay(pdMS_TO_TICKS(1000));
+          uint32_t el = millis() - t0;
+          vTaskDelay(pdMS_TO_TICKS(el < 1000u ? 1000u - el : 1u));
           return;
         }
         if (screensaverTextNeedsClear) {

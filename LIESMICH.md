@@ -69,7 +69,83 @@ https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/raw/main/docs/images/ZeDMD_WiF
 
 ## 🆕 Neu in dieser Version
 
-### v1.5.3 *(diese Version)*
+### v1.7.0 *(diese Version)*
+
+#### Kritische Stabilitätsfixes — Watchdog überwacht jetzt den Haupt-Task
+Seit dem ersten WiFi-Firmware-Build war ein grundlegendes Problem vorhanden: `enableLoopWDT()` wurde nie aufgerufen, d. h. der Task-Watchdog-Timer (TWDT) hat den Haupt-Loop-Task nie wirklich überwacht. Alle `esp_task_wdt_reset()`-Aufrufe im gesamten Code waren stille No-Ops — das Gerät stützte sich nur auf den sekundären IDLE-Task-Starvation-Mechanismus.
+
+Mit `enableLoopWDT()` jetzt korrekt am Anfang von `setup()` überwacht der TWDT den Loop-Task aktiv gegen das 5-Sekunden-Budget. Dabei wurden drei echte Hängepunkte entdeckt und behoben:
+
+- **Großer Screensaver-Cache** — `TryLoadFolderCache()` las bei Geräten mit vielen Dateien 3 700+ Einträge ohne WDT-Reset und verursachte eine Bootschleife. Behoben: Reset alle 50 Zeilen.
+- **SoftAP-Countdown** — der 19-Sekunden-Countdown bei WiFi-Verbindungsfehler lief ohne einen einzigen Reset. Behoben.
+- **NTP-Sync** — `clockInit()` ruft `getLocalTime()` mit 5-Sekunden-Timeout auf und landet damit exakt an der WDT-Grenze. Ein Reset wird jetzt vorher ausgeführt.
+
+Geräte, die nach einem Firmware-Update wiederholt `TASK_WDT`-Einträge in `/diag` zeigten, sollten mit diesem Release sofort stabil werden.
+
+#### „The Arcade"-Boot-Logo
+Das Boot-Logo wurde vom generischen PPUC-Logo auf **The Arcade**-Branding aktualisiert. Der Crash-Screen-Overlay wurde ebenfalls korrigiert (er überschrieb bisher das Logo beim ersten Boot nach einem Crash).
+
+#### Radio-Icon-Reload-Fix
+Die Aktion **Icons neu laden** (`/icons_reload`) aktualisiert jetzt auch den Radio-Icon-Slug-Cache. Bisher erschien ein neu hochgeladenes Senderlogo erst nach einem vollständigen Neustart.
+
+#### Neuer `/upload_asset`-Endpoint
+Ein neuer Endpoint nimmt beliebige PNG- oder RAW-Dateien entgegen und speichert sie direkt im LittleFS-Root. Nützlich für eigene Boot-Logos oder Hintergrund-Assets ohne vollständigen LittleFS-Flash.
+
+#### Helligkeit speichern respektiert Blank-Timer
+Das Speichern der Helligkeit über `/save_brightness` rief bisher `SetBrightness()` direkt auf und deaktivierte damit ein aktives Display-Blank-Intervall. Es wird jetzt `ApplyBrightness()` verwendet und der Blank-Status bleibt unangetastet.
+
+---
+
+### v1.6.0
+
+#### Wetter-Icons — 17×17 Pixel-Art, jetzt in LittleFS
+Das große Wetter-Icon (oben rechts in der Uhr-/Wetteransicht) wurde auf **17×17** statt 16×16 Pixel neu gezeichnet. Die ungerade Größe legt den Mittelpunkt auf einen exakten Pixel (8, 8) statt zwischen zwei Pixel — Sonnenstrahlen, Mondspitzen und Nebelstreifen sind dadurch perfekt symmetrisch. Änderungen im Detail:
+
+- **Sonne** — Kardinalstrahlen auf 1 px verschmälert und auf 3 px verlängert; Diagonalstrahlen näher an den Körper gerückt
+- **Mond** — breitere Sichelspitzen oben und unten (3 px); Enden sehen gerundet statt spitz aus
+- **Wolken-Bitmap** — von `uint16_t` (16 Spalten) auf `uint32_t` (17 Spalten) erweitert; alle wolkenbasierten Icons profitieren
+- **Nebel** — sechster Streifen unten ergänzt um die zusätzliche Zeile zu füllen
+- **Regen / Nieselregen / Schauer** — Tropfenpositionen für gleichmäßigen horizontalen Abstand korrigiert
+
+Die 11 Wetter-Icons werden jetzt als **RGBA-Dateien in LittleFS** gespeichert (`/icons_weather/`) statt als fest einkompilierter Zeichencode. Das bedeutet:
+- Icons können **ohne Reflash ausgetauscht werden** — neue Icons einfach über `/upload_icon_weather` hochladen
+- Das Icon-System ist konsistent mit den bestehenden Ordnern (`/icons/` für Emojis, `/icons_radio/` für Senderlogos)
+- Ersteinrichtung: die 11 `weather_*.rgba`-Dateien aus `data/icons_weather/` nach dem ersten Flash hochladen
+
+#### Temperaturanzeige — Minus-Zeichen rückt enger
+Das Minuszeichen bei negativen Temperaturen **rückt näher an die Ziffer**: bei einstelligen Negativwerten (`−1` bis `−9`) sitzt das Minus dort, wo sonst die Zehner-Stelle wäre; bei zweistelligen Werten (`−10` bis `−19`) rückt es 2 px weiter nach rechts Richtung der führenden `1`. Das Ergebnis ist eine natürlichere, kompaktere Darstellung auf der 128×32-Matrix.
+
+#### Interaktive Standortkarte für Wetterdaten
+Im Bereich **Wetter (Open-Meteo)** der `admin.html` gibt es jetzt eine **Leaflet / OpenStreetMap**-Karte. Einfach auf die Karte klicken oder den Marker ziehen — Koordinaten werden automatisch übernommen, kein manuelles Eingeben nötig. Städtesuche ist ebenfalls integriert. Die Karte öffnet sich an den aktuell gespeicherten Koordinaten.
+
+#### HUB75-Bibliothek 3.0.14 + Line-Decoder-Parameter
+Die ESP32-HUB75-MatrixPanel-DMA-Bibliothek wurde von **3.0.12 auf 3.0.14** aktualisiert. Im Panel-Bereich der Admin-Seite gibt es jetzt den neuen Parameter **Line Decoder** — notwendig für Panels mit Schieberegister-basierter Zeilenselektion statt direkter Adressierung (selten, aber für bestimmte Panel-Typen erforderlich). Standardwert ist 0 (kein Effekt auf Standard-Panels). Einstellung wird in LittleFS gespeichert.
+
+#### SDMMC-Build-Umgebung entfernt
+Die PlatformIO-Umgebung `S3-N16R8_128x32_wifi_sdmmc_webradio` wurde aus `platformio.ini` entfernt. Sie wurde nicht aktiv gepflegt und war nur störend in der Build-Konfiguration. Der Standard-SPI-SD-Build (`wifi_sd_webradio`) bleibt das einzige unterstützte Target.
+
+#### 7-Segment-Anzeigestile
+Unter **Display Settings** im Webinterface sind vier Segment-Stile wählbar:
+
+- **Default** — angefaste Ecken mit Kreuzungs-Clearing (ursprünglicher Look)
+- **Classic** — innere Kerbe an Segment-Kreuzungen; innere Ecken angefasst
+- **Classic 2** — frühere Variante: L-Kreuzungs-Innenpixel + innere Anfasung, „0" ausgenommen
+- **Modern** — schlichte Rechteck-Segmente ohne Anfasung
+
+Der aktive Stil wird in LittleFS gespeichert und bleibt nach Neustart erhalten.
+
+#### Glow-Effekt *(Beta)*
+Ein **Glow β**-Button in Display Settings schaltet einen Schattenwurf auf den Uhrziffern ein (2 px Versatz, 30 % Helligkeit). Experimentell — wird nach Neustart nicht gespeichert.
+
+#### Equalizer-Bereich auf ±12 dB erweitert
+Die Bass-/Mitten-/Höhen-Regler gehen jetzt von **−12 dB bis +12 dB** (bisher ±6 dB). Besonders nützlich bei Lautsprechern wie dem FRS8, bei denen Bass absenken und Höhen anheben die wahrgenommene Klangqualität deutlich verbessert.
+
+#### SD-Karten-Firmware-Update
+Eine `firmware.bin` im Ordner `/UPDATE/` auf der SD-Karte wird beim nächsten Boot automatisch geflasht und danach gelöscht. Alternativ gibt es auf der **Admin**-Seite einen manuellen Trigger-Button — ohne Neustart.
+
+---
+
+### v1.5.3
 
 #### Konfigurierbare MQTT-Feldnamen
 Die JSON-Feldnamen, mit denen Wetterdaten vom MQTT-Broker gelesen werden, sind jetzt im Admin-Panel konfigurierbar — kein Neuflashen nötig. Das ist wichtig, wenn die eigene Wetterstation (z. B. WeeWx) andere Feldnamen verwendet. Standardwerte entsprechen dem WeeWx-LOOP-Standardformat: `outTemp_C`, `outHumidity`, `windSpeed_kph`, `barometer_mbar`. Die Einstellung wird in LittleFS gespeichert.
@@ -351,6 +427,7 @@ Dieser Fork ist **nur WiFi** und zielt auf den **ESP32-S3-N16R8** mit einer **12
 - **Webradio** — Internetradio via I2S-Verstärker (MAX98357A); Sendersuche via [radio-browser.info](https://www.radio-browser.info); Preset-Verwaltung mit Logo-Icons; LED-Matrix zeigt Senderinfo 5 s beim Start, „DMD 10s"-Button für On-Demand-Anzeige
 - **Konfig Export/Import** — vollständiges Konfigurations-Backup und -Restore über den Browser (`/config_transfer.html`)
 - **Display Text** — individuelle Textnachricht mit Emojis über die Web-UI an die LED-Matrix senden; statisch oder scrollend, mit Farbwahl und konfigurierbarer Dauer (5–60 s); 34 Emojis per eingebautem Picker wählbar
+- **LittleFS-Icon-System** — drei Icon-Ordner: `/icons/` (20×20 Emojis/Fragezeichen), `/icons_weather/` (17×17 Wetter-Icons, upload über `/upload_icon_weather`), `/icons_radio/` (32×32 Senderlogos); Splash-Assets über `/upload_asset`
 - **Display-Timer** — tägliche Ein-/Ausschaltzeiten für das LED-Display; „Display off / Display on"-Button für sofortiges manuelles Aus-/Einschalten
 - **Tabs im Webinterface** — Hauptseite in Screensaver / Display / Radio gegliedert; SD-Info und Admin immer sichtbar
 - **Stereo-Audio** *(experimentell)* — zwei MAX98357A-Module für echten Stereo-Ausgang; Kanalwahl per SD-Pin-Widerstandsbrücke (nur 5V, Werte verifiziert); Stereo/Mono-Umschalter in der Web-UI
@@ -456,6 +533,8 @@ Zugriff über `http://<IP>/` (Hauptseite) und `http://<IP>/admin.html` (Admin-Se
 | **MQTT** | Server-IP und Port für Wetterintegration |
 | **Wetter (Open-Meteo)** | Breitengrad/Längengrad für lokale Wetteranzeige |
 | **Web-Dateien aktualisieren** | index.html / admin.html hochladen ohne vollständigen Filesystem-Flash |
+| **Wetter-Icons hochladen** | 17×17-RGBA-Icons in LittleFS `/icons_weather/` laden über `/upload_icon_weather` |
+| **Assets hochladen** | PNG/RAW-Splash-Bilder ins LittleFS-Root laden über `/upload_asset` |
 | **Konfig Export/Import** | Vollständiges Backup/Restore über `/config_transfer.html` |
 | **Information** | Firmware-Version, Build-Datum und Git-Hash, Debug-Info |
 
@@ -539,7 +618,6 @@ Erfordert ein **I2S-Verstärkermodul** und einen kleinen Lautsprecher.
 | Setup | Environment | Zusätzliche Hardware |
 |-------|-------------|----------------------|
 | Bestehendes Board + SPI SD-Modul | `S3-N16R8_128x32_wifi_sd_webradio` | MAX98357A anschließen |
-| SDMMC-Board (onboard SD) | `S3-N16R8_128x32_wifi_sdmmc_webradio` | MAX98357A + HUB75 LAT/CLK umklemmen |
 
 ### Webradio — Bedienung
 
