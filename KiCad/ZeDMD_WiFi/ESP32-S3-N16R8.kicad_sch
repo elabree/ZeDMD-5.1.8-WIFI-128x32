@@ -6,10 +6,10 @@
 	(paper "A4")
 	(title_block
 		(title "YD-ESP32-S3 N16R8")
-		(date "2026-07-11")
-		(rev "1.2")
+		(date "2026-09-04")
+		(rev "1.3")
 		(company "elabree")
-		(comment 1 "https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32")
+		(comment 1 "https://github.com/jens-b/The-Arcade")
 		(comment 2 "https://ppuc.github.io/docs/zedmd/")
 		(comment 3 "https://github.com/PPUC/ZeDMD")
 	)
@@ -1282,6 +1282,16 @@
 			(embedded_fonts no)
 		)
 	)
+	(text "Do not use GPIO 33-37!\nIn use by internal Flash and PSRAM"
+		(exclude_from_sim no)
+		(at 186.182 120.396 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "e1316109-97d1-4106-a3ab-435ee4d35187")
+	)
 	(junction
 		(at 163.83 72.39)
 		(diameter 0)
@@ -1311,6 +1321,18 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "f35aded5-0845-45d6-bc6b-ae4482a9d6fa")
+	)
+	(no_connect
+		(at 165.1 123.19)
+		(uuid "13cf3cdf-6b32-41db-aa3f-18c8f4fd63af")
+	)
+	(no_connect
+		(at 165.1 120.65)
+		(uuid "6cf7bca3-7027-4256-86c7-dc6612a2a952")
+	)
+	(no_connect
+		(at 165.1 118.11)
+		(uuid "7c5f94bb-eb80-4023-8e7c-f4cab18f825a")
 	)
 	(wire
 		(pts
@@ -1394,6 +1416,16 @@
 	)
 	(wire
 		(pts
+			(xy 160.02 123.19) (xy 165.1 123.19)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "32f22966-6fdc-4db1-9507-7db285154d7f")
+	)
+	(wire
+		(pts
 			(xy 160.02 133.35) (xy 177.8 133.35)
 		)
 		(stroke
@@ -1411,6 +1443,16 @@
 			(type default)
 		)
 		(uuid "40b55296-d1a9-4444-b1eb-ec2a314d7a25")
+	)
+	(wire
+		(pts
+			(xy 160.02 125.73) (xy 177.8 125.73)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4185f519-368e-4da2-9cac-5f4fba7a1af7")
 	)
 	(wire
 		(pts
@@ -1434,6 +1476,16 @@
 	)
 	(wire
 		(pts
+			(xy 160.02 118.11) (xy 165.1 118.11)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4d49d85e-dc96-4626-9aea-7ab51427e840")
+	)
+	(wire
+		(pts
 			(xy 88.9 77.47) (xy 109.22 77.47)
 		)
 		(stroke
@@ -1441,6 +1493,16 @@
 			(type default)
 		)
 		(uuid "58fd67d4-9856-4e1c-b307-d04e9a4bc0d2")
+	)
+	(wire
+		(pts
+			(xy 160.02 110.49) (xy 177.8 110.49)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "5a620c3c-39cb-4da8-bac5-b4b352067560")
 	)
 	(wire
 		(pts
@@ -1644,6 +1706,16 @@
 	)
 	(wire
 		(pts
+			(xy 160.02 120.65) (xy 165.1 120.65)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "cad4e595-3c17-4e1a-b513-0e86ff6a66c3")
+	)
+	(wire
+		(pts
 			(xy 163.83 46.99) (xy 163.83 72.39)
 		)
 		(stroke
@@ -1681,6 +1753,16 @@
 			(type default)
 		)
 		(uuid "e75084e8-3f4e-4e09-a7f0-531dd2977085")
+	)
+	(wire
+		(pts
+			(xy 88.9 72.39) (xy 109.22 72.39)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e8af5449-778d-4890-a1a2-8545b5bcf9e7")
 	)
 	(wire
 		(pts
@@ -1877,6 +1959,28 @@
 		)
 		(uuid "546d0fa9-a4c5-49f1-8d47-69d349c381e8")
 	)
+	(hierarchical_label "GPIO39"
+		(shape bidirectional)
+		(at 88.9 72.39 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "602b4153-37de-417f-bec2-1ec501da708f")
+	)
+	(hierarchical_label "GPIO38"
+		(shape bidirectional)
+		(at 177.8 125.73 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "6c07108c-ab1c-45a2-80d0-2a37b3d87801")
+	)
 	(hierarchical_label "GPIO16"
 		(shape output)
 		(at 88.9 64.77 180)
@@ -1909,6 +2013,17 @@
 			(justify left)
 		)
 		(uuid "a2c42164-4155-48f4-b262-87fe50ecba23")
+	)
+	(hierarchical_label "GPIO17"
+		(shape input)
+		(at 177.8 110.49 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "adbcacc1-ee3e-4de2-9e9d-9ae8d0c288de")
 	)
 	(hierarchical_label "ESP5V"
 		(shape passive)

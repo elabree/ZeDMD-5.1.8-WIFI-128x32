@@ -1,5 +1,8 @@
 2026-06-21  elabree	Rev1.1	Initial Version
 2026-07-12  elabree	Rev1.2	Changed spacing between the DevKit pinheader rows from 0.9"to 1"
+2026-09-04  elabree	Rev1.3	Added connector J12 for ADXL345 module, Added 2nd USB-C, Removed RGBout_SELECT & MAX_Vin_SELECT, Added C1
+
+
 
 
 

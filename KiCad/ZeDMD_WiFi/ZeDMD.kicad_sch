@@ -6,10 +6,10 @@
 	(paper "A4")
 	(title_block
 		(title "HUB75")
-		(date "2026-07-11")
-		(rev "1.2")
+		(date "2026-09-04")
+		(rev "1.3")
 		(company "elabree")
-		(comment 1 "https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32")
+		(comment 1 "https://github.com/jens-b/The-Arcade")
 		(comment 2 "https://ppuc.github.io/docs/zedmd/")
 		(comment 3 "https://github.com/PPUC/ZeDMD")
 	)
@@ -898,6 +898,16 @@
 	)
 	(wire
 		(pts
+			(xy 0.0762 0.0762) (xy 78.8162 0.0762)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "12474aa9-bacf-406a-9ba9-b963c4842e78")
+	)
+	(wire
+		(pts
 			(xy 138.43 85.09) (xy 157.48 85.09)
 		)
 		(stroke
@@ -1075,6 +1085,16 @@
 			(type default)
 		)
 		(uuid "ba7373d8-4eac-4a77-be53-884e50f9c601")
+	)
+	(wire
+		(pts
+			(xy 78.8162 0.0762) (xy 78.8162 20.3962)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bad835e8-5593-41d2-a5ea-363b73559757")
 	)
 	(wire
 		(pts

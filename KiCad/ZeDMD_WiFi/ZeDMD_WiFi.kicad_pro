@@ -76,7 +76,24 @@
           "width": 0.0
         }
       ],
-      "drc_exclusions": [],
+      "drc_exclusions": [
+        [
+          "courtyards_overlap|171737800|116345000|02e7b61b-f776-4ca2-a66e-384ef9dd9fe3|335c6922-1233-4140-bb75-d7def7739792",
+          ""
+        ],
+        [
+          "courtyards_overlap|194027000|122457000|335c6922-1233-4140-bb75-d7def7739792|a62d1289-ca78-441a-9723-b7f01a460437",
+          ""
+        ],
+        [
+          "lib_footprint_mismatch|170815000|142757500|243facc2-9049-4c1d-9b9b-9984658e4cf5|00000000-0000-0000-0000-000000000000",
+          ""
+        ],
+        [
+          "lib_footprint_mismatch|179893640|122555000|335c6922-1233-4140-bb75-d7def7739792|00000000-0000-0000-0000-000000000000",
+          ""
+        ]
+      ],
       "meta": {
         "version": 2
       },
@@ -253,7 +270,7 @@
       "internal_id": "",
       "mfg": "",
       "mpn": "",
-      "sch_revision": "1.2"
+      "sch_revision": "1.3"
     },
     "layer_pairs": [],
     "layer_presets": [],
@@ -654,7 +671,7 @@
       },
       {
         "netclass": "PWR",
-        "pattern": "/VBUS"
+        "pattern": "/VBUS*"
       },
       {
         "netclass": "PWR-1A",
@@ -686,7 +703,7 @@
       "method": 0,
       "sort_order": 0
     },
-    "bom_export_filename": "${PROJECTNAME}.csv",
+    "bom_export_filename": "ZeDMD_WiFi.csv",
     "bom_fmt_presets": [],
     "bom_fmt_settings": {
       "field_delimiter": ",",
