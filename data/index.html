@@ -466,7 +466,7 @@
                                 </div>
                             </div>
                             <div style="text-align:center; background:#000; border-radius:4px; padding:4px; min-height:40px;">
-                                <img id="gif-preview-img" src="" alt=""
+                                <img id="gif-preview-img" alt=""
                                      style="image-rendering:pixelated; image-rendering:crisp-edges; max-width:100%; height:auto; display:none;">
                                 <span id="gif-preview-msg" style="font-size:0.8em; color:#666; line-height:32px;"></span>
                             </div>
@@ -479,6 +479,10 @@
                                 <span id="ss-file-list-arrow" style="color:#fff; font-size:1.1em;">▶&#xFE0E;</span>
                             </div>
                             <div id="ss-file-list-panel" class="collapsible-panel" style="display:none;">
+                                <div style="display:flex; gap:6px; margin-bottom:8px; align-items:center;">
+                                    <input type="text" id="ss-search-input" placeholder="Search GIF name…" style="flex:1; padding:5px 8px; margin:0; font-size:0.85em;" oninput="ssSearchChanged(this.value)">
+                                    <button id="ss-search-clear" onclick="ssClearSearch()" style="width:auto; padding:5px 10px; margin:0; background:#555; display:none;" title="Clear search">&#10005;</button>
+                                </div>
                                 <div id="ss-pagination-top" style="display:none; gap:8px; align-items:center; margin-bottom:6px;">
                                     <button id="ss-prev-btn-top" style="width:auto; padding:5px 12px; margin:0;" onclick="sdFilePage(-1)">&#9664; Back</button>
                                     <span id="ss-page-info-top" style="flex:1; text-align:center; font-size:0.85em; color:#aaa;"></span>
@@ -497,7 +501,7 @@
                     </div>
 
                     <!-- GIF-Audio Section -->
-                    <div class="section">
+                    <div class="section" style="align-self:start;">
                         <h2 class="section-header">&#127925; GIF-Audio</h2>
                         <div style="font-size:0.8em; color:#aaa; margin-bottom:10px;">
                             MP3 files for GIF audio — MP3 name must be contained in the GIF name (e.g. <em>defender.mp3</em> plays with <em>defender_level1.gif</em>).<br>
@@ -560,7 +564,7 @@
             <div id="tab-display" class="tab-panel">
                 <div class="sections-grid">
                     <!-- Display Text Section -->
-                    <div class="section">
+                    <div class="section" style="align-self: start;">
                         <h2 class="section-header">&#128196; Display Text</h2>
                         <label for="display-text-input">Text:</label>
                         <input type="text" id="display-text-input" maxlength="127" placeholder="Enter text...">
@@ -580,7 +584,7 @@
                                 <label style="margin:0;">Color:</label>
                                 <input type="color" id="display-text-color" value="#ffffff"
                                     style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin:0;"
-                                    onchange="localStorage.setItem('dtColor', this.value)">
+                                    onchange="lsSet('dtColor', this.value)">
                             </div>
                         </div>
 
@@ -593,7 +597,7 @@
                     </div>
 
                     <!-- Display Timer Section -->
-                    <div class="section">
+                    <div class="section" style="align-self: start;">
                         <h2 class="section-header">&#128337; Display Timer</h2>
                         <p style="font-size:0.82em; color:#888; margin:0 0 12px 0;">Turns the display off daily between the set times — e.g. off at 23:00, back on at 07:00.</p>
                         <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
@@ -615,23 +619,25 @@
                             <span id="display-timer-status" class="status-message" style="margin:0;"></span>
                         </div>
                         <button id="display-blank-btn" onclick="toggleDisplayBlank()"
-                            style="width:auto; padding:8px 18px; background:#555;">&#x23FC; Display off</button>
-                        <span id="display-blank-status" class="status-message" style="margin-left:8px;"></span>
+                            style="width:auto; padding:8px 14px; margin:0; background:#555;">&#x23FC; Display off</button>
+                        <span id="display-blank-status" class="status-message"></span>
                     </div>
 
                     <!-- Display Settings Section -->
-                    <div class="section">
-                        <h2 class="section-header">Display Settings</h2>
+                    <div class="section" style="grid-row: span 2;">
+                        <h2 class="section-header">&#9881;&#65039; Display Settings</h2>
 
                         <label for="screensaver-mode">Display Mode:</label>
                         <select id="screensaver-mode" onchange="saveScreensaverMode()">
                             <option value="0">Screensaver only</option>
-                            <option value="1">Clock only</option>
-                            <option value="2">Clock + Screensaver</option>
-                            <option value="3">Clock + Weather</option>
-                            <option value="4">Clock + Weather + Screensaver</option>
+                            <option value="1">Clock + Weather</option>
+                            <option value="2">Clock + Weather + Screensaver</option>
+                            <option value="3">Clock + Weather + Forecast</option>
+                            <option value="4">Clock + Weather + Forecast + Screensaver</option>
                             <option value="5">Text Screensaver</option>
                             <option value="6">Clock + Text</option>
+                            <option value="7">News Ticker (RSS)</option>
+                            <option value="8">Stock / Crypto Ticker</option>
                         </select>
                         <div id="mode-status" class="status-message"></div>
 
@@ -642,7 +648,7 @@
                             <label>Date Color:</label>
                             <input type="color" id="date-color" value="#b4b4b4"
                                 style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin-bottom:8px;">
-                            <button onclick="saveClockColors()">Apply Clock Colors</button>
+                            <button onclick="saveClockColors()" style="width:auto; margin:0;">Apply Clock Colors</button>
                             <div id="clock-color-status" class="status-message"></div>
                             <div style="display:flex; align-items:center; gap:8px; margin-bottom:15px; flex-wrap:wrap;">
                                 <span style="font-size:0.9em; color:var(--text-muted, #888); white-space:nowrap;">Segment Style:</span>
@@ -664,9 +670,8 @@
                                 oninput="updateScreensaverBrightness()">
                             <span>&#x2600;</span>
                         </div>
-                        <br>
                         <div id="screensaver-status" class="status-message"></div>
-                        <button onclick="applyScreensaverBrightness()">Apply Display Brightness</button>
+                        <button onclick="applyScreensaverBrightness()" style="width:auto; margin:0;">Apply Display Brightness</button>
 
                         <div id="screensaver-duration-group">
                         <label for="screensaver-duration">Screensaver Duration: <span id="screensaver-duration-value">10</span>s</label>
@@ -676,9 +681,8 @@
                                 oninput="updateScreensaverDuration()">
                             <span>60s</span>
                         </div>
-                        <br>
                         <div id="screensaver-duration-status" class="status-message"></div>
-                        <button onclick="applyScreensaverDuration()">Apply Duration</button>
+                        <button onclick="applyScreensaverDuration()" style="width:auto; margin:0;">Apply Duration</button>
                         </div>
 
                         <div style="display:flex; align-items:center; gap:24px; margin-top:14px; flex-wrap:wrap;">
@@ -701,6 +705,57 @@
                         <div id="screensaver-shuffle-status" class="status-message"></div>
                         <div id="screensaver-strict-timer-status" class="status-message"></div>
                     </div>
+
+                    <!-- RSS News Ticker Section -->
+                    <div class="section" id="rss-section" style="align-self: start;">
+                        <h2 class="section-header">&#128240; News Ticker (RSS)</h2>
+                        <p style="font-size:0.82em; color:#888; margin:0 0 12px 0;">RSS 2.0 feed URL — headlines scroll in Mode 7, and as a carousel slot in all other modes. Refreshed every 15 minutes.</p>
+                        <label for="rss-url-input">Feed URL:</label>
+                        <input type="text" id="rss-url-input" maxlength="255" placeholder="https://www.tagesschau.de/xml/rss2">
+                        <div style="display:flex; gap:10px; margin-top:10px;">
+                            <button onclick="saveRssUrl()" style="flex:1; padding:8px 14px;">Save &amp; Fetch</button>
+                        </div>
+                        <div id="rss-status" class="status-message"></div>
+                    </div>
+
+                    <!-- Stock / Crypto Ticker Section -->
+                    <div class="section" id="ticker-section" style="align-self: start;">
+                        <h2 class="section-header">&#128200; Stock / Crypto Ticker</h2>
+                        <div id="ticker-enabled-row" style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                            <span style="font-size:0.95em; color:#aaa;">Off</span>
+                            <label class="toggle-switch" style="margin:0;">
+                                <input type="checkbox" id="ticker-enabled" onchange="saveTickerEnabled()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span style="font-size:0.95em;">Ticker active</span>
+                            <span id="ticker-enabled-status" class="status-message" style="margin:0; flex:1;"></span>
+                        </div>
+                        <p style="font-size:0.82em; color:#888; margin:0 0 12px 0;">Symbols from Yahoo Finance — e.g. <code>AAPL,BTC-EUR,^DAX</code>. Displayed 3&nbsp;s each.</p>
+                        <label for="ticker-symbols-input">Symbols (comma-separated):</label>
+                        <input type="text" id="ticker-symbols-input" maxlength="159" placeholder="AAPL,BTC-EUR,^DAX">
+                        <div style="display:flex; gap:10px; margin-top:12px;">
+                            <div style="flex:1;">
+                                <label for="ticker-interval-select">Refresh Interval:</label>
+                                <select id="ticker-interval-select" style="width:100%; padding:8px; border-radius:6px; margin-top:4px;">
+                                    <option value="900" selected>15 minutes</option>
+                                    <option value="1800">30 minutes</option>
+                                    <option value="3600">60 minutes</option>
+                                </select>
+                            </div>
+                            <div style="flex:1;">
+                                <label for="ticker-range-select">Chart Range:</label>
+                                <select id="ticker-range-select" style="width:100%; padding:8px; border-radius:6px; margin-top:4px;">
+                                    <option value="1d">Today (1D)</option>
+                                    <option value="5d" selected>5 Days (5D)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:10px; margin-top:10px;">
+                            <button onclick="saveTickerConfig()" style="flex:1; padding:8px 14px;">Save &amp; Fetch</button>
+                        </div>
+                        <div id="ticker-status" class="status-message"></div>
+                    </div>
+
                 </div>
             </div>
 
@@ -711,7 +766,7 @@
                     <div class="section">
                         <h2 class="section-header">&#127925; Webradio</h2>
                     <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; min-height:1.1em;">
-                        <img id="radio-icon" src="" alt="" style="width:24px; height:24px; object-fit:contain; border-radius:2px; display:none;">
+                        <img id="radio-icon" alt="" style="width:24px; height:24px; object-fit:contain; border-radius:2px; display:none;">
                         <span id="radio-station" style="font-size:0.85em; color:#ccc;"></span>
                     </div>
                     <div style="font-size:0.8em; color:#aaa; margin-bottom:8px; min-height:1em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="radio-track"></div>
@@ -722,14 +777,12 @@
                         <span>&#128266;</span>
                         <span id="radio-vol-val" style="min-width:30px; text-align:right; font-size:0.85em; color:#aaa; margin-left:4px;">15</span>
                     </div>
-                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                    <div id="speaker-channel-row" style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
                         <span style="font-size:0.75em; color:#aaa; min-width:46px;">Channel</span>
                         <button id="btn-stereo" onclick="setRadioMono(false)"
                             style="width:auto; padding:5px 12px; margin:0; background:#27ae60;">Stereo</button>
                         <button id="btn-mono" onclick="setRadioMono(true)"
                             style="width:auto; padding:5px 12px; margin:0; background:#555;">Mono</button>
-                        <button id="btn-swap" onclick="toggleRadioSwap()"
-                            style="width:auto; padding:5px 12px; margin:0; background:#555;">L/R Swap</button>
                     </div>
                     <div style="margin-bottom:10px; padding:6px 8px; background:#1e1e1e; border-radius:6px; border:1px solid #333;">
                         <div style="font-size:0.75em; color:#888; margin-bottom:4px;">EQ</div>
@@ -781,23 +834,27 @@
 
     <!-- JavaScript Functions -->
     <script>
+        // Safe localStorage wrappers — localStorage throws SecurityError in Safari private mode.
+        function lsGet(k, def) { try { var v = localStorage.getItem(k); return v !== null ? v : (def !== undefined ? def : null); } catch(e) { return def !== undefined ? def : null; } }
+        function lsSet(k, v)   { try { localStorage.setItem(k, v); } catch(e) {} }
+
         (function() {
             var EMOJIS = [
-                ['❤️','Herz'],         ['⭐','Stern'],        ['🌟','Glitzer-Stern'],
-                ['🌙','Mond'],          ['🔥','Feuer'],  ['😊','Lächeln'],
-                ['😀','Grinsen'],       ['😎','Cool'],   ['😡','Wütend'],
-                ['😭','Weinen'],        ['😴','Schlafen'],['🙂','Smile'],
-                ['🤔','Denken'],        ['🤖','Roboter'],['✅','Check'],
-                ['❌','Kreuz'],               ['❓','Frage'],        ['❗','Ausruf'],
-                ['👍','Daumen hoch'],  ['👎','Daumen runter'],
-                ['🍕','Pizza'],         ['🍺','Bier'],   ['🎁','Geschenk'],
+                ['❤️','Heart'],        ['⭐','Star'],         ['🌟','Glitter star'],
+                ['🌙','Moon'],          ['🔥','Fire'],   ['😊','Smile'],
+                ['😀','Grin'],          ['😎','Cool'],   ['😡','Angry'],
+                ['😭','Cry'],           ['😴','Sleep'],  ['🙂','Happy'],
+                ['🤔','Thinking'],      ['🤖','Robot'],  ['✅','Check'],
+                ['❌','Cross'],         ['❓','Question'],      ['❗','Exclamation'],
+                ['👍','Thumbs up'],    ['👎','Thumbs down'],
+                ['🍕','Pizza'],         ['🍺','Beer'],   ['🎁','Gift'],
                 ['🎉','Party'],         ['🎮','Gamepad'],['👾','Alien'],
-                ['💡','Idee'],          ['💰','Geld'],   ['📝','Notiz'],
-                ['📢','Lautsprecher'], ['📱','Telefon'],['🔔','Glocke'],
-                ['🎵','Musiknote'],   ['⚠️','Warnung']
+                ['💡','Idea'],          ['💰','Money'],  ['📝','Note'],
+                ['📢','Speaker'],      ['📱','Phone'],  ['🔔','Bell'],
+                ['🎵','Music note'],  ['⚠️','Warning']
             ];
             document.addEventListener('DOMContentLoaded', function() {
-                var saved = localStorage.getItem('dtColor');
+                var saved = lsGet('dtColor');
                 if (saved) document.getElementById('display-text-color').value = saved;
 
                 var picker = document.getElementById('emoji-picker');
@@ -828,7 +885,7 @@
             document.querySelectorAll('.tab-panel').forEach(function(panel) {
                 panel.classList.toggle('active', panel.id === 'tab-' + name);
             });
-            localStorage.setItem('activeTab', name);
+            lsSet('activeTab', name);
         }
 
         function loadDisplayTimer() {
@@ -882,8 +939,8 @@
                     if (xhr.status === 200) {
                         statusElem.innerText = "Displaying (" + duration + "s)";
                         statusElem.style.color = "green";
-                        localStorage.setItem('dtText', text);
-                        localStorage.setItem('dtColor', color);
+                        lsSet('dtText', text);
+                        lsSet('dtColor', color);
                     } else {
                         statusElem.innerText = "Error sending.";
                         statusElem.style.color = "red";
@@ -1011,6 +1068,30 @@
                 if (r.ok) {
                     statusElem.innerText = val ? "GIF Audio enabled" : "GIF Audio disabled";
                     statusElem.style.color = val ? "green" : "#aaa";
+                } else {
+                    statusElem.innerText = "Error saving.";
+                    statusElem.style.color = "red";
+                }
+            });
+        }
+
+        function setMode8Available(enabled) {
+            var opt = document.querySelector('#screensaver-mode option[value="8"]');
+            if (opt) opt.disabled = !enabled;
+        }
+
+        function saveTickerEnabled() {
+            var val = document.getElementById('ticker-enabled').checked ? 1 : 0;
+            var statusElem = document.getElementById('ticker-enabled-status');
+            fetch('/ticker_enabled', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'enabled=' + val
+            }).then(function(r) {
+                if (r.ok) {
+                    statusElem.innerText = val ? "Ticker enabled" : "Ticker disabled";
+                    statusElem.style.color = val ? "green" : "#aaa";
+                    setMode8Available(val);
                 } else {
                     statusElem.innerText = "Error saving.";
                     statusElem.style.color = "red";
@@ -1613,6 +1694,7 @@
         }
 
         function updateDurationState(mode) {
+            mode = parseInt(mode, 10);
             var screensaverTextMode = (mode == 5 || mode == 6);
             var slider = document.getElementById('display-text-duration');
             slider.disabled = screensaverTextMode;
@@ -1621,11 +1703,15 @@
             btn.innerHTML = screensaverTextMode ? '&#9654; Apply' : '&#9654; Send';
             document.getElementById('display-text-screensaver-hint').style.display =
                 screensaverTextMode ? 'block' : 'none';
-            // Mode 5: text scrolls continuously, screensaver duration has no effect
+            // Modes 5, 7, 8: continuous display — screensaver duration slider has no effect
             var ssGroup = document.getElementById('screensaver-duration-group');
-            var mode5 = (mode == 5);
-            ssGroup.style.opacity = mode5 ? '0.4' : '1';
-            ssGroup.style.pointerEvents = mode5 ? 'none' : '';
+            var noDuration = (mode == 5 || mode == 7 || mode == 8);
+            ssGroup.style.opacity = noDuration ? '0.4' : '1';
+            ssGroup.style.pointerEvents = noDuration ? 'none' : '';
+            // both sections always visible — RSS and ticker apply in all modes
+            document.getElementById('rss-section').style.display    = 'block';
+            document.getElementById('ticker-section').style.display = 'block';
+            document.getElementById('ticker-enabled-row').style.display = (mode == 8) ? 'none' : 'flex';
         }
 
         function saveScreensaverMode() {
@@ -1643,6 +1729,58 @@
                 }
             };
             xhr.send('mode=' + mode);
+        }
+
+        function saveRssUrl() {
+            var url = document.getElementById('rss-url-input').value.trim();
+            var status = document.getElementById('rss-status');
+            if (!url) { status.innerText = '✗ Please enter a URL'; status.style.color = 'red'; return; }
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/rss_url', true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    status.innerText = xhr.status === 200 ? '✓ Saved — fetching...' : '✗ Error ' + xhr.status;
+                    status.style.color = xhr.status === 200 ? 'green' : 'red';
+                }
+            };
+            xhr.send('url=' + encodeURIComponent(url));
+        }
+
+        function saveTickerConfig() {
+            var symbols  = document.getElementById('ticker-symbols-input').value.trim().toUpperCase();
+            var interval = document.getElementById('ticker-interval-select').value;
+            var range    = document.getElementById('ticker-range-select').value;
+            var status   = document.getElementById('ticker-status');
+            if (!symbols) { status.innerText = '✗ Please enter at least one symbol'; status.style.color = 'red'; return; }
+            var xhr1 = new XMLHttpRequest();
+            xhr1.open('POST', '/ticker_symbols', true);
+            xhr1.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr1.onreadystatechange = function() {
+                if (xhr1.readyState === XMLHttpRequest.DONE) {
+                    if (xhr1.status !== 200) { status.innerText = '✗ Error saving symbols'; status.style.color = 'red'; return; }
+                    var xhr2 = new XMLHttpRequest();
+                    xhr2.open('POST', '/ticker_interval', true);
+                    xhr2.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    xhr2.onreadystatechange = function() {
+                        if (xhr2.readyState === XMLHttpRequest.DONE) {
+                            if (xhr2.status !== 200) { status.innerText = '✗ Error saving interval'; status.style.color = 'red'; return; }
+                            var xhr3 = new XMLHttpRequest();
+                            xhr3.open('POST', '/ticker_range', true);
+                            xhr3.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                            xhr3.onreadystatechange = function() {
+                                if (xhr3.readyState === XMLHttpRequest.DONE) {
+                                    status.innerText = xhr3.status === 200 ? '✓ Saved — fetching...' : '✗ Error saving range';
+                                    status.style.color = xhr3.status === 200 ? 'green' : 'red';
+                                }
+                            };
+                            xhr3.send('range=' + range);
+                        }
+                    };
+                    xhr2.send('interval=' + interval);
+                }
+            };
+            xhr1.send('symbols=' + encodeURIComponent(symbols));
         }
 
         function applyScreensaverBrightness() {
@@ -1730,6 +1868,52 @@
                         var btn = document.getElementById('seg-btn-' + config.clockSegStyle);
                         if (btn) btn.classList.add('active');
                     }
+                    if (config.speakerCount === 1) {
+                        var row = document.getElementById('speaker-channel-row');
+                        if (row) row.style.display = 'none';
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        function loadRssConfig() {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/rss_status', true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                    try {
+                        var s = JSON.parse(xhr.responseText);
+                        if (s.url) document.getElementById('rss-url-input').value = s.url;
+                    } catch(e) {}
+                }
+            };
+            xhr.send();
+        }
+
+        function loadTickerConfig() {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/ticker_status', true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                    try {
+                        var s = JSON.parse(xhr.responseText);
+                        if (s.symbols) document.getElementById('ticker-symbols-input').value = s.symbols;
+                        if (s.intervalSec) {
+                            var sel = document.getElementById('ticker-interval-select');
+                            sel.value = String(s.intervalSec);
+                            if (!sel.value) sel.value = '60';
+                        }
+                        if (s.range) {
+                            var rsel = document.getElementById('ticker-range-select');
+                            rsel.value = s.range;
+                            if (!rsel.value) rsel.value = '5d';
+                        }
+                        if (s.hasOwnProperty('enabled')) {
+                            document.getElementById('ticker-enabled').checked = s.enabled;
+                            setMode8Available(s.enabled);
+                        }
+                    } catch(e) {}
                 }
             };
             xhr.send();
@@ -2082,9 +2266,9 @@
             document.getElementById('eq-bass-val').innerText   = bass;
             document.getElementById('eq-mid-val').innerText    = mid;
             document.getElementById('eq-treble-val').innerText = treble;
-            localStorage.setItem('eqBass', bass);
-            localStorage.setItem('eqMid', mid);
-            localStorage.setItem('eqTreble', treble);
+            lsSet('eqBass', bass);
+            lsSet('eqMid', mid);
+            lsSet('eqTreble', treble);
             if (!skipSend) {
                 var fd = new FormData();
                 fd.append('bass', bass); fd.append('mid', mid); fd.append('treble', treble);
@@ -2124,21 +2308,6 @@
                 fetch('/radio_mono', { method: 'POST', body: fd })
                     .catch(function(e) { console.warn('ZeDMD radio_mono:', e); });
             }
-        }
-
-        function setRadioSwap(swap, skipSend) {
-            var btn = document.getElementById('btn-swap');
-            if (btn) { btn.style.background = swap ? '#e67e22' : '#555'; btn.dataset.active = swap ? '1' : '0'; }
-            if (!skipSend) {
-                var fd = new FormData(); fd.append('swap', swap ? '1' : '0');
-                fetch('/radio_swap', { method: 'POST', body: fd })
-                    .catch(function(e) { console.warn('ZeDMD radio_swap:', e); });
-            }
-        }
-
-        function toggleRadioSwap() {
-            var btn = document.getElementById('btn-swap');
-            setRadioSwap(!(btn && btn.dataset.active === '1'));
         }
 
         function updateDisplayBtn(active) {
@@ -2569,6 +2738,26 @@
         var sdFileTotal = 0;
         var sdFilePageSize = 20;
         var ssPollRunning = false;
+        var sdSearchTerm = '';
+        var ssSearchTimer = null;
+
+        function ssSearchChanged(val) {
+            clearTimeout(ssSearchTimer);
+            ssSearchTimer = setTimeout(function() {
+                sdSearchTerm = val.trim();
+                document.getElementById('ss-search-clear').style.display = sdSearchTerm ? 'inline-block' : 'none';
+                sdFileOffset = 0;
+                loadSDScreensaverFiles();
+            }, 300);
+        }
+
+        function ssClearSearch() {
+            document.getElementById('ss-search-input').value = '';
+            document.getElementById('ss-search-clear').style.display = 'none';
+            sdSearchTerm = '';
+            sdFileOffset = 0;
+            loadSDScreensaverFiles();
+        }
 
         function sdFilePage(dir) {
             var newOffset = sdFileOffset + dir * sdFilePageSize;
@@ -2586,6 +2775,7 @@
         function loadSDScreensaverFiles() {
             var xhr = new XMLHttpRequest();
             var url = "/screensaver_files?offset=" + sdFileOffset;
+            if (sdSearchTerm) url += "&search=" + encodeURIComponent(sdSearchTerm);
             xhr.open("GET", url, true);
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
@@ -2593,7 +2783,9 @@
                     var list = document.getElementById('sd-screensaver-file-list');
                     list.innerHTML = "";
                     if (files.length === 0) {
-                        list.innerHTML = "<li><span>No files in selected folder.</span></li>";
+                        list.innerHTML = sdSearchTerm
+                            ? "<li><span>No files matching &ldquo;" + sdSearchTerm.replace(/&/g,'&amp;').replace(/</g,'&lt;') + "&rdquo;.</span></li>"
+                            : "<li><span>No files in selected folder.</span></li>";
                     } else {
                         // Cache verwenden statt bei jedem Refresh neu laden
                         var favLines = cachedFavLines;
@@ -2722,13 +2914,16 @@
                     }
                     // Gesamtzahl abrufen und Pagination aktualisieren
                     var xhr2 = new XMLHttpRequest();
-                    xhr2.open("GET", "/screensaver_folder_count", true);
+                    var countUrl = "/screensaver_folder_count";
+                    if (sdSearchTerm) countUrl += "?search=" + encodeURIComponent(sdSearchTerm);
+                    xhr2.open("GET", countUrl, true);
                     xhr2.onreadystatechange = function() {
                         if (xhr2.readyState === XMLHttpRequest.DONE && xhr2.status === 200) {
                             var info = JSON.parse(xhr2.responseText);
                             sdFileTotal = info.total;
                             var countEl = document.getElementById('screensaver-file-count');
-                            countEl.textContent = info.scanning ? ' (scanning…)' : '(' + info.total + ')';
+                            countEl.textContent = info.scanning ? ' (scanning…)'
+                                : sdSearchTerm ? ' (' + info.total + ' found)' : '(' + info.total + ')';
                             if (info.scanning && !ssPollRunning) {
                                 var cancelBtn = document.getElementById('cancel-scan-btn');
                                 if (cancelBtn) cancelBtn.style.display = 'inline-block';
@@ -2766,11 +2961,11 @@
         }
 
         window.onload = function () {
-            switchTab(localStorage.getItem('activeTab') || 'screensaver');
+            switchTab(lsGet('activeTab') || 'screensaver');
 
             // Display Text aus localStorage wiederherstellen
-            var savedText  = localStorage.getItem('dtText');
-            var savedColor = localStorage.getItem('dtColor');
+            var savedText  = lsGet('dtText');
+            var savedColor = lsGet('dtColor');
             if (savedText)  { var inp = document.getElementById('display-text-input');  if (inp)  inp.value  = savedText;  }
             if (savedColor) { var col = document.getElementById('display-text-color');  if (col)  col.value  = savedColor; }
 
@@ -2779,13 +2974,15 @@
 
             // EQ sofort aus localStorage laden (vor async Fetch)
             loadRadioEq(
-                parseInt(localStorage.getItem('eqBass')   || '0'),
-                parseInt(localStorage.getItem('eqMid')    || '0'),
-                parseInt(localStorage.getItem('eqTreble') || '0')
+                parseInt(lsGet('eqBass')   || '0'),
+                parseInt(lsGet('eqMid')    || '0'),
+                parseInt(lsGet('eqTreble') || '0')
             );
 
             // Gruppe 1 (sofort): UI-kritisch
             loadConfig();
+            loadRssConfig();
+            loadTickerConfig();
             updateRadioBtns();
 
             // Gruppe 2 (100ms): Status-Anzeigen
@@ -2856,7 +3053,6 @@
                     if (d.volume !== undefined) setRadioVolume(d.volume, true);
                     if (d.eqBass !== undefined && !_eqSaveTimer) loadRadioEq(d.eqBass, d.eqMid, d.eqTreble);
                     if (d.mono !== undefined) setRadioMono(d.mono, true);
-                    if (d.swapChannels !== undefined) setRadioSwap(d.swapChannels, true);
                     if (d.displayActive !== undefined) {
                         _radioDisplayActive = d.displayActive;
                         updateDisplayBtn(_radioDisplayActive);

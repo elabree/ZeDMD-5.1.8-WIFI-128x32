@@ -107,7 +107,7 @@
     .preset-del:hover { color: #e44; }
     .preset-empty { color: #555; font-size: 0.85em; padding: 8px 0; }
 
-    /* Suche / URL-Eingabe */
+    /* Search / URL input */
     .search-bar {
       background: #1e1e1e;
       border-radius: 10px;
@@ -136,7 +136,7 @@
     }
     .search-hint { font-size: 0.75em; color: #666; margin-bottom: 8px; }
 
-    /* Suchergebnisse */
+    /* Search results */
     .result-list { display: flex; flex-direction: column; gap: 5px; max-height: 340px; overflow-y: auto; }
     .result-item {
       background: #252525;
@@ -349,7 +349,7 @@
     return u.replace(/([^:])\/\/+/g, '$1/');
   }
 
-  async function savePreset(name, url, icon) {
+  async function savePreset(name, url, icon, btn) {
     if (presets.length >= 20) {
       alert('Maximum 20 presets saved. Please delete one first.');
       return false;
@@ -360,7 +360,15 @@
     fd.append('icon', cleanUrl(icon));
     let r;
     try { r = await fetch('/radio_save_preset', { method: 'POST', body: fd }); } catch(e) { console.warn('ZeDMD radio_save_preset:', e); return false; }
-    if (r.ok) await loadPresets();
+    if (r.status === 409) {
+      alert('Station already saved.');
+      if (btn) { btn.disabled = true; btn.title = 'Already saved'; }
+      return false;
+    }
+    if (r.ok) {
+      if (btn) { btn.disabled = true; btn.title = 'Saved'; }
+      await loadPresets();
+    }
     return r.ok;
   }
 
@@ -451,7 +459,7 @@
           </div>
           <div class="result-actions">
             <button class="btn-play-result" onclick="playUrl('${esc(url)}','${esc(name)}','${esc(icon)}')">&#9654;</button>
-            <button class="btn-save-result" ${saved ? 'disabled title="Already saved"' : `onclick="savePreset('${esc(name)}','${esc(url)}','${esc(icon)}')"`}>+</button>
+            <button class="btn-save-result" ${saved ? 'disabled title="Already saved"' : `onclick="savePreset('${esc(name)}','${esc(url)}','${esc(icon)}',this)"`}>+</button>
           </div>
         </div>`;
     }).join('');

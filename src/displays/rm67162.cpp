@@ -156,7 +156,6 @@ void lcd_setRotation(uint8_t r) {
 
   switch (r) {
     case 0:  // Portrait
-      // WriteData(gbr);
       break;
     case 1:  // Landscape (Portrait + 90)
       gbr = TFT_MAD_MX | TFT_MAD_MV | gbr;
@@ -235,7 +234,6 @@ void IRAM_ATTR lcd_PushColors(uint16_t x, uint16_t y, uint16_t width,
     t.base.tx_buffer = p;
     t.base.length = chunk_size * 16;
 
-    // spi_device_queue_trans(spi, (spi_transaction_t *)&t, portMAX_DELAY);
     spi_device_polling_transmit(spi, (spi_transaction_t *)&t);
     len -= chunk_size;
     p += chunk_size;
@@ -280,7 +278,6 @@ void lcd_PushColors(uint16_t *data, uint32_t len) {
     t.base.tx_buffer = p;
     t.base.length = chunk_size * 16;
 
-    // spi_device_queue_trans(spi, (spi_transaction_t *)&t, portMAX_DELAY);
     spi_device_polling_transmit(spi, (spi_transaction_t *)&t);
     len -= chunk_size;
     p += chunk_size;

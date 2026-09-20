@@ -10,7 +10,7 @@
 
 extern uint8_t       clockR, clockG, clockB;   // Clock color   (Default: Cyan)
 extern uint8_t       dateR,  dateG,  dateB;    // Date color    (Default: Gray)
-extern volatile bool clockColorChanged;        // Forces redraw on color change
+extern volatile bool forceClockRedraw;        // Forces redraw on color change
 extern bool          ntpSynced;
 extern String        ntpServer;
 extern String        clockTimezone;

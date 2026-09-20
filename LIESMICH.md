@@ -2,12 +2,13 @@
 
 > 🇬🇧 **English documentation:** [README.md](README.md)
 
-**The Arcade** ist eine ESP32-S3-Firmware für eine 128×32 HUB75-LED-Matrix. Sie verwandelt ein Pinball-DMD-Panel in ein eigenständiges Smart-Display mit:
+**The Arcade** ist eine ESP32-S3-Firmware für eine 128×32 HUB75-LED-Matrix — ein multifunktionales Smart-Display für Uhrzeit, Wetter, GIFs und Internetradio. Mit Pinball hat das nichts zu tun.
 
 - **Uhr + Wetter** — Live-Daten von der eigenen Wetterstation per MQTT (WeeWx), mit Open-Meteo als automatischem Fallback; konfigurierbare Feldnamen, visueller Fallback-Indikator
 - **GIF-Screensaver** — animierte GIFs von der SD-Karte, alphabetisch oder zufällig, optional mit synchronem MP3-Audio pro GIF
 - **Webradio** — Internetradio per I2S-Verstärker (MAX98357A); Senderlogos, Titelinfo, Equalizer, L/R-Tausch
 - **Web-UI** — vollständige Konfiguration und Steuerung über jeden Browser im lokalen Netzwerk; keine App, kein Account, keine Cloud
+- **Batocera/Recalbox-Streaming** — empfängt animierte Spiel-Marquees über das ZeDMD-Protokoll wenn ein Retro-Gaming-Frontend läuft; das Display schaltet automatisch um und kehrt danach in den Normalbetrieb zurück
 
 ---
 
@@ -45,7 +46,7 @@
 
 ---
 
-https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/raw/main/docs/images/ZeDMD_WiFi_128x32_demo.mp4
+https://github.com/jens-b/The-Arcade/raw/main/docs/images/ZeDMD_WiFi_128x32_demo.mp4
 
 ---
 
@@ -69,7 +70,48 @@ https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/raw/main/docs/images/ZeDMD_WiF
 
 ## 🆕 Neu in dieser Version
 
-### v1.7.0 *(diese Version)*
+### v1.9.0 *(diese Version)*
+
+#### RSS-News-Ticker (Modus 7)
+Ein neuer Screensaver-Modus ruft Schlagzeilen aus einem beliebigen RSS-2.0-Feed ab und scrollt sie über das Display. Die Feed-URL ist im Web-UI konfigurierbar — Voreinstellungen für Tagesschau, BBC u. a. sind eingebaut, oder eigene URL eingeben. Schlagzeilen werden alle 15 Minuten aktualisiert. Der Ticker erscheint außerdem als Slot in der GIF-Screensaver-Rotation (Modi 0/2/4) und in der Uhr+Wetter-Rotation (Modi 1/3).
+
+#### Aktien-/Krypto-/Index-Ticker (Modus 8)
+Ein neuer Screensaver-Modus ruft Live-Kurse von Yahoo Finance ab (kein API-Key erforderlich) und zeigt sie als Karussell — ein Symbol nach dem anderen, im Sekundentakt. Unterstützt Aktien (`AAPL`, `SAP.DE`), Krypto (`BTC-EUR`, `ETH-EUR`) und Indizes (`^DAX`, `^GSPC`). Bis zu 10 Symbole, konfigurierbar im Web-UI. Kurs und prozentuale Änderung in Grün (positiv) oder Rot (negativ). Mini-Sparkline für den Tagesverlauf. Aktualisierungsintervall 15/30/60 min wählbar. Das Ticker-Karussell integriert sich auch in GIF- und Uhrmodi — ein Symbol erscheint zwischen GIFs oder in regelmäßigen Abständen.
+
+#### WKN- und ISIN-Unterstützung
+Deutsche Wertpapiere können jetzt als WKN (6-stellig alphanumerisch, z. B. `DBX1ME`) oder ISIN (12-stellig, z. B. `DE000DBX1ME3`) statt als Ticker-Symbol eingegeben werden. Die Firmware löst die Kennung beim ersten Abruf automatisch zum korrekten Yahoo-Finance-Symbol auf und cached das Ergebnis.
+
+#### Unterspannungsschutz (Brownout)
+Wenn das Display durch ein Niederspannungsereignis resettet (z. B. Powerbank-Ladeende), zeigt es jetzt „Low power — sleeping 60s" und geht für 60 Sekunden in den Tiefschlaf, statt sofort neu zu starten. Das unterbricht die schnelle Neustart-Endlosschleife, die eine grenzwertige Stromversorgung vollständig entlädt.
+
+---
+
+### v1.8.0
+
+#### Uhrzifferanimation — Drop-Effekt
+Wenn sich eine Minute ändert, animiert jede betroffene Ziffer: Die alte Ziffer gleitet nach unten raus, die neue fällt von oben ein. Fünf Frames à 40 ms ergeben einen flüssigen 200-ms-Übergang.
+
+#### Modi 1 und 2 — Uhr + Wetter kombiniert
+Modi 1 und 2 zeigten bisher nur die Uhr. Sie zeigen jetzt **Uhr und Wetter nebeneinander** — wie Modi 3/4 — und geben damit allen zeitbasierten Modi Zugang zu Live-Wetterdaten.
+
+#### Webradio — automatischer Stream-Wechsel
+Wenn ein Stationstream dauerhaft zu langsam ist, sucht die Firmware automatisch bei [radio-browser.info](https://www.radio-browser.info) nach einer alternativen URL für dieselbe Station und wechselt stillschweigend. Der Sendername bleibt auf dem Display sichtbar.
+
+#### GIF-Screensaver — Suche nach Dateiname
+Die Screensaver-Dateiliste unterstützt jetzt **Live-Suche nach Dateinamen**. Beliebige Teilstrings werden direkt im Backend gefiltert — ohne Seitenreload, auch bei tausenden Dateien.
+
+#### Konfigurierbare OpenMeteo-Zeitzone
+Die für die Open-Meteo-Wetter-API verwendete Zeitzone ist jetzt im Admin-Panel konfigurierbar (IANA-Format, z. B. `Europe/Berlin`). Vorher hartcodiert. Einstellung wird in LittleFS gespeichert.
+
+#### HTTPS-Radiostreams
+Der mbedTLS-SSL-Puffer wurde in den PSRAM verschoben. Verschlüsselte Streams (`https://`) funktionieren jetzt genauso zuverlässig wie einfaches HTTP.
+
+#### GIF PSRAM-Vorladen + 50-fps-Untergrenze
+GIF-Frames werden jetzt vor dem Abspielen vollständig in den PSRAM geladen, was SD-Stotterer während der Wiedergabe eliminiert. Eine Untergrenze von 50 fps verhindert, dass Dateien ohne gültige Frame-Delay-Metadaten unkontrolliert schnell abspielen.
+
+---
+
+### v1.7.0
 
 #### Kritische Stabilitätsfixes — Watchdog überwacht jetzt den Haupt-Task
 Seit dem ersten WiFi-Firmware-Build war ein grundlegendes Problem vorhanden: `enableLoopWDT()` wurde nie aufgerufen, d. h. der Task-Watchdog-Timer (TWDT) hat den Haupt-Loop-Task nie wirklich überwacht. Alle `esp_task_wdt_reset()`-Aufrufe im gesamten Code waren stille No-Ops — das Gerät stützte sich nur auf den sekundären IDLE-Task-Starvation-Mechanismus.
@@ -393,7 +435,7 @@ Die ESP32-audioI2S-Bibliothek gibt bei Stereo-Quelldateien nativ Stereo-I2S aus.
 
 ---
 
-## 🔜 Geplante Features
+## Hardware
 
 ### Eigene Platine von [elabree](https://github.com/elabree) ✅
 Eine dedizierte Trägerplatine, entworfen und gebaut von [elabree](https://github.com/elabree) — getestet und bestätigt funktionsfähig mit dieser Firmware. Die Platine trägt das ESP32-S3-DevKitC-1-N16R8, einen SD-Karten-Modul-Sockel und zwei MAX98357A-Stereo-Verstärker-Sockel auf einer kompakten Leiterplatte.
@@ -402,9 +444,13 @@ Zwei Revisionen verfügbar:
 - **Rev1.1** — für das original Espressif ESP32-S3-DevKitC (0,9″ Pin-Reihenabstand)
 - **Rev1.2** — für die meisten Clone-Boards (1″ Pin-Reihenabstand)
 
-KiCad-Quellen und Gerber-Dateien zum Bestellen bei JLCPCB: [KiCad/ZeDMD_WiFi/](https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/tree/main/KiCad/ZeDMD_WiFi) (direkt in diesem Repository enthalten).
+KiCad-Quellen und Gerber-Dateien zum Bestellen bei JLCPCB: [KiCad/ZeDMD_WiFi/](https://github.com/jens-b/The-Arcade/tree/main/KiCad/ZeDMD_WiFi) (direkt in diesem Repository enthalten).
 
 Ein herzliches Dankeschön an elabree für den Entwurf und die Bereitstellung dieser Platine — ohne seine Arbeit wäre das nicht möglich gewesen.
+
+---
+
+## 🔜 Geplante Features
 
 ### Code-Aufräumen *(steht auf meiner Liste)*
 Der Code ist hier und da ehrlich gesagt etwas gewachsen und durcheinander geraten — ich weiß das. Ich plane irgendwann aufzuräumen, aber wann genau kann ich nicht versprechen. Er funktioniert, und das zählt erstmal.
@@ -431,6 +477,10 @@ Dieser Fork ist **nur WiFi** und zielt auf den **ESP32-S3-N16R8** mit einer **12
 - **Display-Timer** — tägliche Ein-/Ausschaltzeiten für das LED-Display; „Display off / Display on"-Button für sofortiges manuelles Aus-/Einschalten
 - **Tabs im Webinterface** — Hauptseite in Screensaver / Display / Radio gegliedert; SD-Info und Admin immer sichtbar
 - **Stereo-Audio** *(experimentell)* — zwei MAX98357A-Module für echten Stereo-Ausgang; Kanalwahl per SD-Pin-Widerstandsbrücke (nur 5V, Werte verifiziert); Stereo/Mono-Umschalter in der Web-UI
+- **RSS-News-Ticker (Modus 7)** — ruft Schlagzeilen aus beliebigen RSS-2.0-Feeds ab und scrollt sie über das Display; Feed-URL im Web-UI konfigurierbar (Voreinstellungen inklusive); Aktualisierung alle 15 min; erscheint als Karussell-Slot in GIF-Screensaver (Modi 0/2/4) und Uhr+Wetter (Modi 1/3)
+- **Aktien-/Krypto-/Index-Ticker (Modus 8)** — Live-Kurse von Yahoo Finance (kein API-Key); Aktien (`AAPL`, `SAP.DE`), Krypto (`BTC-EUR`), Indizes (`^DAX`, `^GSPC`); bis zu 10 Symbole; Kurs und prozentuale Änderung in Grün/Rot; Mini-Sparkline für Tagesverlauf; Aktualisierungsintervall 15/30/60 min; integriert sich in GIF- und Uhrmodi
+- **WKN- und ISIN-Unterstützung** — deutsche Wertpapiere als WKN (6-stellig alphanumerisch, z. B. `DBX1ME`) oder ISIN (12-stellig, z. B. `DE000DBX1ME3`) eingeben; wird automatisch zum Yahoo-Finance-Symbol aufgelöst und gecacht
+- **Unterspannungsschutz (Brownout)** — Niederspannungs-Reset zeigt „Low power — sleeping 60s" und geht 60 s in den Tiefschlaf statt neu zu starten; verhindert Entladungsschleifen bei grenzwertigen Netzteilen (z. B. Powerbank)
 
 ---
 
@@ -563,8 +613,6 @@ Zugriff über `http://<IP>/` (Hauptseite) und `http://<IP>/admin.html` (Admin-Se
 | CLK | 41 | `wifi_sd_webradio` |
 | CLK | **17** | `wifi_sdmmc_webradio` — Kabel umklemmen! |
 
-> HUB75 LAT/CLK müssen **nur beim SDMMC-Board** umgeklemmt werden, da GPIO 40/41 dort intern für die SD-Karte belegt sind.
-
 ### SD-Karte
 
 | Signal | GPIO | Build |
@@ -684,7 +732,7 @@ Browser → **`http://<IP>/admin.html`** → „Firmware Update (OTA)"
 ## Danksagung
 
 - **[Markus Kalkbrenner / PPUC](https://github.com/PPUC/ZeDMD)** — original ZeDMD project
-- **[elabree](https://github.com/elabree)** — Platinenentwurf: Trägerplatine für DevKit + SD + MAX98357A ([KiCad-Dateien](https://github.com/jens-b/ZeDMD-5.1.8-WIFI-128x32/tree/main/KiCad))
+- **[elabree](https://github.com/elabree)** — Platinenentwurf: Trägerplatine für DevKit + SD + MAX98357A ([KiCad-Dateien](https://github.com/jens-b/The-Arcade/tree/main/KiCad))
 - **Niels (My Son)** — coding assistance & inspiration & moral support
 - **[Claude Sonnet](https://anthropic.com)** — coding assistance
 

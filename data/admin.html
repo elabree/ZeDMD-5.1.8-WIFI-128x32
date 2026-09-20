@@ -9,49 +9,55 @@
 body { background:#121212; color:#e0e0e0; font-family:Arial,sans-serif; padding:20px; max-width:600px; margin:0 auto; }
 h1 { color:#4a9eff; }
 h2 { color:#4a9eff; font-size:1em; margin-top:20px; border-bottom:1px solid #333; padding-bottom:5px; }
+h3 { color:#888; font-size:0.8em; text-transform:uppercase; letter-spacing:0.05em; margin:14px 0 2px 0; border-bottom:1px solid #2a2a2a; padding-bottom:4px; }
 .section { background:#1e1e1e; border-radius:8px; padding:15px; margin-bottom:15px; }
 button { background:#007bff; color:#fff; border:none; padding:10px 16px; border-radius:4px; cursor:pointer; margin:4px 0; width:100%; }
 button:hover { background:#0056b3; }
 button.red { background:#dc3545; }
+button.red:hover { background:#b02a37; }
 button.green { background:#28a745; }
+button.green:hover { background:#1e7e34; }
 button.grey { background:#555; }
+button.grey:hover { background:#444; }
 input[type=text], input[type=password], input[type=number], select {
   background:#2c2c2c; color:#e0e0e0; border:1px solid #444;
   padding:10px; border-radius:4px; width:100%; margin-bottom:8px; box-sizing:border-box;
 }
 input[type=file] { background:#2c2c2c; color:#e0e0e0; border:none; padding:8px; border-radius:4px; width:100%; margin-bottom:8px; }
 input[type=range] { width:100%; }
-.status { color:#aaa; font-size:0.85em; margin:5px 0; }
-.file-list { list-style:none; padding:0; }
-.file-list li { display:flex; justify-content:space-between; align-items:center; padding:6px; border-bottom:1px solid #333; font-size:0.85em; }
+input[type=color] { width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin-bottom:8px; }
+.status { color:#aaa; font-size:0.85em; margin:5px 0; min-height:1.2em; }
 label { display:block; font-size:0.9em; color:#aaa; margin-bottom:4px; margin-top:10px; }
 a.back { color:#4a9eff; text-decoration:none; display:block; margin-bottom:15px; }
 pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overflow-x:auto; }
+.hint { font-size:0.8em; color:#555; }
+.restart-note { font-size:0.8em; color:#e67e22; font-weight:normal; }
+.btn-inline { display:inline-block; background:#dc3545; color:#fff; border:none; padding:3px 10px; border-radius:4px; cursor:pointer; font-size:0.85em; margin-left:8px; vertical-align:middle; }
+.btn-inline:hover { background:#b02a37; }
+p.note { color:#aaa; font-size:0.85em; margin:8px 0; }
 </style>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" media="print" onload="this.media='all'">
 </head>
 <body>
 <a class="back" href="/">&#x2190; Back to Main</a>
 <h1>&#x2699; The Arcade Admin</h1>
 
-<!-- Restart -->
+<!-- 1. SYSTEM -->
 <div class="section">
   <h2>System</h2>
   <button class="red" onclick="restartESP()">&#x21BA; Restart ESP</button>
-  <div class="status" id="restart-status"></div>
-</div>
-
-<!-- Diagnose -->
-<div class="section">
-  <h2>Diagnostics &amp; Crash Logs</h2>
+  <button class="red" onclick="applyDisplay()">&#x21BA; Save Screensaver Brightness &amp; Restart</button>
   <button class="red" onclick="resetDiag()">&#x21BA; Reset Diagnostics Counter</button>
   <button class="red" onclick="deleteCrashlogs()">&#x1F5D1; Delete Crash Logs</button>
-  <div class="status" id="diag-status"></div>
+  <div class="status" id="system-status"></div>
 </div>
 
-<!-- WiFi -->
+<!-- 2. NETWORK (WiFi + Transport — both require restart) -->
 <div class="section">
-  <h2>WiFi Configuration</h2>
+  <h2>Network <span class="restart-note">— restart required after changes</span></h2>
+  <div class="status" id="network-info"></div>
+
+  <h3>WiFi</h3>
   <label>SSID</label>
   <input type="text" id="ssid">
   <label>Password</label>
@@ -61,35 +67,8 @@ pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overfl
   <div class="status" id="wifi-status"></div>
   <button onclick="saveWiFi()">Save WiFi</button>
   <button class="red" onclick="resetWiFi()">Reset WiFi</button>
-</div>
 
-<!-- Display Settings -->
-<div class="section">
-  <h2>Display Settings</h2>
-  <label>Gaming Brightness: <span id="brightness-value">–</span></label>
-  <div style="display:flex; align-items:center; gap:8px; margin-bottom:15px;">
-    <span>&#x1F311;</span>
-    <input type="range" id="brightness" name="brightness" min="1" max="15"
-      style="flex:1; margin:0;" oninput="updateBrightness()">
-    <span>&#x2600;</span>
-  </div>
-  <div class="status" id="brightness-status"></div>
-  <label>RGB Order</label>
-  <select id="rgb-order" onchange="saveRGB()">
-    <option value="0">R, G, B</option>
-    <option value="1">B, R, G</option>
-    <option value="2">G, B, R</option>
-    <option value="3">R, B, G</option>
-    <option value="4">G, R, B</option>
-    <option value="5">B, G, R</option>
-  </select>
-  <div class="status" id="display-status"></div>
-  <button onclick="applyDisplay()">Apply Display Settings</button>
-</div>
-
-<!-- Transport -->
-<div class="section">
-  <h2>Transport</h2>
+  <h3>Transport</h3>
   <label>Connection Type</label>
   <select id="transport">
     <option value="0">USB</option>
@@ -97,17 +76,34 @@ pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overfl
     <option value="2">WiFi TCP</option>
     <option value="3">SPI</option>
   </select>
-  <label>UDP Delay (ms)</label>
-  <input type="number" id="udp-delay" min="0" max="100" value="5">
-  <label>USB Packet Size Multiplier</label>
-  <input type="number" id="usb-size" min="1" max="8" value="4">
+  <label>UDP Delay</label>
+  <select id="udp-delay">
+    <option value="0">0 ms</option>
+    <option value="1">1 ms</option>
+    <option value="2">2 ms</option>
+    <option value="3">3 ms</option>
+    <option value="4">4 ms</option>
+    <option value="5">5 ms (default)</option>
+    <option value="6">6 ms</option>
+    <option value="7">7 ms</option>
+    <option value="8">8 ms</option>
+    <option value="9">9 ms</option>
+  </select>
+  <label>USB Packet Size</label>
+  <select id="usb-size">
+    <option value="1">32 bytes (×1)</option>
+    <option value="2">64 bytes (×2)</option>
+    <option value="4">128 bytes (×4)</option>
+    <option value="8">256 bytes (×8)</option>
+    <option value="16">512 bytes (×16, default)</option>
+  </select>
   <div class="status" id="transport-status"></div>
-  <button onclick="saveTransportSettings()">Save Transport Settings</button>
+  <button onclick="saveTransportSettings()">Save Transport</button>
 </div>
 
-<!-- Panel Settings -->
+<!-- 3. HARDWARE (Panel Settings — requires restart) -->
 <div class="section">
-  <h2>Panel Settings</h2>
+  <h2>Hardware <span class="restart-note">— restart required after changes</span></h2>
   <label>Panel Driver</label>
   <select id="driver">
     <option value="0">SHIFTREG (default)</option>
@@ -146,10 +142,58 @@ pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overfl
   </select>
   <label><input type="checkbox" id="clkphase"> Clock Phase (positive edge)</label>
   <div class="status" id="panel-status"></div>
-  <button onclick="savePanelSettings()">Save Panel Settings</button>
+  <button onclick="savePanelSettings()">Save Hardware Settings</button>
 </div>
 
-<!-- MQTT Konfiguration -->
+<!-- 4. DISPLAY (auto-save) -->
+<div class="section">
+  <h2>Display</h2>
+  <label>Gaming Brightness: <span id="brightness-value">–</span> <span class="hint">(saved automatically)</span></label>
+  <div style="display:flex; align-items:center; gap:8px; margin-bottom:15px;">
+    <span>&#x1F311;</span>
+    <input type="range" id="brightness" name="brightness" min="1" max="15"
+      style="flex:1; margin:0;" oninput="updateBrightness()">
+    <span>&#x2600;</span>
+  </div>
+  <div class="status" id="brightness-status"></div>
+  <label>RGB Order <span class="hint">(saved automatically)</span></label>
+  <select id="rgb-order" onchange="saveRGB()">
+    <option value="0">R, G, B</option>
+    <option value="1">B, R, G</option>
+    <option value="2">G, B, R</option>
+    <option value="3">R, B, G</option>
+    <option value="4">G, R, B</option>
+    <option value="5">B, G, R</option>
+  </select>
+  <div class="status" id="display-status"></div>
+</div>
+
+<!-- 5. AUDIO (auto-save / immediate) -->
+<div class="section">
+  <h2>Audio</h2>
+  <label>Speaker Configuration <span class="hint">(saved automatically)</span></label>
+  <div style="display:flex; gap:16px; margin-bottom:6px;">
+    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+      <input type="radio" name="speaker-count" id="speaker-1" value="1" onchange="saveSpeakerCount()"> 1 Speaker
+    </label>
+    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+      <input type="radio" name="speaker-count" id="speaker-2" value="2" onchange="saveSpeakerCount()" checked> 2 Speakers
+    </label>
+  </div>
+  <div class="status" id="speaker-status"></div>
+  <div id="audio-swap-row">
+    <label>Channel Test</label>
+    <div style="display:flex; gap:8px; margin-bottom:10px;">
+      <button onclick="playTestAudio('left')" style="width:auto; padding:8px 16px;">&#x25C0; Test Left</button>
+      <button onclick="playTestAudio('right')" style="width:auto; padding:8px 16px;">Test Right &#x25B6;</button>
+    </div>
+    <label>L/R Channel Swap <span class="hint">(saved automatically)</span></label>
+    <button id="admin-btn-swap" onclick="toggleAdminSwap()" style="width:auto; padding:8px 16px; background:#555;">L/R Swap</button>
+    <div class="status" id="swap-status"></div>
+  </div>
+</div>
+
+<!-- 6. MQTT -->
 <div class="section">
   <h2>MQTT Server</h2>
   <label>Server IP</label>
@@ -170,9 +214,9 @@ pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overfl
   <button onclick="saveMqttConfig()">Save MQTT Config</button>
 </div>
 
-<!-- Wetter Koordinaten -->
+<!-- 7. WEATHER -->
 <div class="section">
-  <h2>Weather Coordinates (Open-Meteo)</h2>
+  <h2>Weather (Open-Meteo)</h2>
   <label>Search City</label>
   <input type="text" id="weather-city-input" placeholder="e.g. Berlin, Hamburg…"
     oninput="weatherCitySearch(this.value)">
@@ -183,15 +227,17 @@ pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overfl
   <input type="text" id="weather-lat" inputmode="decimal" placeholder="52.3202">
   <label>Longitude</label>
   <input type="text" id="weather-lon" inputmode="decimal" placeholder="10.4011">
+  <label>Timezone (IANA, e.g. Europe/Berlin)</label>
+  <input type="text" id="weather-tz" placeholder="Europe/Berlin">
   <div class="status" id="weather-config-status"></div>
   <button onclick="saveWeatherConfig()">Save Weather Config</button>
 </div>
 
-<!-- Zeitzone -->
+<!-- 8. TIMEZONE -->
 <div class="section">
   <h2>Timezone (NTP Clock)</h2>
   <label>Preset</label>
-  <select id="tz-preset" onchange="tzPresetChanged()" style="width:100%; padding:8px; background:#1e1e1e; color:#e0e0e0; border:1px solid #444; border-radius:4px; margin-bottom:8px;">
+  <select id="tz-preset" onchange="tzPresetChanged()">
     <option value="CET-1CEST,M3.5.0,M10.5.0/3">Central Europe (DE/AT/CH)</option>
     <option value="EET-2EEST,M3.5.0/3,M10.5.0/4">Eastern Europe (GR/RO/FI)</option>
     <option value="GMT0BST,M3.5.0/1,M10.5.0">UK / Ireland</option>
@@ -204,45 +250,40 @@ pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overfl
   </select>
   <div id="tz-custom-row" style="display:none;">
     <label>Custom POSIX String</label>
-    <input type="text" id="tz-string" placeholder="e.g. CET-1CEST,M3.5.0,M10.5.0/3" style="width:100%; padding:8px; background:#1e1e1e; color:#e0e0e0; border:1px solid #444; border-radius:4px; box-sizing:border-box;">
+    <input type="text" id="tz-string" placeholder="e.g. CET-1CEST,M3.5.0,M10.5.0/3">
   </div>
   <div class="status" id="tz-status"></div>
   <button onclick="saveTimezone()">Save Timezone</button>
 </div>
 
-<!-- Firmware OTA Update -->
+<!-- 9. FIRMWARE UPDATES -->
 <div class="section">
-  <h2>Firmware Update (OTA)</h2>
-  <p style="color:#aaa; font-size:0.85em;">Upload firmware .bin — device reboots automatically on success.</p>
-  <label>Select firmware .bin</label>
+  <h2>Firmware Update</h2>
+  <h3>Over the Air (OTA)</h3>
+  <p class="note">Upload a firmware .bin — device reboots automatically on success.</p>
   <input type="file" id="ota-file" accept=".bin">
   <div id="ota-progress-wrap" style="display:none; margin:8px 0;">
     <progress id="ota-progress" value="0" max="100" style="width:100%;"></progress>
   </div>
   <div class="status" id="ota-status"></div>
   <button class="green" onclick="uploadOTA()">&#x2191; Flash Firmware</button>
-</div>
 
-<!-- SD Card Firmware Update -->
-<div class="section">
-  <h2>Firmware Update from SD Card</h2>
-  <p style="color:#aaa; font-size:0.85em;">Place <code>firmware.bin</code> in the <code>/UPDATE/</code> folder on the SD card, then click the button. The device will flash and reboot automatically. The file is deleted after a successful update.</p>
+  <h3>From SD Card</h3>
+  <p class="note">Place <code>firmware.bin</code> in <code>/UPDATE/</code> on the SD card, then click Flash. File is deleted after success.</p>
   <div class="status" id="sd-update-status"></div>
   <button onclick="triggerSdUpdate()">&#x1F4BE; Flash from SD</button>
 </div>
 
-<!-- Web File Update -->
+<!-- 10. WEB FILES -->
 <div class="section">
   <h2>Update Web Files</h2>
-  <p style="color:#aaa; font-size:0.85em;">Upload index.html or admin.html directly — no filesystem flash needed.</p>
-  <label>Select HTML file</label>
-  <input type="file" id="upload-html-file" accept=".html">
-  <button onclick="uploadHtmlFile()">&#x2191; Upload File</button>
+  <p class="note">Upload .html or .wav files directly to LittleFS — no firmware flash needed.</p>
+  <input type="file" id="upload-html-file" accept=".html,.wav">
   <div class="status" id="upload-html-status"></div>
+  <button onclick="uploadHtmlFile()">&#x2191; Upload File</button>
 </div>
 
-
-<!-- Font Test (nur wenn FONT_TEST_ENABLED in Firmware) -->
+<!-- 11. FONT TEST (shown only when firmware supports it) -->
 <div class="section" id="font-test-section" style="display:none;">
   <h2>&#128292; Font Test</h2>
   <label>Text</label>
@@ -251,37 +292,39 @@ pre { background:#111; padding:10px; border-radius:4px; font-size:0.75em; overfl
   <select id="ft-font"></select>
   <label>Lines</label>
   <select id="ft-lines">
-    <option value="1">1 Zeile</option>
-    <option value="2">2 Zeilen</option>
-    <option value="3">3 Zeilen</option>
+    <option value="1">1 Line</option>
+    <option value="2">2 Lines</option>
+    <option value="3">3 Lines</option>
   </select>
   <label>Duration: <span id="ft-dur-val">10</span>s</label>
   <input type="range" id="ft-dur" min="5" max="60" step="5" value="10"
-      oninput="document.getElementById('ft-dur-val').innerText=this.value">
+    oninput="document.getElementById('ft-dur-val').innerText=this.value">
   <label>Color</label>
-  <input type="color" id="ft-color" value="#ffffff"
-      style="width:60px; height:36px; border:none; border-radius:4px; cursor:pointer; margin-bottom:8px;">
+  <input type="color" id="ft-color" value="#ffffff">
+  <div class="status" id="ft-status"></div>
   <button onclick="sendFontTest()">&#9654; Test</button>
   <button class="grey" onclick="stopFontTest()">&#9646;&#9646; Stop</button>
-  <div class="status" id="ft-status"></div>
 </div>
 
-<!-- Information -->
+<!-- 12. INFORMATION -->
 <div class="section">
   <h2>Information</h2>
   <div class="status" id="info-version"></div>
   <label><input type="checkbox" id="debug-cb" onchange="toggleDebug()"> Show Debug Info</label>
-  <div id="debug-info" style="display:none">
+  <div id="debug-info" style="display:none;">
     <pre id="debug-content"></pre>
   </div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" async></script>
 <script>
 window.onload = function() {
   initFontTest();
   fetch('/get_config').then(function(r) { return r.json(); }).then(function(d) {
-    if (d.brightness !== undefined) { document.getElementById('brightness').value = d.brightness; document.getElementById('brightness-value').innerText = d.brightness; }
+    if (d.brightness !== undefined) {
+      document.getElementById('brightness').value = d.brightness;
+      document.getElementById('brightness-value').innerText = d.brightness;
+    }
     document.getElementById('ssid').value = d.ssid || '';
     document.getElementById('port').value = d.port || 3333;
     document.getElementById('rgb-order').value = d.rgbOrder || 0;
@@ -300,8 +343,9 @@ window.onload = function() {
     if (d.mqttFieldHumidity !== undefined) document.getElementById('mqtt-field-humidity').value = d.mqttFieldHumidity;
     if (d.mqttFieldWind     !== undefined) document.getElementById('mqtt-field-wind').value     = d.mqttFieldWind;
     if (d.mqttFieldPressure !== undefined) document.getElementById('mqtt-field-pressure').value = d.mqttFieldPressure;
-    if (d.weatherLat !== undefined) document.getElementById('weather-lat').value  = d.weatherLat;
-    if (d.weatherLon !== undefined) document.getElementById('weather-lon').value  = d.weatherLon;
+    if (d.weatherLat !== undefined) document.getElementById('weather-lat').value = d.weatherLat;
+    if (d.weatherLon !== undefined) document.getElementById('weather-lon').value = d.weatherLon;
+    if (d.weatherTimezone !== undefined) document.getElementById('weather-tz').value = d.weatherTimezone;
     var _mlat = parseFloat(d.weatherLat) || 52.3202;
     var _mlon = parseFloat(d.weatherLon) || 10.4011;
     if (typeof L !== 'undefined') initWeatherMap(_mlat, _mlon);
@@ -317,27 +361,113 @@ window.onload = function() {
         document.getElementById('tz-custom-row').style.display = 'block';
       }
     }
+    if (d.speakerCount !== undefined) {
+      var rb = document.getElementById('speaker-' + d.speakerCount);
+      if (rb) rb.checked = true;
+      updateSpeakerUI(d.speakerCount);
+    }
+    var netInfo = document.getElementById('network-info');
+    if (netInfo) {
+      var tNames = ['USB', 'WiFi UDP', 'WiFi TCP', 'SPI'];
+      var tLabel = tNames[d.transport] || 'Unknown';
+      netInfo.innerText = 'Active: ' + (d.localIP || '–') + ' · ' + (d.ssid || '–') + ' · ' + tLabel;
+    }
   }).catch(function(e) { console.warn('ZeDMD get_config:', e); });
+
+  fetch('/radio_status').then(function(r) { return r.json(); }).then(function(d) {
+    if (d.swapChannels !== undefined) {
+      var btn = document.getElementById('admin-btn-swap');
+      if (btn) {
+        btn.style.background = d.swapChannels ? '#e67e22' : '#555';
+        btn.dataset.active = d.swapChannels ? '1' : '0';
+      }
+    }
+  }).catch(function() {});
+
   fetch('/get_version').then(function(r) { return r.text(); }).then(function(v) {
     document.getElementById('info-version').innerText = 'Firmware: ' + v;
   }).catch(function(e) { console.warn('ZeDMD get_version:', e); });
 };
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function showAutoSaved(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.innerText = '✓ Saved';
+  el.style.color = '#27ae60';
+  setTimeout(function() { el.innerText = ''; }, 2000);
+}
+
+function showSavedRestart(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = '✓ Saved &nbsp;<button class="btn-inline" onclick="doRestartSilent(this)">&#x21BA; Restart now</button>';
+  el.style.color = '#27ae60';
+}
+
+function showError(id, msg) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.innerText = '✗ ' + (msg || 'Error');
+  el.style.color = 'red';
+}
+
+function doRestartSilent(btn) {
+  if (btn) { btn.disabled = true; btn.innerText = 'Restarting…'; }
+  fetch('/restart', {method:'POST'}).catch(function() {});
+}
+
+// ── System ───────────────────────────────────────────────────────────────────
+
 function restartESP() {
   if (!confirm('Restart ESP now?')) return;
-  var status = document.getElementById('restart-status');
-  status.innerText = 'Restarting...';
-  status.style.color = 'orange';
+  var st = document.getElementById('system-status');
+  st.innerText = 'Restarting…'; st.style.color = 'orange';
   fetch('/restart', {method:'POST'})
     .then(function() {
-      status.innerText = 'ESP is restarting — page will reload in 5 seconds...';
+      st.innerText = 'Restarting — page reloads in 5s…';
       setTimeout(function() { location.reload(); }, 5000);
     })
     .catch(function() {
-      status.innerText = 'ESP restarted (connection lost)';
+      st.innerText = 'ESP restarted (connection lost)';
       setTimeout(function() { location.reload(); }, 5000);
     });
 }
+
+function applyDisplay() {
+  if (!confirm('Save screensaver brightness and restart ESP?')) return;
+  fetch('/apply', {method:'POST'})
+    .then(function() {
+      var st = document.getElementById('system-status');
+      st.innerText = 'Restarting…'; st.style.color = 'orange';
+    })
+    .catch(function() {});
+}
+
+function resetDiag() {
+  if (!confirm('Reset diagnostics counter?')) return;
+  fetch('/reset_diag', {method:'POST'})
+    .then(function(r) {
+      var st = document.getElementById('system-status');
+      st.innerText = r.ok ? '✓ Diagnostics counter reset' : '✗ Error';
+      st.style.color = r.ok ? '#27ae60' : 'red';
+    })
+    .catch(function() { showError('system-status', 'Connection error'); });
+}
+
+function deleteCrashlogs() {
+  if (!confirm('Delete all crash logs?')) return;
+  fetch('/delete_crashlogs', {method:'POST'})
+    .then(function(r) {
+      var st = document.getElementById('system-status');
+      st.innerText = r.ok ? '✓ Crash logs deleted' : '✗ Error';
+      st.style.color = r.ok ? '#27ae60' : 'red';
+    })
+    .catch(function() { showError('system-status', 'Connection error'); });
+}
+
+// ── Network ──────────────────────────────────────────────────────────────────
 
 function saveWiFi() {
   var fd = new FormData();
@@ -345,97 +475,104 @@ function saveWiFi() {
   fd.append('password', document.getElementById('password').value);
   fd.append('port', document.getElementById('port').value);
   fetch('/save_wifi', {method:'POST', body: fd})
-    .then(function(r) { return r.text(); })
-    .then(function(t) { document.getElementById('wifi-status').innerText = t; })
-    .catch(function() { document.getElementById('wifi-status').innerText = 'Connection error'; });
+    .then(function(r) {
+      if (r.ok) showSavedRestart('wifi-status');
+      else r.text().then(function(t) { showError('wifi-status', t); });
+    })
+    .catch(function() { showError('wifi-status', 'Connection error'); });
 }
 
 function resetWiFi() {
   if (!confirm('Reset WiFi settings?')) return;
-  fetch('/reset_wifi', {method:'POST'}).then(function() { location.reload(); })
-    .catch(function() { document.getElementById('wifi-status').innerText = 'Connection error'; });
+  fetch('/reset_wifi', {method:'POST'})
+    .then(function() { location.reload(); })
+    .catch(function() { showError('wifi-status', 'Connection error'); });
 }
+
+function saveTransportSettings() {
+  var p1 = new FormData(); p1.append('transport', document.getElementById('transport').value);
+  var p2 = new FormData(); p2.append('udpDelay', document.getElementById('udp-delay').value);
+  var p3 = new FormData(); p3.append('usbPackageSizeMultiplier', document.getElementById('usb-size').value);
+  Promise.all([
+    fetch('/save_transport', {method:'POST', body: p1}),
+    fetch('/save_udp_delay',  {method:'POST', body: p2}),
+    fetch('/save_usb_size',   {method:'POST', body: p3})
+  ]).then(function() {
+    showSavedRestart('transport-status');
+  }).catch(function() { showError('transport-status', 'Connection error'); });
+}
+
+// ── Hardware ─────────────────────────────────────────────────────────────────
+
+function savePanelSettings() {
+  var fd = new FormData();
+  fd.append('panelClkphase',       document.getElementById('clkphase').checked ? '1' : '0');
+  fd.append('panelI2sspeed',       document.getElementById('i2sspeed').value);
+  fd.append('panelLatchBlanking',  document.getElementById('latch').value);
+  fd.append('panelMinRefreshRate', document.getElementById('minrefresh').value);
+  fd.append('panelDriver',         document.getElementById('driver').value);
+  fetch('/save_panel_settings', {method:'POST', body: fd})
+    .then(function(r) {
+      if (r.ok) showSavedRestart('panel-status');
+      else showError('panel-status', 'Error');
+    })
+    .catch(function() { showError('panel-status', 'Connection error'); });
+}
+
+// ── Display ──────────────────────────────────────────────────────────────────
 
 function updateBrightness() {
   var val = document.getElementById('brightness').value;
   document.getElementById('brightness-value').innerText = val;
-  fetch('/save_brightness', { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body: 'brightness=' + val })
-    .then(function(r) { document.getElementById('brightness-status').innerText = r.ok ? 'Saved' : 'Error'; })
-    .catch(function() { document.getElementById('brightness-status').innerText = 'Connection error'; });
+  fetch('/save_brightness', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'brightness=' + val})
+    .then(function(r) { if (r.ok) showAutoSaved('brightness-status'); })
+    .catch(function() { showError('brightness-status', 'Connection error'); });
 }
 
 function saveRGB() {
   var fd = new FormData();
   fd.append('rgbOrder', document.getElementById('rgb-order').value);
   fetch('/save_rgb_order', {method:'POST', body: fd})
-    .then(function() { document.getElementById('display-status').innerText = 'RGB saved'; })
-    .catch(function() { document.getElementById('display-status').innerText = 'Connection error'; });
+    .then(function() { showAutoSaved('display-status'); })
+    .catch(function() { showError('display-status', 'Connection error'); });
 }
 
+// ── Audio ────────────────────────────────────────────────────────────────────
 
-function applyDisplay() {
-  fetch('/apply', {method:'POST'})
-    .then(function() { document.getElementById('display-status').innerText = 'Applied!'; })
-    .catch(function() { document.getElementById('display-status').innerText = 'Connection error'; });
+function updateSpeakerUI(count) {
+  document.getElementById('audio-swap-row').style.display = (count == 1) ? 'none' : '';
 }
 
-function saveTransportSettings() {
-  var status = document.getElementById('transport-status');
-  var p1 = new FormData(); p1.append('transport', document.getElementById('transport').value);
-  var p2 = new FormData(); p2.append('udpDelay', document.getElementById('udp-delay').value);
-  var p3 = new FormData(); p3.append('usbPackageSizeMultiplier', document.getElementById('usb-size').value);
-  Promise.all([
-    fetch('/save_transport', {method:'POST', body: p1}),
-    fetch('/save_udp_delay', {method:'POST', body: p2}),
-    fetch('/save_usb_size', {method:'POST', body: p3})
-  ]).then(function() {
-    status.innerText = 'Saved — restart required!';
-    status.style.color = 'orange';
-  }).catch(function() {
-    status.innerText = 'Connection error';
-    status.style.color = 'red';
-  });
+function saveSpeakerCount() {
+  var count = document.querySelector('input[name="speaker-count"]:checked').value;
+  updateSpeakerUI(count);
+  var fd = new FormData(); fd.append('count', count);
+  fetch('/set_speaker_count', {method:'POST', body:fd})
+    .then(function() { showAutoSaved('speaker-status'); })
+    .catch(function(e) { console.warn('ZeDMD set_speaker_count:', e); });
 }
 
-function savePanelSettings() {
-  var fd = new FormData();
-  fd.append('panelClkphase', document.getElementById('clkphase').checked ? '1' : '0');
-  fd.append('panelI2sspeed', document.getElementById('i2sspeed').value);
-  fd.append('panelLatchBlanking', document.getElementById('latch').value);
-  fd.append('panelMinRefreshRate', document.getElementById('minrefresh').value);
-  fd.append('panelDriver', document.getElementById('driver').value);
-  fetch('/save_panel_settings', {method:'POST', body: fd})
+function playTestAudio(channel) {
+  var fd = new FormData(); fd.append('channel', channel);
+  fetch('/play_test_audio', {method:'POST', body:fd})
+    .catch(function(e) { console.warn('ZeDMD play_test_audio:', e); });
+}
+
+function toggleAdminSwap() {
+  var btn = document.getElementById('admin-btn-swap');
+  var active = !(btn && btn.dataset.active === '1');
+  if (btn) { btn.style.background = active ? '#e67e22' : '#555'; btn.dataset.active = active ? '1' : '0'; }
+  var fd = new FormData(); fd.append('swap', active ? '1' : '0');
+  fetch('/radio_swap', {method:'POST', body:fd})
     .then(function() {
-      document.getElementById('panel-status').innerText = 'Saved — restart required!';
-      document.getElementById('panel-status').style.color = 'orange';
+      var st = document.getElementById('swap-status');
+      if (st) { st.innerText = active ? '✓ Channels swapped' : '✓ Channels normal'; st.style.color = '#27ae60'; }
+      setTimeout(function() { var s = document.getElementById('swap-status'); if(s) s.innerText=''; }, 2000);
     })
-    .catch(function() {
-      document.getElementById('panel-status').innerText = 'Connection error';
-      document.getElementById('panel-status').style.color = 'red';
-    });
+    .catch(function(e) { console.warn('ZeDMD radio_swap:', e); });
 }
 
-function uploadHtmlFile() {
-  var file = document.getElementById('upload-html-file').files[0];
-  var status = document.getElementById('upload-html-status');
-  if (!file) { status.innerText = 'Please select a file.'; status.style.color = 'red'; return; }
-  if (!file.name.endsWith('.html')) { status.innerText = 'Only .html files allowed.'; status.style.color = 'red'; return; }
-  status.innerText = 'Uploading ' + file.name + '...';
-  status.style.color = '#aaa';
-  var fd = new FormData();
-  fd.append('file', file, file.name);
-  fetch('/upload_file', {method: 'POST', body: fd})
-    .then(function(r) {
-      if (r.ok) {
-        status.innerText = '✓ ' + file.name + ' uploaded — reload page to apply.';
-        status.style.color = 'green';
-      } else {
-        status.innerText = '✗ Upload failed (status ' + r.status + ').';
-        status.style.color = 'red';
-      }
-    })
-    .catch(function() { status.innerText = '✗ Upload error.'; status.style.color = 'red'; });
-}
+// ── MQTT ─────────────────────────────────────────────────────────────────────
 
 function saveMqttConfig() {
   var params = new URLSearchParams();
@@ -450,33 +587,12 @@ function saveMqttConfig() {
     .then(function(r) {
       var el = document.getElementById('mqtt-status');
       el.innerText = r.ok ? '✓ Saved' : '✗ Error';
-      el.style.color = r.ok ? 'green' : 'red';
+      el.style.color = r.ok ? '#27ae60' : 'red';
     })
-    .catch(function() { var el = document.getElementById('mqtt-status'); el.innerText = '✗ Connection error'; el.style.color = 'red'; });
+    .catch(function() { showError('mqtt-status', 'Connection error'); });
 }
 
-function tzPresetChanged() {
-  var sel = document.getElementById('tz-preset');
-  var customRow = document.getElementById('tz-custom-row');
-  customRow.style.display = sel.value === 'custom' ? 'block' : 'none';
-}
-
-function saveTimezone() {
-  var sel = document.getElementById('tz-preset');
-  var tz = sel.value === 'custom'
-    ? document.getElementById('tz-string').value.trim()
-    : sel.value;
-  var el = document.getElementById('tz-status');
-  if (!tz) { el.innerText = '✗ Empty timezone string'; el.style.color = 'red'; return; }
-  var params = new URLSearchParams();
-  params.append('tz', tz);
-  fetch('/save_timezone', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: params.toString()})
-    .then(function(r) {
-      el.innerText = r.ok ? '✓ Saved — clock will update' : '✗ Error';
-      el.style.color = r.ok ? 'green' : 'red';
-    })
-    .catch(function() { el.innerText = '✗ Connection error'; el.style.color = 'red'; });
-}
+// ── Weather ──────────────────────────────────────────────────────────────────
 
 var _weatherMap = null;
 var _weatherMarker = null;
@@ -512,20 +628,20 @@ function weatherCitySearch(q) {
         if (!data.results || data.results.length === 0) { list.style.display = 'none'; return; }
         data.results.forEach(function(r) {
           var li = document.createElement('li');
-          var label = r.name + (r.admin1 ? ', ' + r.admin1 : '') + ', ' + r.country;
-          li.textContent = label;
+          var lbl = r.name + (r.admin1 ? ', ' + r.admin1 : '') + ', ' + r.country;
+          li.textContent = lbl;
           li.style.cssText = 'padding:8px 12px; cursor:pointer; font-size:0.9em; border-bottom:1px solid #333;';
           li.addEventListener('mouseenter', function() { li.style.background = '#2a2a2a'; });
           li.addEventListener('mouseleave', function() { li.style.background = ''; });
           li.addEventListener('click', function() {
             document.getElementById('weather-lat').value = r.latitude.toFixed(4);
             document.getElementById('weather-lon').value = r.longitude.toFixed(4);
-            document.getElementById('weather-city-input').value = label;
+            document.getElementById('weather-city-input').value = lbl;
             list.style.display = 'none';
             if (_weatherMap && _weatherMarker) {
-              var latlng = [r.latitude, r.longitude];
-              _weatherMarker.setLatLng(latlng);
-              _weatherMap.setView(latlng, 10);
+              var ll = [r.latitude, r.longitude];
+              _weatherMarker.setLatLng(ll);
+              _weatherMap.setView(ll, 10);
             }
           });
           list.appendChild(li);
@@ -536,19 +652,42 @@ function weatherCitySearch(q) {
   }, 350);
 }
 
-
 function saveWeatherConfig() {
   var params = new URLSearchParams();
   params.append('lat', document.getElementById('weather-lat').value);
   params.append('lon', document.getElementById('weather-lon').value);
+  params.append('timezone', document.getElementById('weather-tz').value);
   fetch('/save_weather_config', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: params.toString()})
     .then(function(r) {
       var el = document.getElementById('weather-config-status');
       el.innerText = r.ok ? '✓ Saved — weather will reload' : '✗ Error';
-      el.style.color = r.ok ? 'green' : 'red';
+      el.style.color = r.ok ? '#27ae60' : 'red';
     })
-    .catch(function() { var el = document.getElementById('weather-config-status'); el.innerText = '✗ Connection error'; el.style.color = 'red'; });
+    .catch(function() { showError('weather-config-status', 'Connection error'); });
 }
+
+// ── Timezone ─────────────────────────────────────────────────────────────────
+
+function tzPresetChanged() {
+  var sel = document.getElementById('tz-preset');
+  document.getElementById('tz-custom-row').style.display = sel.value === 'custom' ? 'block' : 'none';
+}
+
+function saveTimezone() {
+  var sel = document.getElementById('tz-preset');
+  var tz = sel.value === 'custom' ? document.getElementById('tz-string').value.trim() : sel.value;
+  if (!tz) { showError('tz-status', 'Empty timezone string'); return; }
+  var params = new URLSearchParams(); params.append('tz', tz);
+  fetch('/save_timezone', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: params.toString()})
+    .then(function(r) {
+      var el = document.getElementById('tz-status');
+      el.innerText = r.ok ? '✓ Saved — clock will update' : '✗ Error';
+      el.style.color = r.ok ? '#27ae60' : 'red';
+    })
+    .catch(function() { showError('tz-status', 'Connection error'); });
+}
+
+// ── Firmware Update ──────────────────────────────────────────────────────────
 
 function uploadOTA() {
   var file = document.getElementById('ota-file').files[0];
@@ -559,42 +698,36 @@ function uploadOTA() {
   if (!file.name.endsWith('.bin')) { status.innerText = 'Only .bin files allowed.'; status.style.color = 'red'; return; }
   if (!confirm('Flash ' + file.name + ' (' + Math.round(file.size/1024) + ' KB)?\nThe device will reboot after the update.')) return;
 
-  var fd = new FormData();
-  fd.append('file', file, file.name);
-
+  var fd = new FormData(); fd.append('file', file, file.name);
   var xhr = new XMLHttpRequest();
   xhr.open('POST', '/ota', true);
   xhr.setRequestHeader('Authorization', 'Basic ' + btoa('admin:zedmd1234'));
-
   var uploadedFully = false;
 
   xhr.upload.onprogress = function(e) {
     if (e.lengthComputable) {
       var pct = Math.round(e.loaded / e.total * 100);
       progress.value = pct;
-      status.innerText = 'Uploading... ' + pct + '%';
+      status.innerText = pct === 100 ? 'Flashing… please wait' : 'Uploading… ' + pct + '%';
       status.style.color = '#aaa';
-      if (pct === 100) {
-        uploadedFully = true;
-        status.innerText = 'Flashing... please wait';
-      }
+      if (pct === 100) uploadedFully = true;
     }
   };
 
   function waitForReboot() {
-    status.innerText = '✓ Update OK — waiting for device...';
-    status.style.color = 'green';
+    status.innerText = '✓ Update OK — waiting for device…';
+    status.style.color = '#27ae60';
     var attempts = 0;
     var timer = setInterval(function() {
       attempts++;
       fetch('/get_version').then(function(r) { return r.text(); }).then(function(v) {
         clearInterval(timer);
-        status.innerText = '✓ Device is back online — Firmware: ' + v;
-        status.style.color = 'green';
+        status.innerText = '✓ Device online — Firmware: ' + v;
+        status.style.color = '#27ae60';
       }).catch(function() {
         if (attempts > 20) {
           clearInterval(timer);
-          status.innerText = '⚠ Device not responding after reboot — check manually.';
+          status.innerText = '⚠ Device not responding — check manually.';
           status.style.color = 'orange';
         }
       });
@@ -603,53 +736,62 @@ function uploadOTA() {
 
   xhr.onload = function() {
     progressWrap.style.display = 'none';
-    if (xhr.status === 200 && xhr.responseText.indexOf('OK') === 0) {
-      waitForReboot();
-    } else {
-      status.innerText = '✗ Update failed: ' + xhr.responseText;
-      status.style.color = 'red';
-    }
+    if (xhr.status === 200 && xhr.responseText.indexOf('OK') === 0) waitForReboot();
+    else { status.innerText = '✗ Update failed: ' + xhr.responseText; status.style.color = 'red'; }
   };
-
   xhr.onerror = function() {
     progressWrap.style.display = 'none';
-    if (uploadedFully) {
-      waitForReboot();
-    } else {
-      status.innerText = '✗ Connection lost before upload completed.';
-      status.style.color = 'red';
-    }
+    if (uploadedFully) waitForReboot();
+    else { status.innerText = '✗ Connection lost before upload completed.'; status.style.color = 'red'; }
   };
 
   progressWrap.style.display = 'block';
   progress.value = 0;
-  status.innerText = 'Starting upload...';
-  status.style.color = '#aaa';
+  status.innerText = 'Starting upload…'; status.style.color = '#aaa';
   xhr.send(fd);
 }
 
-
-function resetDiag() {
-  if (!confirm('Reset diagnostics counter? (boots, lastReset etc.)')) return;
-  var status = document.getElementById('diag-status');
-  fetch('/reset_diag', {method:'POST'})
-    .then(function(r) {
-      status.innerText = r.ok ? '✓ Diagnostics counter reset' : '✗ Error';
-      status.style.color = r.ok ? 'green' : 'red';
+function triggerSdUpdate() {
+  var status = document.getElementById('sd-update-status');
+  status.innerText = 'Checking /UPDATE/firmware.bin…'; status.style.color = '#aaa';
+  fetch('/trigger_sd_update', {method:'POST'})
+    .then(function(r) { return r.text().then(function(t) { return {ok: r.ok, text: t}; }); })
+    .then(function(res) {
+      if (res.ok) {
+        status.innerText = 'Flashing… device will reboot. Page reloads in 30s.';
+        status.style.color = '#ffc107';
+        setTimeout(function() { location.reload(); }, 30000);
+      } else {
+        status.innerText = '✗ ' + res.text; status.style.color = 'red';
+      }
     })
-    .catch(function() { status.innerText = '✗ Connection error'; status.style.color = 'red'; });
+    .catch(function() { showError('sd-update-status', 'Request failed'); });
 }
 
-function deleteCrashlogs() {
-  if (!confirm('Delete all crash logs?')) return;
-  var status = document.getElementById('diag-status');
-  fetch('/delete_crashlogs', {method:'POST'})
+// ── Web Files ────────────────────────────────────────────────────────────────
+
+function uploadHtmlFile() {
+  var file = document.getElementById('upload-html-file').files[0];
+  var status = document.getElementById('upload-html-status');
+  if (!file) { status.innerText = 'Please select a file.'; status.style.color = 'red'; return; }
+  if (!file.name.endsWith('.html') && !file.name.endsWith('.wav')) {
+    status.innerText = 'Only .html and .wav files allowed.'; status.style.color = 'red'; return;
+  }
+  status.innerText = 'Uploading ' + file.name + '…'; status.style.color = '#aaa';
+  var fd = new FormData(); fd.append('file', file, file.name);
+  fetch('/upload_file', {method:'POST', body: fd})
     .then(function(r) {
-      status.innerText = r.ok ? '✓ Crash logs deleted' : '✗ Error';
-      status.style.color = r.ok ? 'green' : 'red';
+      if (r.ok) {
+        status.innerText = '✓ ' + file.name + ' uploaded — reload page to apply.';
+        status.style.color = '#27ae60';
+      } else {
+        status.innerText = '✗ Upload failed (status ' + r.status + ').'; status.style.color = 'red';
+      }
     })
-    .catch(function() { status.innerText = '✗ Connection error'; status.style.color = 'red'; });
+    .catch(function() { status.innerText = '✗ Upload error.'; status.style.color = 'red'; });
 }
+
+// ── Font Test ────────────────────────────────────────────────────────────────
 
 function initFontTest() {
   fetch('/font_test_enabled').then(function(r) {
@@ -657,19 +799,14 @@ function initFontTest() {
     document.getElementById('font-test-section').style.display = '';
     fetch('/font_list').then(function(r2) { return r2.json(); }).then(function(fonts) {
       var sel = document.getElementById('ft-font');
-      fonts.forEach(function(f) {
-        var opt = document.createElement('option');
-        opt.value = f; opt.text = f;
-        sel.appendChild(opt);
-      });
+      fonts.forEach(function(f) { var o = document.createElement('option'); o.value = f; o.text = f; sel.appendChild(o); });
     });
   }).catch(function() {});
 }
 
 function sendFontTest() {
   var text = document.getElementById('ft-text').value.trim();
-  var status = document.getElementById('ft-status');
-  if (!text) { status.innerText = 'No text entered.'; status.style.color = 'red'; return; }
+  if (!text) { showError('ft-status', 'No text entered'); return; }
   var params = new URLSearchParams();
   params.append('text', text);
   params.append('font', document.getElementById('ft-font').value);
@@ -678,18 +815,23 @@ function sendFontTest() {
   params.append('color', document.getElementById('ft-color').value);
   fetch('/font_test', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: params.toString()})
     .then(function(r) {
-      status.innerText = r.ok ? '✓ Displaying (' + document.getElementById('ft-dur').value + 's)' : '✗ Error';
-      status.style.color = r.ok ? 'green' : 'red';
+      var st = document.getElementById('ft-status');
+      st.innerText = r.ok ? '✓ Displaying (' + document.getElementById('ft-dur').value + 's)' : '✗ Error';
+      st.style.color = r.ok ? '#27ae60' : 'red';
     })
-    .catch(function() { status.innerText = '✗ Connection error'; status.style.color = 'red'; });
+    .catch(function() { showError('ft-status', 'Connection error'); });
 }
 
 function stopFontTest() {
-  var status = document.getElementById('ft-status');
   fetch('/font_test_stop', {method:'POST'})
-    .then(function(r) { status.innerText = r.ok ? 'Stopped.' : '✗ Error'; status.style.color = r.ok ? '#aaa' : 'red'; })
-    .catch(function() { status.innerText = '✗ Connection error'; status.style.color = 'red'; });
+    .then(function(r) {
+      var st = document.getElementById('ft-status');
+      st.innerText = r.ok ? 'Stopped.' : '✗ Error'; st.style.color = r.ok ? '#aaa' : 'red';
+    })
+    .catch(function() { showError('ft-status', 'Connection error'); });
 }
+
+// ── Debug ────────────────────────────────────────────────────────────────────
 
 function toggleDebug() {
   var show = document.getElementById('debug-cb').checked;
@@ -700,33 +842,6 @@ function toggleDebug() {
     });
   }
 }
-
-
-
-function triggerSdUpdate() {
-  var status = document.getElementById('sd-update-status');
-  status.innerText = 'Checking /UPDATE/firmware.bin...';
-  status.style.color = '#aaa';
-  fetch('/trigger_sd_update', { method: 'POST' })
-    .then(function(r) {
-      return r.text().then(function(t) { return { ok: r.ok, text: t }; });
-    })
-    .then(function(res) {
-      if (res.ok) {
-        status.innerText = 'Flashing… device will reboot. Page reloads in 30s.';
-        status.style.color = '#ffc107';
-        setTimeout(function() { location.reload(); }, 30000);
-      } else {
-        status.innerText = '✗ ' + res.text;
-        status.style.color = 'red';
-      }
-    })
-    .catch(function() {
-      status.innerText = '✗ Request failed';
-      status.style.color = 'red';
-    });
-}
-
 </script>
 </body>
 </html>

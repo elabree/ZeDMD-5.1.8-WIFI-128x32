@@ -23,6 +23,7 @@ extern volatile bool forecastAvailable;
 extern volatile bool weatherFetchRunning;
 extern float    weatherLat;
 extern float    weatherLon;
+extern String   weatherTimezone;
 
 // ── Public API ────────────────────────────────────────────────────────────────
 

@@ -25,7 +25,7 @@ extern void ApplyBrightness(uint8_t base);
 extern const uint8_t* GetIcon(const char* name);
 extern const uint8_t* GetWeatherIcon(const char* name);
 
-#include "clock.h"  // clockR/G/B, dateR/G/B, clockColorChanged, DrawSegDigit, DrawColon
+#include "clock.h"  // clockR/G/B, dateR/G/B, forceClockRedraw, DrawSegDigit, DrawColon
 
 // ── Globals ───────────────────────────────────────────────────────────────────
 
@@ -44,8 +44,9 @@ int8_t   forecastTempMax[3] = {0, 0, 0};
 volatile bool forecastAvailable  = false;
 volatile bool weatherFetchRunning = false;
 
-float weatherLat = 52.3202f;
-float weatherLon = 10.4011f;
+float  weatherLat      = 52.3202f;
+float  weatherLon      = 10.4011f;
+String weatherTimezone = "Europe/Berlin";
 
 // ── Internal types and helpers ────────────────────────────────────────────────
 
@@ -333,7 +334,7 @@ static void DrawWeatherIcon(uint8_t idx, int x, int y, uint8_t scale = 2) {
     static const uint8_t GC[8][3] = {  // cloud gradient like icon 8 (darker)
       {  0,  0,  0},{108,113,126},{ 96,101,114},{ 86, 91,104},
       { 78, 83, 96},{ 68, 73, 86},{  0,  0,  0},{  0,  0,  0}};
-    static const uint8_t DRPS[8] = {  // diagonale Tropfen Zeilen 6–7
+    static const uint8_t DRPS[8] = {  // diagonal rain pixels rows 6-7
       0,0,0,0, 0,0, 0b00100010, 0b00010001};
     drawLayerGrad(L1[1], GS);
     drawLayerGrad(CLOUD9, GC);
@@ -371,14 +372,24 @@ static void fetchWeather() {
   HTTPClient http;
   // HTTP (no TLS) — Open-Meteo supports plain HTTP for embedded devices;
   // internal RAM is insufficient for mbedTLS handshake when audio codec is active
+  // URL-encode weatherTimezone: replace "/" with "%2F"
+  char tzEncoded[64] = "";
+  const char* src = weatherTimezone.c_str();
+  size_t j = 0;
+  for (size_t i = 0; src[i] && j + 4 < sizeof(tzEncoded); i++) {
+    if (src[i] == '/') { tzEncoded[j++] = '%'; tzEncoded[j++] = '2'; tzEncoded[j++] = 'F'; }
+    else tzEncoded[j++] = src[i];
+  }
+  tzEncoded[j] = '\0';
+
   char urlBuf[320];
   snprintf(urlBuf, sizeof(urlBuf),
     "http://api.open-meteo.com/v1/forecast"
     "?latitude=%.4f&longitude=%.4f"
     "&current=temperature_2m,relative_humidity_2m,weather_code,pressure_msl,wind_speed_10m,is_day"
     "&daily=temperature_2m_max&hourly=weather_code"
-    "&timezone=Europe%%2FBerlin&forecast_days=4",
-    weatherLat, weatherLon);
+    "&timezone=%s&forecast_days=4",
+    weatherLat, weatherLon, tzEncoded);
 
   http.begin(client, urlBuf);
   http.setTimeout(8000);
@@ -525,7 +536,7 @@ bool weatherIsAvailable() {
   return weatherAvailable;
 }
 
-// ── 17×17 weather icons — aus LittleFS RGBA-Dateien ─────────────────────────
+// ── 17×17 weather icons — loaded from LittleFS RGBA files ───────────────────
 static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
   static const char* kNames[] = {
     "weather_0","weather_1","weather_2","weather_3","weather_4",
@@ -549,7 +560,7 @@ static void DrawWeatherIcon16(uint8_t idx, int x, int y) {
 }
 
 void weatherIconTest() {
-  // 11 Icons: Reihe 0 → Icons 0-5 (6×, Abstand 21px), Reihe 1 → Icons 6-10 (5×, Abstand 24px)
+  // 11 icons: row 0 → icons 0-5 (6×, 21px gap), row 1 → icons 6-10 (5×, 24px gap)
   ApplyBrightness(screensaverBrightness);
   display->ClearScreen();
   for (uint8_t i = 0; i < 6; i++) {
@@ -562,7 +573,7 @@ void weatherIconTest() {
 }
 
 void weatherSmallIconTest() {
-  // 11 Icons (scale=1, 8×8px) in einer Zeile: x=0,12,24,...120 — y zentriert (12)
+  // 11 icons (scale=1, 8×8px) in one row: x=0,12,24,...120 — y centered (12)
   ApplyBrightness(screensaverBrightness);
   display->ClearScreen();
   for (uint8_t i = 0; i < 11; i++) {
@@ -610,7 +621,7 @@ void weatherDisplayClock() {
   static int  lastCWMin         = -1;
   static int  lastCWHour        = -1;
   static bool lastWeatherAvail  = false;
-  if (!clockColorChanged &&
+  if (!forceClockRedraw &&
       timeinfo.tm_min  == lastCWMin  &&
       timeinfo.tm_hour == lastCWHour &&
       lastWeatherAvail == weatherAvailable) {
@@ -618,7 +629,7 @@ void weatherDisplayClock() {
       display->DrawPixel(53, y, 100, 100, 100);
     return;
   }
-  clockColorChanged = false;
+  forceClockRedraw = false;
   lastCWMin         = timeinfo.tm_min;
   lastCWHour        = timeinfo.tm_hour;
   lastWeatherAvail  = weatherAvailable;
@@ -673,7 +684,7 @@ void weatherDisplayClock() {
 
     if (negative) {
       if (absTemp >= 10) {
-        // Kerning: "1" hat ersten Pixel bei Slot+8 statt Slot+0 — Minus folgt nach
+        // Kerning: "1" starts at slot+8 instead of slot+0 — adjust minus position
         static const int8_t kLeftPad[10] = {0,6,0,0,0,0,0,0,0,0};
         int minusX = 72 + kLeftPad[absTemp / 10];
         for (int dx = 0; dx < 4; dx++)
@@ -681,7 +692,7 @@ void weatherDisplayClock() {
             display->DrawPixel(minusX + dx, 12 + dy, tR, tG, tB);
         DrawDigitAuto(77, 3, absTemp / 10, tR, tG, tB);
       } else {
-        // Minus rechtsbündig im Zehner-Slot (x=81), 1px vor dem Einer
+        // minus right-aligned in tens slot (x=81), 1px before the ones digit
         for (int dx = 0; dx < 4; dx++)
           for (int dy = 0; dy < 2; dy++)
             display->DrawPixel(81 + dx, 12 + dy, tR, tG, tB);
@@ -721,7 +732,7 @@ void weatherDisplayForecast() {
 
   static uint16_t lastFCode[3] = {0xFFFF, 0xFFFF, 0xFFFF};
   static int8_t   lastFTmax[3] = {-99, -99, -99};
-  bool changed = clockColorChanged;
+  bool changed = forceClockRedraw;
   for (int i = 0; i < 3; i++)
     if (lastFCode[i] != forecastCode[i] || lastFTmax[i] != forecastTempMax[i]) { changed = true; break; }
   if (!changed) {
@@ -731,7 +742,7 @@ void weatherDisplayForecast() {
     }
     return;
   }
-  clockColorChanged = false;
+  forceClockRedraw = false;
   for (int i = 0; i < 3; i++) { lastFCode[i] = forecastCode[i]; lastFTmax[i] = forecastTempMax[i]; }
 
   ApplyBrightness(screensaverBrightness);

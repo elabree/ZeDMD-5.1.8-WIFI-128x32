@@ -12,11 +12,31 @@
 
 extern void radioIconSlugsLoad();
 
+// ArduinoJson v6 custom allocator (duck-typed, no base class) routing preset-parsing
+// memory to PSRAM instead of the default internal-heap `new`/`delete` — keeps the
+// 6 KB preset document off internal SRAM, which is otherwise contended by WiFi/TCP
+// at boot. Used via BasicJsonDocument<SpiRamAllocator> below.
+struct SpiRamAllocator {
+  void* allocate(size_t size) {
+    return heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  }
+  void deallocate(void* pointer) {
+    heap_caps_free(pointer);
+  }
+  void* reallocate(void* ptr, size_t new_size) {
+    return heap_caps_realloc(ptr, new_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  }
+};
+
 static constexpr uint32_t RADIO_DISP_TRACK_MS   = 15000;
 static constexpr uint32_t RADIO_SWITCH_GRACE_MS  =  6000;
 static constexpr uint32_t RADIO_DISP_CONNECT_MS  = 30000;
 static constexpr uint32_t RADIO_DISP_PLAY_MS     = 20000;
 static constexpr uint32_t RADIO_DISP_MANUAL_MS   = 10000;
+static constexpr uint32_t SLOW_STREAM_TRIGGER_MS =  30000; // sustained before fallback
+static constexpr uint32_t SLOW_STREAM_RESET_MS   =   2000; // healthy gap resets timer
+static constexpr uint32_t FALLBACK_COOLDOWN_MS   = 180000; // 3 min between retries
+static constexpr uint8_t  FALLBACK_MAX_ATTEMPTS  =     3;  // per play-session
 
 static Audio audio;
 
@@ -45,19 +65,53 @@ static volatile bool switchingStation    = false;
 static char          gifAudioPath[256]   = "";
 static volatile bool gifAudioPending     = false;
 static volatile bool gifAudioStopPending = false;
+static volatile bool gifAudioLittleFS    = false;
 volatile bool        gifAudioPlaying     = false;
 // Grace timer: ignore EOF callbacks during connection setup
 // (playlist resolution and redirect fire EOF before the stream starts)
 static volatile uint32_t switchGraceUntil = 0;
 
+// Auto-fallback state (slow-stream detection)
+static char          currentPlayUrl[256]  = "";
+static volatile bool autoFallbackPending  = false;
+static uint32_t      slowStreamStartMs    = 0; // when current slow-stream run began
+static uint32_t      lastSlowStreamMs     = 0; // last time "slow stream" was seen
+static uint8_t       fallbackAttempts     = 0;
+static uint32_t      lastFallbackMs       = 0;
+
 extern void logMsg(const char* fmt, ...);
+extern void radioFallbackFailed(const char* stationName);
 
 // ── Callbacks from ESP32-audioI2S ─────────────────────────────────────────────
 
 void audio_info(const char* info) {
   if (!info) return;
+
+  // "slow stream" fires 1×/s and would flood the ring buffer — handle separately
+  // without logging individual occurrences.
+  if (strstr(info, "slow stream")) {
+    if (radioIsPlaying && !autoFallbackPending) {
+      uint32_t now = millis();
+      if (slowStreamStartMs == 0) {
+        slowStreamStartMs = now;
+        logMsg("[radio] slow stream started (fallback after %lu s sustained)",
+               (unsigned long)(SLOW_STREAM_TRIGGER_MS / 1000));
+      }
+      lastSlowStreamMs = now;
+      if ((now - slowStreamStartMs) >= SLOW_STREAM_TRIGGER_MS
+          && fallbackAttempts < FALLBACK_MAX_ATTEMPTS
+          && (lastFallbackMs == 0 || (now - lastFallbackMs) >= FALLBACK_COOLDOWN_MS)) {
+        slowStreamStartMs   = 0;
+        autoFallbackPending = true;
+        logMsg("[radio] auto-fallback triggered: %lu s sustained slow stream (#%d)",
+               (unsigned long)(SLOW_STREAM_TRIGGER_MS / 1000), (int)(fallbackAttempts + 1));
+      }
+    }
+    return; // never log individual slow-stream ticks
+  }
+
   logMsg("[audio] %s", info);
-  // audio_showstationname() does not fire for all streams — read ICY name directly from audio_info
+  // audio_showstationname() does not fire for all streams — read ICY name directly
   if (strncmp(info, "icy-name: ", 10) == 0 && info[10] && radioStringMutex) {
     if (xSemaphoreTake(radioStringMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
       strlcpy(radioStationName, info + 10, sizeof(radioStationName));
@@ -94,6 +148,14 @@ void audio_eof_stream(const char* info) {
   } else if ((int32_t)(switchGraceUntil - millis()) <= 0) {
     radioIsPlaying = false;
     logMsg("[radio] eof_stream: radioIsPlaying -> false");
+    // Stream dropped while slow-stream was active — trigger fallback immediately
+    if (slowStreamStartMs != 0 && !autoFallbackPending
+        && fallbackAttempts < FALLBACK_MAX_ATTEMPTS
+        && (lastFallbackMs == 0 || (millis() - lastFallbackMs) >= FALLBACK_COOLDOWN_MS)) {
+      slowStreamStartMs   = 0;
+      autoFallbackPending = true;
+      logMsg("[radio] eof_stream during slow stream — fallback triggered");
+    }
   } else {
     logMsg("[radio] eof_stream: ignoriert (Grace aktiv)");
   }
@@ -167,8 +229,9 @@ static void loadRadioSwap() {
 
 // ── HTTP redirect resolution ──────────────────────────────────────────────────
 // Follows exactly one HTTP 3xx redirect and returns the Location URL.
-// HTTPS redirects are ignored (TLS OOM on ESP32 with running decoder).
-// For HTTP URLs only — HTTPS inputs are not handled.
+// For HTTP input URLs only — HTTPS inputs go directly to audio.connecttohost().
+// HTTP→HTTPS redirects are followed: the resolved HTTPS URL is returned and
+// audio.connecttohost() handles TLS (mbedTLS buffers are in PSRAM).
 
 static size_t readHttpLine(WiFiClient& wc, char* buf, size_t maxLen, uint32_t deadline) {
   size_t n = 0;
@@ -226,7 +289,6 @@ static bool resolveOneRedirect(const char* url, char* out, size_t outLen) {
       if (strncasecmp(buf, "Location:", 9) == 0) {
         const char* loc = buf + 9;
         while (*loc == ' ') loc++;
-        if (strncmp(loc, "https://", 8) == 0) break; // ignore HTTPS redirect
         strlcpy(out, loc, outLen);
         found = true;
         break;
@@ -235,6 +297,109 @@ static bool resolveOneRedirect(const char* url, char* out, size_t outLen) {
   }
 
   wc.stop();
+  return found;
+}
+
+// ── Auto-fallback: query radio-browser.info for alternative stream ────────────
+// Tries up to 5 url_resolved values from radio-browser.info search results.
+// On first successful connecttohost(): writes URL to foundUrl and returns true.
+// On failure: foundUrl unchanged, returns false (caller reconnects to same URL).
+static bool fetchAndTryFallbacks(const char* stationName, char* foundUrl, size_t foundLen) {
+  if (!stationName || !stationName[0]) return false;
+
+  // 2-word search term, spaces encoded as +
+  char term[64] = {};
+  strncpy(term, stationName, sizeof(term) - 1);
+  int spaces = 0;
+  for (char* c = term; *c; c++) {
+    if (*c == ' ') {
+      if (++spaces >= 2) { *c = '\0'; break; }
+      *c = '+';
+    }
+  }
+
+  WiFiClient wc;
+  wc.setTimeout(5000);
+  if (!wc.connect("de1.api.radio-browser.info", 80)) {
+    logMsg("[radio] auto-fallback: radio-browser unreachable");
+    return false;
+  }
+  wc.printf("GET /json/stations/search?name=%s&codec=MP3&limit=5"
+            "&order=votes&reverse=true&hidebroken=true HTTP/1.0\r\n"
+            "Host: de1.api.radio-browser.info\r\nUser-Agent: TheArcade/1.0\r\n"
+            "Connection: close\r\n\r\n", term);
+
+  // Skip HTTP response headers
+  char line[256];
+  uint32_t dl = millis() + 5000;
+  while (millis() < dl) {
+    if (readHttpLine(wc, line, sizeof(line), dl) == 0) break;
+  }
+
+  // Read JSON body into PSRAM
+  const size_t BODY_CAP = 6144;
+  char* body = (char*)heap_caps_malloc(BODY_CAP, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (!body) { wc.stop(); return false; }
+  size_t pos = 0;
+  dl = millis() + 5000;
+  while (millis() < dl && pos < BODY_CAP - 1) {
+    int av = wc.available();
+    if (av > 0) {
+      pos += wc.readBytes(body + pos, min((size_t)av, BODY_CAP - 1 - pos));
+    } else if (!wc.connected()) {
+      break;
+    } else {
+      vTaskDelay(pdMS_TO_TICKS(2));
+    }
+  }
+  body[pos] = '\0';
+  wc.stop();
+  logMsg("[radio] auto-fallback: %u bytes from radio-browser (term='%s')", (unsigned)pos, term);
+
+  if (!pos) { heap_caps_free(body); return false; }
+
+  // Lightweight extraction of url_resolved values — no ArduinoJson needed
+  const char* p    = body;
+  bool        found = false;
+  int         tried = 0;
+  while (tried < 5) {
+    const char* key = strstr(p, "\"url_resolved\":\"");
+    if (!key) break;
+    const char* s = key + 16;
+    const char* e = strchr(s, '"');
+    if (!e) break;
+    size_t len = (size_t)(e - s);
+    p = e + 1;
+    tried++;
+    if (len == 0 || len >= 256) continue;
+    if (strncmp(s, "http", 4) != 0) continue;
+
+    char url[256];
+    memcpy(url, s, len);
+    url[len] = '\0';
+
+    // Downgrade https→http for fallback candidates — avoids double-SSL during
+    // the switchover where an extra socket from the radio-browser fetch is still
+    // in TIME_WAIT, which would push minEver to ~1800 bytes.
+    if (strncmp(url, "https://", 8) == 0) {
+      char tmp[256];
+      snprintf(tmp, sizeof(tmp), "http://%s", url + 8);
+      strlcpy(url, tmp, sizeof(url));
+    }
+
+    if (strcmp(url, foundUrl) == 0) continue; // skip current URL
+
+    logMsg("[radio] auto-fallback: trying '%s'", url);
+    bool ok = audio.connecttohost(url);
+    if (ok) {
+      strlcpy(foundUrl, url, foundLen);
+      found = true;
+      break;
+    }
+    vTaskDelay(pdMS_TO_TICKS(500));
+  }
+
+  heap_caps_free(body);
   return found;
 }
 
@@ -272,6 +437,11 @@ static void radioTask(void* params) {
       bool ok = audio.connecttohost(localUrl);
       logMsg("[radio] task: connecttohost=%d grace=%lu", (int)ok, switchGraceUntil);
       if (ok) {
+        strlcpy(currentPlayUrl, localUrl, sizeof(currentPlayUrl));
+        fallbackAttempts    = 0;   // reset per-session counter on manual connect
+        autoFallbackPending = false;
+        slowStreamStartMs   = 0;
+        lastSlowStreamMs    = 0;
         radioIsPlaying   = true;
         switchingStation = false;
         radioDisplayActive = true;
@@ -295,13 +465,71 @@ static void radioTask(void* params) {
     } else if (gifAudioPending) {
       gifAudioPending = false;
       if (!radioIsPlaying && !radioUserActive) {
-        audio.connecttoFS(SD, gifAudioPath);
+        if (gifAudioLittleFS) {
+          audio.connecttoFS(LittleFS, gifAudioPath);
+        } else {
+          audio.connecttoFS(SD, gifAudioPath);
+        }
         gifAudioPlaying = true;
+      }
+    } else if (autoFallbackPending && !connectPending) {
+      autoFallbackPending = false;
+      fallbackAttempts++;
+      lastFallbackMs    = millis();
+      slowStreamStartMs = 0;
+      lastSlowStreamMs  = 0;
+
+      char nameSnapshot[64] = {};
+      if (radioStringMutex && xSemaphoreTake(radioStringMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        strlcpy(nameSnapshot, radioStationName, sizeof(nameSnapshot));
+        xSemaphoreGive(radioStringMutex);
+      }
+      logMsg("[radio] auto-fallback #%d: searching for '%s'", (int)fallbackAttempts, nameSnapshot);
+
+      if (radioIsPlaying) {
+        audio.setVolume(0);
+        audio.stopSong();
+        radioIsPlaying = false;
+        vTaskDelay(pdMS_TO_TICKS(300));
+      }
+
+      // tryUrl starts as currentPlayUrl — fetchAndTryFallbacks overwrites on success
+      char tryUrl[256];
+      strlcpy(tryUrl, currentPlayUrl, sizeof(tryUrl));
+      bool found = fetchAndTryFallbacks(nameSnapshot, tryUrl, sizeof(tryUrl));
+      if (!found) {
+        logMsg("[radio] auto-fallback: no alternative found, reconnecting '%s'", tryUrl);
+        bool ok = audio.connecttohost(tryUrl);
+        if (ok) radioIsPlaying = true;
+        else    radioFallbackFailed(nameSnapshot);
+      } else {
+        strlcpy(currentPlayUrl, tryUrl, sizeof(currentPlayUrl));
+        radioIsPlaying = true;
+        logMsg("[radio] auto-fallback: now on '%s'", tryUrl);
+      }
+      if (radioIsPlaying) {
+        switchGraceUntil   = millis() + RADIO_SWITCH_GRACE_MS;
+        switchingStation   = false;
+        radioDisplayActive = true;
+        radioDisplayUntil  = millis() + RADIO_DISP_CONNECT_MS;
+        audio.setVolume(radioVolume);
+        audio.setTone(radioEqBass, radioEqMid, radioEqTreble);
+        audio.forceMono(radioMono);
+        audio.swapChannels(radioSwapChannels);
+      } else if (fallbackAttempts >= FALLBACK_MAX_ATTEMPTS) {
+        // All attempts exhausted — tell the user
+        radioFallbackFailed(nameSnapshot);
       }
     }
 
     if (radioIsPlaying || gifAudioPlaying) {
       audio.loop();
+      // Reset slow-stream timer when stream has been healthy for 2+ s
+      if (slowStreamStartMs != 0 && (millis() - lastSlowStreamMs) > SLOW_STREAM_RESET_MS) {
+        logMsg("[radio] slow stream ended (was %lu s)",
+               (unsigned long)((lastSlowStreamMs - slowStreamStartMs) / 1000));
+        slowStreamStartMs = 0;
+      }
       vTaskDelay(pdMS_TO_TICKS(1));
     } else {
       vTaskDelay(pdMS_TO_TICKS(50));
@@ -330,15 +558,16 @@ void radioInit() {
   static StaticTask_t radioTaskBuf;
   static StackType_t* radioStack = nullptr;
   if (!radioStack) {
-    radioStack = (StackType_t*)heap_caps_malloc(16384, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    radioStack = (StackType_t*)heap_caps_malloc(16384, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   }
   if (radioStack) {
     xTaskCreateStaticPinnedToCore(radioTask, "radioTask", 16384 / sizeof(StackType_t),
                                   NULL, 11, radioStack, &radioTaskBuf, 0);
-    logMsg("radioInit: stack=16KB PSRAM Core0");
+    logMsg("radioInit: stack=16KB SRAM Core0");
   } else {
-    xTaskCreatePinnedToCore(radioTask, "radioTask", 16384, NULL, 11, NULL, 0);
-    logMsg("radioInit: stack=16KB SRAM Core0 (PSRAM alloc failed)");
+    logMsg("radioInit: KRITISCH — kein SRAM fuer radioTask-Stack. Radio deaktiviert.");
+    // Never fall back to xTaskCreatePinnedToCore here: without MALLOC_CAP_INTERNAL the
+    // stack would land in PSRAM, causing a flash-cache assert on the first IRAM call.
   }
 }
 
@@ -359,13 +588,7 @@ void radioPlay(const char* url, int presetIndex) {
   }
   radioDisplayActive = true;
   radioDisplayUntil  = millis() + RADIO_DISP_PLAY_MS;
-  // TLS handshake occupies 30-40 KB of internal SRAM — OOM with running MP3 codec
-  if (strncmp(url, "https://", 8) == 0) {
-    snprintf(pendingUrl, sizeof(pendingUrl), "http://%s", url + 8);
-    logMsg("[radio] HTTPS → HTTP: \"%s\"", pendingUrl);
-  } else {
-    strlcpy(pendingUrl, url, sizeof(pendingUrl));
-  }
+  strlcpy(pendingUrl, url, sizeof(pendingUrl));
   __sync_synchronize();
   connectPending = true;
 }
@@ -379,6 +602,10 @@ void radioStop() {
   radioStationName[0] = '\0';
   radioTrackTitle[0]  = '\0';
   radioCurrentPreset  = -1;
+  autoFallbackPending = false;
+  fallbackAttempts    = 0;
+  slowStreamStartMs   = 0;
+  lastSlowStreamMs    = 0;
 }
 
 void radioSetVolume(uint8_t vol) {
@@ -402,8 +629,17 @@ void radioSetSwapChannels(bool swap) {
 }
 
 void radioPlayLocalFile(const char* sdPath) {
-  if (radioIsPlaying) return;  // stream takes priority
+  if (radioIsPlaying) return;
+  gifAudioLittleFS = false;
   strlcpy(gifAudioPath, sdPath, sizeof(gifAudioPath));
+  __sync_synchronize();
+  gifAudioPending = true;
+}
+
+void radioPlayLittleFSFile(const char* lfsPath) {
+  if (radioIsPlaying) return;
+  gifAudioLittleFS = true;
+  strlcpy(gifAudioPath, lfsPath, sizeof(gifAudioPath));
   __sync_synchronize();
   gifAudioPending = true;
 }
@@ -417,7 +653,7 @@ void radioStopLocalFile() {
 void radioLoadPresets() {
   File f = LittleFS.open("/radio_presets.json", "r");
   if (!f) return;
-  DynamicJsonDocument doc(6144);
+  BasicJsonDocument<SpiRamAllocator> doc(6144);
   if (deserializeJson(doc, f) == DeserializationError::Ok) {
     radioPresetCount = 0;
     for (JsonObject p : doc.as<JsonArray>()) {
@@ -560,15 +796,15 @@ void radioRegisterRoutes(AsyncWebServer* server) {
     String path = request->getParam("path", true)->value();
     if (path.startsWith("SD:")) path = path.substring(3);
     if (!path.startsWith("/") || (!path.endsWith(".mp3") && !path.endsWith(".MP3"))) {
-      request->send(400, "text/plain", "Ungültiger Pfad (erwartet /GifAudio/file.mp3)");
+      request->send(400, "text/plain", "Invalid path (expected /GifAudio/file.mp3)");
       return;
     }
     if (!SD.exists(path.c_str())) {
-      request->send(404, "text/plain", "Datei nicht gefunden");
+      request->send(404, "text/plain", "File not found");
       return;
     }
     if (radioIsPlaying) {
-      request->send(409, "text/plain", "Radio läuft — GIF-Audio hat keinen Vorrang");
+      request->send(409, "text/plain", "Radio playing — GIF audio takes no priority");
       return;
     }
     radioPlayLocalFile(path.c_str());
@@ -639,6 +875,12 @@ void radioRegisterRoutes(AsyncWebServer* server) {
     String name = request->getParam("name", true)->value();
     String url  = request->getParam("url",  true)->value();
     String icon = request->hasParam("icon", true) ? request->getParam("icon", true)->value() : "";
+    for (int i = 0; i < radioPresetCount; i++) {
+      if (url == radioPresets[i].url) {
+        request->send(409, "text/plain", "Duplicate URL");
+        return;
+      }
+    }
     strlcpy(radioPresets[radioPresetCount].name,     name.c_str(), sizeof(RadioPreset::name));
     strlcpy(radioPresets[radioPresetCount].url,      url.c_str(),  sizeof(RadioPreset::url));
     strlcpy(radioPresets[radioPresetCount].icon_url, icon.c_str(), sizeof(RadioPreset::icon_url));

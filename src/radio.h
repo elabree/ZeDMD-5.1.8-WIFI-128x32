@@ -49,8 +49,9 @@ void radioSetSwapChannels(bool swap);
 void radioLoadPresets();
 void radioSavePresets();
 void radioRegisterRoutes(AsyncWebServer* server);
-// GIF companion audio: plays a local SD MP3 (only when no stream is active)
+// GIF companion audio: plays a local SD or LittleFS file (only when no stream is active)
 void radioPlayLocalFile(const char* sdPath);
+void radioPlayLittleFSFile(const char* lfsPath);
 void radioStopLocalFile();
 
 #endif // WEBRADIO_ENABLED
