@@ -6,8 +6,8 @@
 	(paper "A4")
 	(title_block
 		(title "ZeDMD-WIFI-128x32")
-		(date "2026-09-04")
-		(rev "1.3")
+		(date "2026-09-19")
+		(rev "1.4")
 		(company "elabree")
 		(comment 1 "https://github.com/jens-b/The-Arcade")
 		(comment 2 "https://ppuc.github.io/docs/zedmd/")
@@ -3496,16 +3496,6 @@
 	)
 	(wire
 		(pts
-			(xy 156.21 38.1) (xy 156.21 55.88)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "52a2041c-d047-41e8-90e7-645b02b5a9c6")
-	)
-	(wire
-		(pts
 			(xy 229.87 102.87) (xy 238.76 102.87)
 		)
 		(stroke
@@ -3523,6 +3513,16 @@
 			(type default)
 		)
 		(uuid "5f7450a7-f008-41f6-a7d8-3a0f6429f0e8")
+	)
+	(wire
+		(pts
+			(xy 158.75 35.56) (xy 158.75 55.88)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "652a1f37-e815-43b8-9012-c8c636a346ce")
 	)
 	(wire
 		(pts
@@ -3816,6 +3816,16 @@
 	)
 	(wire
 		(pts
+			(xy 158.75 35.56) (xy 162.56 35.56)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a3e274aa-7628-4147-b67c-27a23014af2d")
+	)
+	(wire
+		(pts
 			(xy 63.5 121.92) (xy 101.6 121.92)
 		)
 		(stroke
@@ -3833,16 +3843,6 @@
 			(type default)
 		)
 		(uuid "a46348ac-cdea-44d8-8328-6b1d801c8543")
-	)
-	(wire
-		(pts
-			(xy 156.21 33.02) (xy 156.21 35.56)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "a4abc601-007f-472e-bc62-5821d1fa95f6")
 	)
 	(wire
 		(pts
@@ -3906,13 +3906,13 @@
 	)
 	(wire
 		(pts
-			(xy 156.21 35.56) (xy 162.56 35.56)
+			(xy 156.21 38.1) (xy 162.56 38.1)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "abb785a7-b9af-4b44-aa92-758f4b676219")
+		(uuid "acc688f5-66d5-424a-a5bd-77aaef52bcf1")
 	)
 	(wire
 		(pts
@@ -3933,16 +3933,6 @@
 			(type default)
 		)
 		(uuid "b06ad441-a640-41f6-8040-22d37b472f4a")
-	)
-	(wire
-		(pts
-			(xy 162.56 38.1) (xy 156.21 38.1)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "b4a216fa-bb00-4ca4-9aeb-6660ae1b434a")
 	)
 	(wire
 		(pts
@@ -4343,6 +4333,16 @@
 			(type default)
 		)
 		(uuid "edf868b8-12ce-4aba-b55f-6d153fa4417e")
+	)
+	(wire
+		(pts
+			(xy 156.21 33.02) (xy 156.21 38.1)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ee6e8598-ee9d-444e-86cb-d6717358cc6d")
 	)
 	(wire
 		(pts
@@ -8540,7 +8540,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 156.21 55.88 0)
+		(at 158.75 55.88 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -8551,7 +8551,7 @@
 		(fields_autoplaced yes)
 		(uuid "e379197c-9700-4fc0-b649-5e3a407bb2d2")
 		(property "Reference" "#PWR013"
-			(at 156.21 62.23 0)
+			(at 158.75 62.23 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8562,7 +8562,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 156.21 60.96 0)
+			(at 158.75 60.96 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8573,7 +8573,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 156.21 55.88 0)
+			(at 158.75 55.88 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8584,7 +8584,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 156.21 55.88 0)
+			(at 158.75 55.88 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8595,7 +8595,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 156.21 55.88 0)
+			(at 158.75 55.88 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
